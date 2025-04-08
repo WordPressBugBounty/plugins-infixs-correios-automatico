@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Core\Admin\WooCommerce;
 
 use Infixs\CorreiosAutomatico\Core\Support\Config;
+use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
 
 defined( 'ABSPATH' ) || exit;
@@ -34,6 +35,12 @@ class Tracking {
 		if ( Config::boolean( 'general.tracking_compatiblity' ) ) {
 			add_action( 'woocommerce_order_get__correios_tracking_code', [ $this, 'get_tracking_code' ], 10, 2 );
 		}
+
+		add_action( 'infixs_correios_automatico_prepost_controller_created', [ $this, 'manual_prepost_created' ], 10, 2 );
+	}
+
+	public function manual_prepost_created( $order_id, Prepost $prepost ) {
+		$this->trackingService->add( $order_id, $prepost->object_code );
 	}
 
 

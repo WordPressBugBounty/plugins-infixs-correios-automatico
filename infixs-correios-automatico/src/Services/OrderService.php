@@ -5,6 +5,8 @@ use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Entities\Order;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 

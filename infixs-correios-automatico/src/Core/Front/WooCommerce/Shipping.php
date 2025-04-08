@@ -71,7 +71,7 @@ class Shipping {
 		ob_start();
 
 		if ( is_product() ) {
-			$template = 'shipping-calculator.php';
+			$template = 'infixs-shipping-calculator.php';
 
 			wc_get_template(
 				$template,
@@ -108,6 +108,7 @@ class Shipping {
 
 		$postscode = sanitize_text_field( wp_unslash( $_POST['postcode'] ) );
 		$product_id = sanitize_text_field( wp_unslash( $_POST['product_id'] ) );
+		$quantity = isset( $_POST['quantity'] ) ? (int) wp_unslash( $_POST['quantity'] ) : 1;
 
 		$variation_id = isset( $_POST['variation_id'] ) ? sanitize_text_field( wp_unslash( $_POST['variation_id'] ) ) : null;
 
@@ -119,33 +120,33 @@ class Shipping {
 
 		$state = $this->shippingService->getStateByPostcode( $postscode );
 
-		WC()->shipping()->calculate_shipping(
+		$package = [];
 
-			[ 
-				[ 
-					'contents' => [ 
-						0 => [ 
-							'data' => $product,
-							'quantity' => 1,
-						],
-					],
-					'contents_cost' => $package_cost,
-					'applied_coupons' => false,
-					'user' => [ 
-						'ID' => get_current_user_id(),
-					],
-					'destination' => [ 
-						'country' => 'BR',
-						'state' => $state,
-						'postcode' => Sanitizer::numeric_text( $postscode ),
-						'city' => $address ? $address['city'] : '',
-						'address' => $address ? $address['address'] : '',
-					],
-					'cart_subtotal' => $package_cost,
-					'is_product_page' => true,
+		$package[0] = [ 
+			'contents' => [ 
+				0 => [ 
+					'data' => $product,
+					'quantity' => $quantity,
 				],
-			]
-		);
+			],
+			'contents_cost' => $package_cost,
+			'applied_coupons' => false,
+			'user' => [ 
+				'ID' => get_current_user_id(),
+			],
+			'destination' => [ 
+				'country' => 'BR',
+				'state' => $state,
+				'postcode' => Sanitizer::numeric_text( $postscode ),
+				'city' => $address ? $address['city'] : '',
+				'address' => $address ? $address['address'] : '',
+			],
+			'cart_subtotal' => $package_cost,
+			'is_product_page' => true,
+		];
+
+
+		WC()->shipping()->calculate_shipping( $package );
 
 
 		$packages = WC()->shipping()->get_packages();
@@ -162,11 +163,13 @@ class Shipping {
 		WC()->customer->save();
 
 
+		$current_package = reset( $packages );
+
 		wc_get_template(
-			'shipping-calculator-results.php',
+			'infixs-shipping-calculator-results.php',
 			[ 
 				'address' => $address,
-				'rates' => $packages[0]['rates'],
+				'rates' => $current_package['rates'],
 			],
 			'infixs-correios-automatico/',
 			\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'templates/'

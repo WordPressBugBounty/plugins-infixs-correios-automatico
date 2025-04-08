@@ -755,7 +755,7 @@ class ShippingService {
 	 * 			state: string,
 	 * 			postcode: string,
 	 * 			city: string,
-	 * 			address_1: string
+	 * 			address: string
 	 * } $address
 	 * 
 	 * @return \WC_Shipping_Method[]
@@ -764,7 +764,7 @@ class ShippingService {
 		$shipping_zone = \WC_Shipping_Zones::get_zone_matching_package(
 			[ 
 				'destination' => [ 
-					'address' => $address['address_1'] ?? '',
+					'address' => $address['address'] ?? '',
 					'country' => $address['country'] ?? '',
 					'state' => $address['state'] ?? '',
 					'postcode' => $address['postcode'] ?? '',
@@ -786,7 +786,7 @@ class ShippingService {
 	 * 			state: string,
 	 * 			postcode: string,
 	 * 			city: string,
-	 * 			address_1: string
+	 * 			address: string
 	 * } $address
 	 * 
 	 * @return CorreiosShippingMethod[]

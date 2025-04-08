@@ -125,7 +125,7 @@ class TrackingController {
 	public function list( $request ) {
 		$params = $request->get_params();
 
-		//$tracking_codes = Container::trackingService()->get( $params['order_id'] );
+		$tracking_codes = $this->trackingService->list();
 
 		return rest_ensure_response( [ 
 			"status" => "success",

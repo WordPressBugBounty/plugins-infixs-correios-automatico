@@ -260,7 +260,7 @@ class ShippingController {
 			'country' => $data['country'] ?? 'BR',
 			'state' => $data['state'] ?? '',
 			'city' => $data['city'] ?? '',
-			'address_1' => $data['address_1'] ?? '',
+			'address' => $data['address'] ?? '',
 			'postcode' => $data['postcode'] ?? '',
 		] );
 

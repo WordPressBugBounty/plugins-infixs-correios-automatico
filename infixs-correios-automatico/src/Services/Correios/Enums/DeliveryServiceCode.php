@@ -11,8 +11,12 @@ class DeliveryServiceCode {
 	public const SEDEX_12 = '04782';
 	public const SEDEX_HOJE = '04804';
 	public const PAC_CONTRATO_AG = '03298';
+	public const PAC_CONTRATO_AG_CC = '03085';
+	public const PAC_CONTRATO_AG_TA = '04596';
 	public const PAC_CONTRATO_AG_VAREJO = '04669';
 	public const SEDEX_CONTRATO_AG = '03220';
+	public const SEDEX_CONTRATO_AG_TA = '04553';
+	public const SEDEX_CONTRATO_AG_CC = '03050';
 	public const SEDEX_CONTRATO_AG_VAREJO = '04162';
 	public const SEDEX_10_CONTRATO_AG = '03158';
 	public const SEDEX_12_CONTRATO_AG = '03140';
@@ -55,9 +59,13 @@ class DeliveryServiceCode {
 	private static $descriptions = [ 
 		self::PAC => 'PAC (Sem Contrato)',
 		self::PAC_CONTRATO_AG => 'PAC (Contrato Agência)',
+		self::PAC_CONTRATO_AG_CC => 'PAC CC (Contrato Agência CC)',
+		self::PAC_CONTRATO_AG_TA => 'PAC TA (Contrato Agência TA)',
 		self::PAC_CONTRATO_AG_VAREJO => 'PAC (Contrato Agência Varejo)',
 		self::SEDEX => 'SEDEX (Sem Contrato)',
 		self::SEDEX_CONTRATO_AG => 'SEDEX (Contrato Agência)',
+		self::SEDEX_CONTRATO_AG_CC => 'SEDEX CC (Contrato Agência CC)',
+		self::SEDEX_CONTRATO_AG_TA => 'SEDEX TA (Contrato Agência TA)',
 		self::SEDEX_CONTRATO_AG_VAREJO => 'SEDEX (Contrato Agência Varejo)',
 		self::SEDEX_10 => 'SEDEX 10 (Sem Contrato)',
 		self::SEDEX_10_CONTRATO_AG => 'SEDEX 10 (Contrato Agência)',

@@ -80,6 +80,15 @@ class CeintCode {
 		];
 	}
 
+	public static function getCeintsOptions() {
+		$ceints = self::getCeints();
+		$options = [];
+		foreach ( $ceints as $ceint ) {
+			$options[ $ceint['id'] ] = $ceint['name'];
+		}
+		return $options;
+	}
+
 	/**
 	 * Get the ceint by id.
 	 * 
@@ -87,10 +96,10 @@ class CeintCode {
 	 * 
 	 * @return array|null
 	 */
-	public static function getCeintById( int $id ) {
+	public static function getCeintById( $id ) {
 		$ceints = self::getCeints();
 		foreach ( $ceints as $ceint ) {
-			if ( $ceint['id'] === $id ) {
+			if ( $ceint['id'] == $id ) {
 				return $ceint;
 			}
 		}

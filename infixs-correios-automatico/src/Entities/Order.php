@@ -432,6 +432,10 @@ class Order {
 		];
 	}
 
+	public function getShippingItemsData() {
+		return $this->shipping_items;
+	}
+
 	public function toArray() {
 		$address = $this->getAddress()->toArray();
 		$customer = $this->getCustomer()->toArray();
@@ -479,13 +483,16 @@ class Order {
 			'email_preparing_sent' => $this->order->get_meta( '_infixs_correios_automatico_email_preparing_sent', true ) ?: null,
 			'customer' => $customer,
 			'created_at' => $this->order->get_date_created()->date( 'Y-m-d H:i:s' ),
+			'preposts' => []
 		];
 
 
-		$prepost = Prepost::where( 'order_id', $this->order->get_id() )->orderBy( "created_at", "desc" )->first();
+		$preposts = Prepost::where( 'order_id', $this->order->get_id() )->orderBy( "created_at", "desc" )->get();
 
-		if ( $prepost ) {
-			$data['prepost'] = Container::prepostService()->prepareData( $prepost );
+		if ( $preposts ) {
+			foreach ( $preposts->all() as $prepost ) {
+				$data['preposts'][] = Container::prepostService()->prepareData( $prepost );
+			}
 		}
 
 		$tracking_codes = $this->getTrackingCodes();

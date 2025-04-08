@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -37,7 +37,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Compatibilidade com Multisites** - Plugin totalmente compatível com Wordpress Multisites mesmo na versão free.
 - **Compatibilidade com Melhor Envio** - Utilize esse plugin em conjunto com o Melhor Envio, substituindo apenas o método de envio dos correios.
 - **Compatibilidade com Envio Simples** - Utilize esse plugin em conjunto com o Envio Simples, substituindo apenas o método de envio dos correios.
-- **Compatibilidade com Envio FreeNet** - Utilize esse plugin em conjunto com o FreeNet, substituindo apenas o método de envio dos correios.
+- **Compatibilidade com Envio FreNet** - Utilize esse plugin em conjunto com o FreNet, substituindo apenas o método de envio dos correios.
 - **Moderno e robusto** - Nosso plugin usa a ultima geração de plugins do wordpress, com interface moderna, robusta e fácil de usar, incluindo varios recursos em um só plugin.
 
 = 💎 Recursos PRO =
@@ -127,6 +127,13 @@ Entre em contato conosco pelo Whatsapp, o número está no botão suporte dentro
 Apesar de não ser obrigatório para usar o plugin, recomendamos muito que você tenha um contrato com os correios, pois alguns recursos do plugin Correios Automático precisam do contrato para funcionar melhor. Para obter um contrato com os correios, entre em contato com nosso suporte dentro do plugin para nossa equipe te ajudar!
 
 == Changelog ==
+
+= 1.5.1 =
+* Novos recursos dos correios
+* Correções de Bug
+
+= 1.5.0 =
+* Novos recursos dos correios
 
 = 1.4.7 =
 * Novos recursos dos correios

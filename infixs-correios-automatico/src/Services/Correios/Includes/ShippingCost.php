@@ -304,6 +304,11 @@ class ShippingCost {
 			$data['servicosAdicionais'][] = AddicionalServiceCode::MODICO;
 		}
 
+		if ( $this->getProductCode() === DeliveryServiceCode::PAC_CONTRATO_GRANDE_FORMATO
+			|| $this->getProductCode() === DeliveryServiceCode::SEDEX_CONTRATO_GRANDE_FORMATO ) {
+			$data['servicosAdicionais'][] = AddicionalServiceCode::BIG_FORMATS;
+		}
+
 		$declaration_value = $this->getInsuranceDeclarationValue();
 
 		if ( $declaration_value && $this->areDeclarationWithinLimits() ) {

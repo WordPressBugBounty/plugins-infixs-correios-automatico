@@ -61,6 +61,7 @@ class WCIntegration {
 		new Email();
 		new Rest( $trackingService );
 		new OrderTrackingColumn( $trackingService );
+		new Checkout();
 
 		$this->actions();
 		$this->filters();

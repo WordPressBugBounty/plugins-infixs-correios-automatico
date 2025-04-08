@@ -315,6 +315,15 @@ class TrackingService {
 		return $this->trackingRepository->findBy( [ 'order_id' => $order_id ], $config );
 	}
 
+	public function getByUnit( $unit_id ) {
+		return $this->trackingRepository->paginate( [ 
+			'relations' => [ 'events' ],
+			'where' => [ 'unit_id' => $unit_id ],
+		],
+			[ $this, 'prepare_tracking_data' ]
+		);
+	}
+
 	/**
 	 * Sync remote tracking code.
 	 * 
@@ -632,4 +641,31 @@ class TrackingService {
 
 		return $this->correiosService->suspend_shipping( $tracking->code );
 	}
+
+	/**
+	 * Remove unit tracking.
+	 * 
+	 * @since 1.5.0
+	 * 
+	 * @param int $unit_id Unit ID.
+	 * @param int $tracking_id Tracking ID.
+	 * 
+	 * @return bool
+	 */
+	public function removeUnit( $unit_id, $tracking_id ) {
+		$tracking = $this->trackingRepository->retrieve( $tracking_id );
+
+		if ( ! $tracking ) {
+			return false;
+		}
+
+		if ( $tracking->unit_id != $unit_id ) {
+			return false;
+		}
+
+		$tracking->unit_id = null;
+
+		return $tracking->save();
+	}
+
 }

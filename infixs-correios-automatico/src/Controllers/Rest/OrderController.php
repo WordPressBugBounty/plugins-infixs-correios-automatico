@@ -106,10 +106,6 @@ class OrderController {
 
 		$params = $request->get_json_params();
 
-		if ( ! isset( $params['orders'] ) ) {
-			return new \WP_Error( 'missing_order_id', 'Order ID is required.', [ 'status' => 400 ] );
-		}
-
 		if ( empty( $params['orders'] ) ) {
 			return new \WP_Error( 'empty_order_id', 'Order ID is not empty.', [ 'status' => 400 ] );
 		}
@@ -231,4 +227,85 @@ class OrderController {
 		] );
 	}
 
+
+	/**
+	 * Unitizer orders
+	 * 
+	 * @since 1.3.7
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function unit( $request ) {
+		$params = $request->get_json_params();
+
+		if ( empty( $params['orders'] ) ) {
+			return new \WP_Error( 'empty_order_id', 'Order ID is not empty.', [ 'status' => 400 ] );
+		}
+
+		$updated_orders = [];
+
+		foreach ( $params['orders'] as $order_id ) {
+			$created = Container::unitService()->unitPacketByOrder( $order_id );
+			if ( ! is_wp_error( $created ) ) {
+				$updated_orders[] = $order_id;
+			}
+		}
+
+		return rest_ensure_response( [ 
+			'status' => 'success',
+			'updated_orders' => $updated_orders,
+		] );
+	}
+
+	/**
+	 * Delete prepost from order.
+	 * 
+	 * @since 1.5.1
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+
+	public function delete_prepost( $request ) {
+		$order_id = $request->get_param( 'id' );
+		$prepost_id = $request->get_param( 'prepost_id' );
+
+		if ( ! $order_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_invalid_order_id', __( 'Invalid order ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		if ( ! $prepost_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_invalid_prepost_id', __( 'Invalid prepost ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			return new \WP_Error( 'order_not_found', 'Pedido não encontrado.', [ 'status' => 404 ] );
+		}
+
+		$prepost = Container::prepostService()->getPrepost( $prepost_id );
+
+		if ( ! $prepost ) {
+			return new \WP_Error( 'prepost_not_found', 'Pré-postagem não encontrada.', [ 'status' => 404 ] );
+		}
+
+		$response = Container::prepostService()->cancelPrepost( $prepost_id );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$order->delete_meta_data( '_infixs_correios_automatico_prepost_id' );
+		$order->delete_meta_data( '_infixs_correios_automatico_prepost_created' );
+		$order->save();
+
+
+		return rest_ensure_response( [ 
+			'status' => 'success',
+		] );
+	}
 }

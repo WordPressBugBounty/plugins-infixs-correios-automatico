@@ -47,8 +47,11 @@ class SettingsAuthController {
 			}
 
 			$environment = sanitize_text_field( $data['environment'] );
+			$user_name = trim( sanitize_text_field( $data['user_name'] ) );
+			$access_code = trim( sanitize_text_field( $data['access_code'] ) );
+			$postcard = trim( sanitize_text_field( $data['postcard'] ) );
 
-			$postcard_response = Container::correiosService()->auth_postcard( $data['user_name'], $data['access_code'], $data['postcard'], $environment );
+			$postcard_response = Container::correiosService()->auth_postcard( $user_name, $access_code, $postcard, $environment );
 			if ( is_wp_error( $postcard_response ) ) {
 				return $postcard_response;
 			}
@@ -65,9 +68,9 @@ class SettingsAuthController {
 
 			$contract_settings = [ 
 				'environment' => $environment,
-				'user_name' => sanitize_text_field( $data['user_name'] ),
-				'access_code' => sanitize_text_field( $data['access_code'] ),
-				'postcard' => sanitize_text_field( $data['postcard'] ),
+				'user_name' => $user_name,
+				'access_code' => $access_code,
+				'postcard' => $postcard,
 				'token' => $postcard_response['token'],
 				'allowed_services' => $allowed_services ?? [],
 				'contract_number' => sanitize_text_field( isset( $postcard_response['cartaoPostagem']['contrato'] ) ? $postcard_response['cartaoPostagem']['contrato'] : '' ),

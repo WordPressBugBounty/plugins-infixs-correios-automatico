@@ -15,6 +15,8 @@ class AddicionalServiceCode {
 
 	public const INSURANCE_DECLARATION_MINI_ENVIOS = '065';
 
+	public const BIG_FORMATS = '057';
+
 	private static $descriptions = [ 
 		self::RECEIPT_NOTICE => 'Aviso de Recebimento',
 		self::OWN_HANDS => 'Mão Própria',
@@ -22,6 +24,7 @@ class AddicionalServiceCode {
 		self::INSURANCE_DECLARATION_SEDEX => 'Declaração de Valor Sedex',
 		self::INSURANCE_DECLARATION_PAC => 'Declaração de Valor PAC',
 		self::INSURANCE_DECLARATION_MINI_ENVIOS => 'Declaração de Valor Mini Envios',
+		self::BIG_FORMATS => 'Grandes Formatos',
 	];
 
 	/**

@@ -2,11 +2,13 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Admin;
 use Infixs\CorreiosAutomatico\Container;
+use Infixs\CorreiosAutomatico\Core\Admin\Dokan\Dokan;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\OrderTrackingColumn;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\WCIntegration;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Plugin;
 use Infixs\CorreiosAutomatico\Core\Support\Template;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
 
@@ -49,6 +51,14 @@ class Admin {
 	private $woocommerce;
 
 	/**
+	 * Dokan Integration class
+	 * 
+	 * @since 1.5.1
+	 * @var Dokan
+	 */
+	private $dokan;
+
+	/**
 	 * Admin constructor.
 	 * 
 	 * @since 1.0.0
@@ -57,6 +67,7 @@ class Admin {
 		$this->infixsApi = $infixsApi;
 		$this->rest_routes = Container::routes();
 		$this->woocommerce = new WCIntegration();
+		$this->dokan = new Dokan();
 		$this->dashboard = new Dashboard();
 
 		$this->actions();
@@ -226,6 +237,7 @@ class Admin {
 			'restUrl' => Container::routes()->get_rest_url(),
 			'resourcesUrl' => \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/dashboard',
 			'nonce' => wp_create_nonce( 'wp_rest' ),
+			'ceints' => CeintCode::getCeintsOptions()
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {

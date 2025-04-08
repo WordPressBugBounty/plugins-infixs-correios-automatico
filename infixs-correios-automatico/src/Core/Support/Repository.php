@@ -27,8 +27,52 @@ class Repository {
 		return $this->modelClass::create( $data );
 	}
 
-	public function find( $id ) {
-		return $this->modelClass::find( $id );
+	public function findById( $id, $options = [] ) {
+		$query = $this->modelClass::query();
+
+		if ( isset( $options['relations'] ) ) {
+			foreach ( $options['relations'] as $relation ) {
+				$query = $query->with( $relation );
+			}
+		}
+
+		return $query->where( 'id', $id )->first();
+	}
+
+	public function find( $options = [] ) {
+		$query = $this->modelClass::query();
+
+		if ( isset( $options['where'] ) ) {
+			foreach ( $options['where'] as $key => $value ) {
+				$query = $query->where( $key, $value );
+			}
+		}
+
+		if ( isset( $options['relations'] ) ) {
+			foreach ( $options['relations'] as $relation ) {
+				$query = $query->with( $relation );
+			}
+		}
+
+		return $query->get();
+	}
+
+	public function findOne( $options = [] ) {
+		$query = $this->modelClass::query();
+
+		if ( isset( $options['where'] ) ) {
+			foreach ( $options['where'] as $key => $value ) {
+				$query = $query->where( $key, $value );
+			}
+		}
+
+		if ( isset( $options['relations'] ) ) {
+			foreach ( $options['relations'] as $relation ) {
+				$query = $query->with( $relation );
+			}
+		}
+
+		return $query->first();
 	}
 
 	public function count() {
@@ -48,6 +92,7 @@ class Repository {
 	 *          order_by: string,
 	 *          order: string,
 	 *          relations: array
+	 * 			where: array
 	 * } $params
 	 * @param  callable|null  $map_data
 	 * 
@@ -61,8 +106,22 @@ class Repository {
 
 		$offset = ( $current_page - 1 ) * $per_page;
 
-		$total_items = $this->count();
-		$query = $this->modelClass::query()->offset( $offset )->limit( $per_page );
+		$query = $this->modelClass::query();
+		if ( isset( $params['where'] ) ) {
+			foreach ( $params['where'] as $key => $value ) {
+				$query = $query->where( $key, $value );
+			}
+		}
+
+		if ( isset( $params['whereIn'] ) ) {
+			foreach ( $params['whereIn'] as $key => $value ) {
+				$query = $query->whereIn( $key, $value );
+			}
+		}
+
+		$total_items = $query->count();
+
+		$query = $query->offset( $offset )->limit( $per_page );
 		$relations = $params['relations'] ?? [];
 		foreach ( $relations as $relation ) {
 			$query = $query->with( $relation );

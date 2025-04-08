@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico;
 
+use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\Unit;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
@@ -53,7 +54,7 @@ class Container {
 		$this->container = new PimpleContainer();
 		$this->container['routes'] = fn() => new RestRoutes();
 
-		$this->container['trackingRepository'] = fn() => new TrackingRepository();
+		$this->container['trackingRepository'] = fn() => new TrackingRepository( TrackingCode::class);
 		$this->container['configRepository'] = fn() => new ConfigRepository();
 		$this->container['logRepository'] = fn( $c ) => new LogRepository( $c['configRepository'] );
 		$this->container['prepostRepository'] = fn() => new PrepostRepository();

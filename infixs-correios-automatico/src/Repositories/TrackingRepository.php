@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Repositories;
 
+use Infixs\CorreiosAutomatico\Core\Support\Repository;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 
 defined( 'ABSPATH' ) || exit;
@@ -12,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * @package Infixs\CorreiosAutomatico
  * @since   1.0.0
  */
-class TrackingRepository {
+class TrackingRepository extends Repository {
 
 	/**
 	 * Create a tracking code.

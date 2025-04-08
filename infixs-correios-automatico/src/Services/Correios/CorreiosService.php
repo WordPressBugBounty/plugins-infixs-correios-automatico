@@ -275,4 +275,28 @@ class CorreiosService {
 	public function suspend_shipping( $tracking_code ) {
 		return $this->correiosApi->suspenderEntrega( $tracking_code );
 	}
+
+	/**
+	 * Register packet unit
+	 * 
+	 * @param array {
+	 * 			dispatchNumber: int,
+	 * 			originCountry: string,
+	 * 			originOperatorName: string,
+	 * 			destinationOperatorName:: string,
+	 * 			postalCategoryCode: string,
+	 * 			serviceSubclassCode: string,
+	 * 			unitList: array {
+	 * 				sequence: number,
+	 * 				unitType: number,
+	 * 				weightKg: number,
+	 *				trackingNumbers: string[]
+	 * 			}
+	 * } $data
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function register_packet_unit( $data ) {
+		return $this->correiosApi->registerPacketUnit( $data );
+	}
 }

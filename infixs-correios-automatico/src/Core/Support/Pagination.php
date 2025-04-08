@@ -49,7 +49,7 @@ class Pagination {
 	public function __construct( $currentPage, $totalItems, $itemsPerPage, $items ) {
 		$this->currentPage = $currentPage;
 		$this->totalItems = $totalItems;
-		$this->itemsPerPage = $itemsPerPage;
+		$this->itemsPerPage = (int) $itemsPerPage;
 		$this->items = $items;
 	}
 

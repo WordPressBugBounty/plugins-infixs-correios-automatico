@@ -62,6 +62,6 @@ class APIServiceCode {
 	 * @return string
 	 */
 	public static function getDescription( $item ) {
-		return self::$descriptions[ $item ] ?? 'Serviço desconhecido';
+		return self::$descriptions[ $item ] ?? "Desconhecido ($item)";
 	}
 }

@@ -41,8 +41,14 @@ class SettingsLabelController {
 	public function saveProfile( $request ) {
 		$data = $request->get_json_params();
 
+		if ( empty( $data['id'] ) ) {
+			return new \WP_Error( 'missing_profile_id', 'Profile ID is required.', [ 'status' => 400 ] );
+		}
+
+		$profile_id = $data['id'];
+
 		if ( ! empty( $data ) ) {
-			Config::update( 'label.profiles.default', $data );
+			Config::update( "label.profiles.$profile_id", $data );
 			Log::debug( 'Configurações de impressão de etiqueta foram salvas' );
 		}
 
@@ -62,7 +68,9 @@ class SettingsLabelController {
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function getProfile( $request ) {
-		$profile = Config::get( 'label.profiles.default' );
+		$profile_id = $request->get_param( 'id' ) ?? 'default';
+
+		$profile = Config::get( "label.profiles.$profile_id" );
 
 		$response = [ 
 			'status' => 'success',
@@ -180,15 +188,16 @@ class SettingsLabelController {
 	 */
 	public function prepare_data( $profile ) {
 		if ( isset( $profile['withDeclaration'] ) ) {
-			$profile['withDeclaration'] = Config::boolean( $profile['withDeclaration'] );
+			$profile['withDeclaration'] = Sanitizer::boolean( $profile['withDeclaration'] );
 		}
 
-		if ( ! isset( $profile['page'], $profile['page']['items_gap_x'] ) ) {
-			$profile['page']['items_gap_x'] = $profile['page']['items_gap'];
-		}
-
-		if ( ! isset( $profile['page'], $profile['page']['items_gap_y'] ) ) {
-			$profile['page']['items_gap_y'] = $profile['page']['items_gap'];
+		if ( isset( $profile['page'], $profile['page']['items_gap'] ) ) {
+			if ( ! isset( $profile['page'], $profile['page']['items_gap_x'] ) ) {
+				$profile['page']['items_gap_x'] = $profile['page']['items_gap'];
+			}
+			if ( ! isset( $profile['page'], $profile['page']['items_gap_y'] ) ) {
+				$profile['page']['items_gap_y'] = $profile['page']['items_gap'];
+			}
 		}
 
 		if ( isset( $profile['page'], $profile['page']['page_margin'] ) ) {

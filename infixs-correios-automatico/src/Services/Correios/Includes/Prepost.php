@@ -285,8 +285,12 @@ class Prepost {
 			$product_price = floatval( $item->get_subtotal() );
 			$product = $item->get_product();
 
+			if ( $product && ! $product->needs_shipping() ) {
+				continue;
+			}
+
 			if ( $product_price <= 0 ) {
-				$product_price = floatval( $product->get_price() );
+				$product_price = $product ? floatval( $product->get_price() ) : 1;
 
 				if ( $product_price <= 0 ) {
 					$product_price = 1;
@@ -294,7 +298,7 @@ class Prepost {
 			}
 
 			$this->content_items[] = [ 
-				'ncm' => $product->get_meta( '_infixs_correios_automatico_ncm' ),
+				'ncm' => $product ? $product->get_meta( '_infixs_correios_automatico_ncm' ) : '',
 				'content' => $item->get_name(),
 				'quantity' => strval( $item->get_quantity() ),
 				'total' => strval( $product_price )

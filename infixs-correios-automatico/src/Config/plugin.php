@@ -7,7 +7,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 		'general' => [ 
 			'autofill_address' => 'yes',
 			'calculate_shipping_product_page' => 'yes',
-			'calculate_shipping_product_page_position' => 'meta_start',
+			'calculate_shipping_product_page_position' => 'description_before',
 			'show_order_tracking_form' => 'yes',
 			'show_order_label_form' => 'yes',
 			'show_order_prepost_form' => 'yes',
@@ -74,6 +74,9 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'profiles' => [ 
 				'default' => [ 
 					"id" => "default",
+				],
+				'unit' => [ 
+					"id" => "unit"
 				]
 			]
 		],

@@ -339,11 +339,43 @@ class RestRoutes {
 			}
 		] );
 
-		$unit_controller = new UnitController( Container::unitService() );
+		$unit_controller = new UnitController( Container::unitService(), Container::trackingService() );
 
 		register_rest_route( $this->namespace, '/units', [ 
 			'methods' => \WP_REST_Server::READABLE,
 			'callback' => [ $unit_controller, 'list' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/units/(?P<id>\d+)', [ 
+			'methods' => \WP_REST_Server::EDITABLE,
+			'callback' => [ $unit_controller, 'update' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/units/(?P<id>\d+)/trackings', [ 
+			'methods' => \WP_REST_Server::READABLE,
+			'callback' => [ $unit_controller, 'trackings' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/units/(?P<id>\d+)/register', [ 
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $unit_controller, 'register' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/units/(?P<id>\d+)/trackings/(?P<tracking_id>\d+)', [ 
+			'methods' => \WP_REST_Server::DELETABLE,
+			'callback' => [ $unit_controller, 'remove_tracking' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}
@@ -363,6 +395,14 @@ class RestRoutes {
 		register_rest_route( $this->namespace, '/orders/batch', [ 
 			'methods' => \WP_REST_Server::EDITABLE,
 			'callback' => [ $order_controller, 'batch_update' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/orders/units', [ 
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $order_controller, 'unit' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}
@@ -395,6 +435,14 @@ class RestRoutes {
 		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/attach-range', [ 
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => [ $order_controller, 'attach_range' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/preposts/(?P<prepost_id>\d+)', [ 
+			'methods' => \WP_REST_Server::DELETABLE,
+			'callback' => [ $order_controller, 'delete_prepost' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}

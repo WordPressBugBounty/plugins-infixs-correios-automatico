@@ -859,6 +859,8 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			return;
 		}
 
+		//update_user_meta( $store_id, 'dokan_profile_settings', $dokan_settings );
+
 		$origin_postcode = Sanitizer::numeric_text( apply_filters( "infixs_correios_automatico_calculate_shipping_origin_postcode", $this->origin_postcode, $package, $this ) );
 		$destination_postcode = Sanitizer::numeric_text( $package['destination']['postcode'] );
 		$destination_country = sanitize_text_field( $package['destination']['country'] );

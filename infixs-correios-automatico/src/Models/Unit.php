@@ -17,9 +17,10 @@ defined( 'ABSPATH' ) || exit;
  * 
  * @property int $id
  * @property string $dispatch_number
- * @property int $ceint_id
+ * @property int|null $ceint_id
  * @property string $unit_code
  * @property \Infixs\WordpressEloquent\Collection $codes
+ * @property string $unit_code
  * @property string $service_code
  * @property string $status
  * @property string $origin_country

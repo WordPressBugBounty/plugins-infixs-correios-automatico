@@ -377,4 +377,11 @@ class CorreiosApi {
 			[]
 		);
 	}
+
+	public function registerPacketUnit( $data ) {
+		return $this->authenticated_post(
+			"packet/v1/units",
+			$data
+		);
+	}
 }
