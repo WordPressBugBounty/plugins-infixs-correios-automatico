@@ -36,6 +36,10 @@ class Tracking {
 			add_action( 'woocommerce_order_get__correios_tracking_code', [ $this, 'get_tracking_code' ], 10, 2 );
 		}
 
+		if ( ! class_exists( 'WC_Correios' ) ) {
+			add_action( 'woocommerce_order_get_correios_tracking_code', [ $this, 'get_tracking_code' ], 10, 2 );
+		}
+
 		add_action( 'infixs_correios_automatico_prepost_controller_created', [ $this, 'manual_prepost_created' ], 10, 2 );
 	}
 

@@ -238,6 +238,14 @@ class Package {
 	 * @return array
 	 */
 	protected function get_cubage( $height, $width, $length ) {
+		if ( count( $height ) === 1 && count( $width ) === 1 && count( $length ) === 1 ) {
+			return [ 
+				'height' => $height[0],
+				'width' => $width[0],
+				'length' => $length[0],
+			];
+		}
+
 		$cubage = [];
 		$max_values = $this->get_max_values( $height, $width, $length );
 		$root = $this->calculate_root( $height, $width, $length, $max_values );

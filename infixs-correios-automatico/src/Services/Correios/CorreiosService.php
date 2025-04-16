@@ -123,9 +123,14 @@ class CorreiosService {
 	 * @return array|\WP_Error
 	 */
 	public function calculate_shipping_cost( $data, $shipping_cost, $adicional_services = [] ) {
+		$product_code = $shipping_cost->getProductCode();
+		$data = $shipping_cost->getData();
+
+		Log::debug( "Shipping cost correios api with code $product_code", $data );
+
 		return $this->correiosApi->precoNacional(
-			$shipping_cost->getProductCode(),
-			$shipping_cost->getData()
+			$product_code,
+			$data
 		);
 	}
 

@@ -318,14 +318,14 @@ class RestRoutes {
 		] );
 
 		/**
-		 * Delete prepost from order is DEPRECATED use prepost cancel.
+		 * Delete prepost from order
 		 * 
 		 * @since 1.0.0
 		 * @deprecated
 		 */
 		register_rest_route( $this->namespace, '/preposts/(?P<id>\d+)', [ 
 			'methods' => \WP_REST_Server::DELETABLE,
-			'callback' => [ $prepost_controller, 'deleteFromOrder' ],
+			'callback' => [ $prepost_controller, 'delete' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}

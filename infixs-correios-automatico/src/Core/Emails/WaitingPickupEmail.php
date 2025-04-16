@@ -69,7 +69,9 @@ class WaitingPickupEmail extends \WC_Email {
 	public function get_default_message() {
 		return __( 'Olá. Sua encomenda do site {site_title} está aguardando a retirada na agência dos correios.', 'infixs-correios-automatico' )
 			. PHP_EOL . ' ' . PHP_EOL
-			. __( 'Segue o endereço para retirada para do objeto {tracking_code}: {pickup_address}', 'infixs-correios-automatico' )
+			. __( 'Segue o endereço para retirada do objeto {tracking_code}:', 'infixs-correios-automatico' )
+			. PHP_EOL . ' ' . PHP_EOL
+			. __( '{pickup_address}', 'infixs-correios-automatico' )
 			. PHP_EOL . ' ' . PHP_EOL
 			. __( 'Qualquer dúvida entre em contato conosco.', 'infixs-correios-automatico' );
 	}

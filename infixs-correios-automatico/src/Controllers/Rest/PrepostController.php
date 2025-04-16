@@ -85,43 +85,6 @@ class PrepostController {
 	}
 
 	/**
-	 * Delete prepost from order.
-	 * 
-	 * @since 1.1.3
-	 * 
-	 * @param \WP_REST_Request $request
-	 * 
-	 * @return \WP_Error|\WP_REST_Response
-	 */
-	public function deleteFromOrder( $request ) {
-		$order_id = $request['id'];
-
-		if ( ! $order_id ) {
-			return new \WP_Error( 'infixs_correios_automatico_invalid_order_id', __( 'Invalid order ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
-		}
-
-		$order = wc_get_order( $order_id );
-
-		if ( ! $order ) {
-			return new \WP_Error( 'order_not_found', 'Pedido não encontrado.', [ 'status' => 404 ] );
-		}
-
-		$prepost_id = $order->get_meta( '_infixs_correios_automatico_prepost_id' );
-
-		if ( ! $prepost_id ) {
-			return new \WP_Error( 'prepost_not_found', 'Pré-postagem não encontrada.', [ 'status' => 404 ] );
-		}
-
-		$response = $this->prepostService->cancelPrepost( $prepost_id );
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		return new \WP_REST_Response( [ 'success' => true ], 200 );
-	}
-
-	/**
 	 * Cancel prepost by ID.
 	 * 
 	 * @since 1.4.8
@@ -138,6 +101,31 @@ class PrepostController {
 		}
 
 		$response = $this->prepostService->cancelPrepost( $prepost_id );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		return new \WP_REST_Response( [ 'success' => true ], 200 );
+	}
+
+	/**
+	 * Delete prepost by ID.
+	 * 
+	 * @since 1.4.8
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function delete( $request ) {
+		$prepost_id = $request['id'];
+
+		if ( ! $prepost_id ) {
+			return new \WP_Error( 'invalid_prepost_id', __( 'Invalid prepost ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$response = $this->prepostService->deletePrepost( $prepost_id );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;

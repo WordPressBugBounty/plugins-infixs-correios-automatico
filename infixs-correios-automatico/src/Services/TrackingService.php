@@ -157,8 +157,32 @@ class TrackingService {
 	 * 
 	 * @return bool
 	 */
-	public function sendWaitingPickupNotification( $order_id, $tracking_code, $pickup_address ) {
-		$success = Tracking::trigger_waiting_pickup_email( $order_id, $tracking_code, $pickup_address );
+	public function sendWaitingPickupNotification( $order_id ) {
+		$tracking_codes = TrackingCode::query()->with( 'events' )->whereHas( 'events', function ($query) {
+			$query->where( 'code', 'LDI' );
+		} )->where( 'order_id', $order_id )->get();
+
+		if ( $tracking_codes->isEmpty() ) {
+			return false;
+		}
+
+		/**
+		 * @var TrackingCode $tracking_code
+		 */
+		$tracking_code = $tracking_codes->first();
+
+		/**
+		 * @var \Infixs\CorreiosAutomatico\Models\TrackingCodeEvent $last_pickup_event
+		 */
+		$last_pickup_event = $tracking_code->events->firstWhere( 'code', 'LDI' );
+
+		if ( ! $last_pickup_event ) {
+			return false;
+		}
+
+		$full_address = $last_pickup_event->location_type . ': ' . $last_pickup_event->location_address . ', ' . $last_pickup_event->location_number . ', ' . $last_pickup_event->location_neighborhood . ', ' . $last_pickup_event->location_city . ', ' . $last_pickup_event->location_state . ', ' . $last_pickup_event->location_postcode;
+
+		$success = Tracking::trigger_waiting_pickup_email( $order_id, $tracking_code->code, $full_address );
 
 		if ( $success ) {
 			$order = wc_get_order( $order_id );
@@ -249,6 +273,34 @@ class TrackingService {
 	 */
 	public function getTrackingsByCodes( $codes, $with_events = false ) {
 		return $this->trackingRepository->whereIn( 'code', $codes, $with_events ? [ 'with_events' => true ] : [] );
+	}
+
+	/**
+	 * Get tracking by code
+	 * 
+	 * @since 1.5.3
+	 * 
+	 * @param string $code.
+	 * 
+	 * @return TrackingCode|null
+	 */
+	public function getTrackingByCode( $code ) {
+		return $this->trackingRepository->retrieveByTrackingCode( $code );
+	}
+
+	/**
+	 * Delete tracking by code
+	 * 
+	 * @since 1.5.3
+	 * 
+	 * @param string $code.
+	 * 
+	 * @return bool|int
+	 */
+	public function deleteTrackingByCode( $code ) {
+		$tracking = $this->getTrackingByCode( $code );
+
+		return $tracking ? $tracking->delete() : false;
 	}
 
 	/**

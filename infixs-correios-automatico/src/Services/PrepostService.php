@@ -315,7 +315,7 @@ class PrepostService {
 	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|null
 	 */
 	public function getPrepost( $prepostId ) {
-		return $this->prepostRepository->find( $prepostId );
+		return $this->prepostRepository->findById( $prepostId );
 	}
 
 	/**
@@ -400,5 +400,28 @@ class PrepostService {
 		);
 
 		return $reponse;
+	}
+
+	/**
+	 * Delete Prepost
+	 * 
+	 * @param int $prepost_id
+	 * 
+	 * @return bool|\WP_Error
+	 */
+	public function deletePrepost( $prepost_id ) {
+		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
+		$prepost = $this->prepostRepository->findById( $prepost_id );
+
+		if ( ! $prepost ) {
+			return new \WP_Error( 'invalid_prepost_id', 'Pré-postagem inválida.', [ 'status' => 400 ] );
+		}
+
+		if ( ! $this->prepostRepository->delete( $prepost_id ) ) {
+			return new \WP_Error( 'delete_prepost_error', 'Erro ao deletar a pré-postagem.', [ 'status' => 400 ] );
+		} else {
+			Container::trackingService()->deleteTrackingByCode( $prepost->object_code );
+			return true;
+		}
 	}
 }

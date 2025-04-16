@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.5.1
+Stable tag: 1.5.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -38,6 +38,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Compatibilidade com Melhor Envio** - Utilize esse plugin em conjunto com o Melhor Envio, substituindo apenas o método de envio dos correios.
 - **Compatibilidade com Envio Simples** - Utilize esse plugin em conjunto com o Envio Simples, substituindo apenas o método de envio dos correios.
 - **Compatibilidade com Envio FreNet** - Utilize esse plugin em conjunto com o FreNet, substituindo apenas o método de envio dos correios.
+- **Compatibilidade com Bling** - Integre o plugin com a sua conta do Bling, para que apareça corretamente os métodos de entrega da suas vendas dentro do Bling.
 - **Moderno e robusto** - Nosso plugin usa a ultima geração de plugins do wordpress, com interface moderna, robusta e fácil de usar, incluindo varios recursos em um só plugin.
 
 = 💎 Recursos PRO =
@@ -125,6 +126,10 @@ Entre em contato conosco pelo Whatsapp, o número está no botão suporte dentro
 = 7 - Como fazer um contrato com os correios? =
 
 Apesar de não ser obrigatório para usar o plugin, recomendamos muito que você tenha um contrato com os correios, pois alguns recursos do plugin Correios Automático precisam do contrato para funcionar melhor. Para obter um contrato com os correios, entre em contato com nosso suporte dentro do plugin para nossa equipe te ajudar!
+
+= 8 - Consigo integrar com o Bling? =
+
+Sim, você consegue integrar os correios automático com o Bling para que apareça o método de entrega, seja PAC, SEDEX ou outros para que você consiga ter seus relátorios e vendas integrados da melhor forma.
 
 == Changelog ==
 

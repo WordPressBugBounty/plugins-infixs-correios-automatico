@@ -27,6 +27,10 @@ class Repository {
 		return $this->modelClass::create( $data );
 	}
 
+	public function delete( $id ) {
+		return $this->modelClass::where( 'id', $id )->limit( 1 )->delete();
+	}
+
 	public function findById( $id, $options = [] ) {
 		$query = $this->modelClass::query();
 

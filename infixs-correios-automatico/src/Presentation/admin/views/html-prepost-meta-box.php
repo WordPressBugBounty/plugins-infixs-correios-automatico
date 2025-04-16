@@ -76,6 +76,8 @@ defined( 'ABSPATH' ) || exit;
 			<?php endif; ?>
 
 			<div style="display: flex; gap: 10px;">
+				<input type="hidden" name="infixs_correios_automatico_prepost_id" id="infixs_correios_automatico_prepost_id"
+					value="<?php echo esc_attr( $prepost->id ); ?>" />
 				<a target="_blank" class="button button-primary" style="width: 100%; text-align: center;"
 					href="<?php echo esc_url( $cancel_prepost_url ) ?>">Ver</a>
 				<a target="_blank" class="<?php echo esc_attr(

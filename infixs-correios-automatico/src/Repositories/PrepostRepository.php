@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Repositories;
 
+use Infixs\CorreiosAutomatico\Core\Support\Repository;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 
 defined( 'ABSPATH' ) || exit;
@@ -12,7 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * @package Infixs\CorreiosAutomatico
  * @since   1.0.0
  */
-class PrepostRepository {
+class PrepostRepository extends Repository {
 
 	/**
 	 * Create a new prepost.
@@ -44,40 +45,11 @@ class PrepostRepository {
 	}
 
 	/**
-	 * Retrieve a prepost by its ID.
-	 * 
-	 * @param mixed $id
-	 * 
-	 * @return Prepost|null
-	 */
-	public function find( $id ) {
-		return Prepost::find( $id );
-	}
-
-	/**
-	 * List all preposts.
-	 * 
-	 * @return \Infixs\WordpressEloquent\Collection
-	 */
-	public function all() {
-		return Prepost::all();
-	}
-
-	/**
 	 * Paginate preposts.
 	 * 
 	 * @return \Infixs\WordpressEloquent\Collection
 	 */
 	public function paginate( $per_page = 10, $page = 1 ) {
 		return Prepost::select( "*" )->limit( 10 )->offset( 10 * ( $page - 1 ) )->orderBy( 'created_at', 'desc' )->get();
-	}
-
-	/**
-	 * Count all preposts.
-	 * 
-	 * @return int
-	 */
-	public function count() {
-		return Prepost::count();
 	}
 }

@@ -2,8 +2,10 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Front\WooCommerce;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
+use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 use Infixs\CorreiosAutomatico\Utils\Formatter;
+use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -116,13 +118,12 @@ class Shipping {
 
 		$package_cost = $product->get_price();
 
-		$address = Config::boolean( "general.show_full_address_calculate_product" ) ? $this->shippingService->getAddressByPostcode( $postscode ) : false;
+		$shipping_cost_requires_address = wc_string_to_bool( get_option( 'woocommerce_shipping_cost_requires_address', 'no' ) );
+		$address = Config::boolean( "general.show_full_address_calculate_product" ) || $shipping_cost_requires_address ? $this->shippingService->getAddressByPostcode( $postscode ) : false;
 
 		$state = $this->shippingService->getStateByPostcode( $postscode );
 
-		$package = [];
-
-		$package[0] = [ 
+		$package = [ 
 			'contents' => [ 
 				0 => [ 
 					'data' => $product,
@@ -145,12 +146,6 @@ class Shipping {
 			'is_product_page' => true,
 		];
 
-
-		WC()->shipping()->calculate_shipping( $package );
-
-
-		$packages = WC()->shipping()->get_packages();
-
 		if ( ! WC()->customer->get_billing_first_name() ) {
 			WC()->customer->set_billing_location( 'BR', $address ? $address['state'] : $state, $postscode, $address ? $address['city'] : '' );
 			if ( $address )
@@ -162,8 +157,12 @@ class Shipping {
 		WC()->customer->set_calculated_shipping( true );
 		WC()->customer->save();
 
+		$hash = Helper::generateHashFromArray( $package );
+		$packages[ $hash ] = $package;
+		$packages_result = WC()->shipping()->calculate_shipping( $packages );
 
-		$current_package = reset( $packages );
+
+		$current_package = reset( $packages_result );
 
 		wc_get_template(
 			'infixs-shipping-calculator-results.php',

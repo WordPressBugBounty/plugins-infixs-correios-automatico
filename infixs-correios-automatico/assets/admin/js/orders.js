@@ -415,19 +415,19 @@ jQuery( function ( $ ) {
 					const restUrl =
 						infixsCorreiosAutomaticoOrdersParams.restUrl;
 					const nonce = infixsCorreiosAutomaticoOrdersParams.nonce;
-					const orderId = $(
-						'#infixs-correios-automatico-order-id'
+					const prepostId = $(
+						'#infixs_correios_automatico_prepost_id'
 					).val();
 
-					if ( ! orderId || ! nonce ) return;
+					if ( ! prepostId || ! nonce ) return;
 
 					InfixsCorreiosAutomaticoOrders.block(
 						'#infixs-correios-automatico-prepost'
 					);
 
 					$.ajax( {
-						url: `${ restUrl }/preposts/${ orderId }`,
-						type: 'DELETE',
+						url: `${ restUrl }/preposts/${ prepostId }/cancel`,
+						type: 'PATCH',
 						contentType: 'application/json',
 						headers: {
 							'X-WP-Nonce': nonce,

@@ -5,6 +5,7 @@ namespace Infixs\CorreiosAutomatico\Core\Shipping;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\Admin;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
+use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Models\WoocommerceShippingZoneMethod;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Package;
@@ -850,6 +851,8 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 */
 	public function calculate_shipping( $package = [] ) {
 		$product_code = $this->get_product_code();
+
+		Log::debug( "Iniciando o cálculo de frete para o serviço $product_code" );
 
 		if ( ! $this->can_be_calculated( $package, $product_code ) ) {
 			return;

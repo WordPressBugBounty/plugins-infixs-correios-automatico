@@ -369,7 +369,7 @@ class Order {
 		if ( 'waiting-pickup' === $new_status &&
 			Config::boolean( 'general.active_waiting_pickup' ) &&
 			Config::boolean( 'general.email_waiting_pickup' ) ) {
-			//$this->trackingService->sendWaitingPickupNotification( $order_id );
+			$this->trackingService->sendWaitingPickupNotification( $order_id );
 		}
 
 		if ( 'returning' === $new_status &&
