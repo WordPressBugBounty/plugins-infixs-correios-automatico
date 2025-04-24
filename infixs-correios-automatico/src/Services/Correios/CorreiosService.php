@@ -65,7 +65,7 @@ class CorreiosService {
 
 			if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) ) {
 				$shipping_cost_response = [ 
-					'shipping_cost' => NumberHelper::parseNumber( $response["pcFinal"] ),
+					'shipping_cost' => Sanitizer::numeric( $response["pcFinal"] ) / 100,
 				];
 
 				if ( isset( $response['servicoAdicional'] ) ) {
@@ -77,7 +77,7 @@ class CorreiosService {
 								AddicionalServiceCode::INSURANCE_DECLARATION_PAC,
 								AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX,
 							] ) ) {
-							$shipping_cost_response['insurance_cost'] = NumberHelper::parseNumber( $service['pcServicoAdicional'] );
+							$shipping_cost_response['insurance_cost'] = Sanitizer::numeric( $service['pcServicoAdicional'] ) / 100;
 							break;
 						}
 					}
