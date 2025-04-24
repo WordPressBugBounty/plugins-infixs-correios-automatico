@@ -11,6 +11,7 @@ use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\ShippingCost;
 use Infixs\CorreiosAutomatico\Traits\HttpTrait;
 use Infixs\CorreiosAutomatico\Utils\Helper;
+use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -62,8 +63,28 @@ class CorreiosService {
 				new \WP_Error( 'correios_automatico_get_shipping_cost', 'Erro ao calcular o frete, método não encontrado.' ),
 				$shipping_cost, [] );
 
-			if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) )
-				return Sanitizer::numeric( $response["pcFinal"] ) / 100;
+			if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) ) {
+				$shipping_cost_response = [ 
+					'shipping_cost' => NumberHelper::parseNumber( $response["pcFinal"] ),
+				];
+
+				if ( isset( $response['servicoAdicional'] ) ) {
+					foreach ( $response['servicoAdicional'] as $service ) {
+						if ( isset( $service['coServAdicional'] ) &&
+							isset( $service['pcServicoAdicional'] ) &&
+							in_array( $service['coServAdicional'], [ 
+								AddicionalServiceCode::INSURANCE_DECLARATION_MINI_ENVIOS,
+								AddicionalServiceCode::INSURANCE_DECLARATION_PAC,
+								AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX,
+							] ) ) {
+							$shipping_cost_response['insurance_cost'] = NumberHelper::parseNumber( $service['pcServicoAdicional'] );
+							break;
+						}
+					}
+				}
+
+				return $shipping_cost_response;
+			}
 
 
 			if ( is_wp_error( $response ) ) {

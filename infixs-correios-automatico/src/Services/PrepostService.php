@@ -9,6 +9,7 @@ use Infixs\CorreiosAutomatico\Core\Support\Plugin;
 use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Repositories\PrepostRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\AddicionalServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\ObjectFormatCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\PaymentTypeCode;
@@ -144,10 +145,19 @@ class PrepostService {
 			] );
 		}
 
-
 		$prepost->setItemsFromPackage( $ca_order->getPackage() );
 
 		$shippingItem = $ca_order->getFirstShippingItemData();
+
+		if ( isset( $shippingItem['insurance_cost'] ) && $shippingItem['insurance_cost'] > 0 ) {
+			$insurance_code = AddicionalServiceCode::getInsuranceCode( $shippingProductCode );
+			if ( $insurance_code ) {
+				$prepost->addAdditionalService( [ 
+					'code' => $insurance_code,
+					'declaredValue' => $prepost->getItemsTotal()
+				] );
+			}
+		}
 
 		$prepost->setLength( $shippingItem['lenght'] );
 		$prepost->setWidth( $shippingItem['width'] );
@@ -378,7 +388,7 @@ class PrepostService {
 	/**
 	 * Cancel Prepost
 	 * 
-	 * PRO Feature: https://store.infixs.io/product/correios-automatico-rastreio-etiqueta-e-frete-versao-pro/
+	 * PRO Feature: https://infixs.io/product/correios-automatico-rastreio-etiqueta-e-frete-versao-pro/
 	 * 
 	 * @param int $prepost_id
 	 * 

@@ -138,6 +138,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 */
 	protected $min_insurance_value = 0;
 
+
+	/**
+	 * Insurance customer cost
+	 * 
+	 * @var bool
+	 */
+	protected $insurance_customer_cost = true;
+
 	/**
 	 * Minimum height in cm
 	 *
@@ -277,6 +285,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->extra_weight = (float) $this->get_option( 'extra_weight' );
 		$this->insurance = Sanitizer::boolean( $this->get_option( 'insurance' ) );
 		$this->min_insurance_value = (int) $this->get_option( 'min_insurance_value' );
+		$this->insurance_customer_cost = Sanitizer::boolean( $this->get_option( 'insurance_customer_cost' ) );
 		$this->auto_prepost = Sanitizer::boolean( $this->get_option( 'auto_prepost' ) );
 		$this->extra_weight_type = $this->get_option( 'extra_weight_type' );
 		$this->discount_rules = $this->get_option( 'discount_rules' );
@@ -469,6 +478,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => '50',
 				'sanitize_callback' => [ Sanitizer::class, 'money100' ],
+			],
+			'insurance_customer_cost' => [ 
+				'title' => __( 'Insurance Customer Cost', 'infixs-correios-automatico' ),
+				'type' => 'checkbox',
+				'description' => __( 'Enable the insurance customer cost.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'default' => 'yes',
 			],
 			'minimum_height' => [ 
 				'title' => __( 'Minimum Height', 'infixs-correios-automatico' ),
@@ -889,10 +905,16 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$shipping_cost->setModico( true );
 		}
 
-		if ( $this->insurance &&
-			isset( $package['contents_cost'] ) &&
-			(int) $this->min_insurance_value / 100 <= floatval( $package['contents_cost'] ) ) {
-			$shipping_cost->setInsuranceDeclarationValue( floatval( $package['contents_cost'] ) );
+		if ( $this->insurance && isset( $package['contents_cost'] ) ) {
+			$content_cost = NumberHelper::parseNumber( $package['contents_cost'] );
+
+			if ( Config::boolean( 'general.consider_quantity' ) && isset( $package['contents'], $package['contents'][0], $package['contents'][0]['quantity'] ) ) {
+				$content_cost = $content_cost * (int) $package['contents'][0]['quantity'];
+			}
+
+			if ( (int) $this->min_insurance_value / 100 <= $content_cost ) {
+				$shipping_cost->setInsuranceDeclarationValue( $content_cost );
+			}
 		}
 
 		if ( $this->hide_exceed && ! $this->are_dimensions_within_limits(
@@ -921,13 +943,18 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$cost_response = $cached_data;
 		}
 
-		$cost = is_array( $cost_response ) && isset( $cost_response['shipping_cost'] ) ? $cost_response['shipping_cost'] : $cost_response;
+		$cost = is_array( $cost_response ) && isset( $cost_response['shipping_cost'] ) ? $cost_response['shipping_cost'] : false;
 		$time = is_array( $cost_response ) && isset( $cost_response['delivery_time'] ) ? $cost_response['delivery_time'] : false;
+		$insurance_cost = is_array( $cost_response ) && isset( $cost_response['insurance_cost'] ) ? $cost_response['insurance_cost'] : false;
 
 		$original_cost = $cost;
 
 		if ( $cost === false ) {
 			return;
+		}
+
+		if ( $this->insurance && $insurance_cost !== false && ! $this->insurance_customer_cost ) {
+			$cost -= $insurance_cost;
 		}
 
 		if ( $this->additional_tax_percentage > 0 )
@@ -1005,6 +1032,10 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			"_height" => $shipping_cost->getHeight(),
 			"shipping_product_code" => $product_code
 		];
+
+		if ( $insurance_cost ) {
+			$meta_data['_insurance_cost'] = $insurance_cost;
+		}
 
 		$delivery_time_text = '';
 

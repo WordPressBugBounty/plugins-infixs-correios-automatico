@@ -37,4 +37,21 @@ class AddicionalServiceCode {
 	public static function getDescription( $item ) {
 		return self::$descriptions[ $item ] ?? 'Serviço desconhecido';
 	}
+
+	public static function getInsuranceCode( $product_code ) {
+		switch ( $product_code ) {
+			case DeliveryServiceCode::PAC_CONTRATO_AG:
+			case DeliveryServiceCode::PAC:
+				return AddicionalServiceCode::INSURANCE_DECLARATION_PAC;
+			case DeliveryServiceCode::SEDEX_HOJE_CONTRATO_AG:
+			case DeliveryServiceCode::SEDEX_CONTRATO_AG:
+			case DeliveryServiceCode::SEDEX_10_CONTRATO_AG:
+			case DeliveryServiceCode::SEDEX_12_CONTRATO_AG:
+				return AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX;
+			case DeliveryServiceCode::CORREIOS_MINI_ENVIOS_CTR_AG:
+				return AddicionalServiceCode::INSURANCE_DECLARATION_MINI_ENVIOS;
+			default:
+				return null;
+		}
+	}
 }

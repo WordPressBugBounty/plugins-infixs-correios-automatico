@@ -32,6 +32,8 @@ class Core {
 		new Front();
 
 		$this->load_modules();
+
+		do_action( 'infixs_correios_automatico_plugin_loaded' );
 	}
 
 	public function load_modules() {

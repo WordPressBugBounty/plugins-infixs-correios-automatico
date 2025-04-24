@@ -17,6 +17,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'simple_cart_shipping_calculator' => 'yes',
 			'cart_shipping_calculator_always_visible' => 'no',
 			'auto_calculate_cart_shipping_postcode' => 'no',
+			'consider_quantity' => 'no',
 			'auto_calculate_product_shipping_postcode' => 'no',
 			'terms_and_conditions_of_use_accepted' => 'no',
 			'enable_order_status' => 'no', //Deprecated in 1.4.3

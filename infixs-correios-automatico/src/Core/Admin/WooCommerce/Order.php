@@ -129,6 +129,7 @@ class Order {
 			'_width' => __( 'Largura', 'infixs-correios-automatico' ),
 			'_height' => __( 'Altura', 'infixs-correios-automatico' ),
 			'_original_cost' => __( 'Valor do Frete Original', 'infixs-correios-automatico' ),
+			'_insurance_cost' => __( 'Custo do Seguro', 'infixs-correios-automatico' ),
 			'delivery_time' => __( 'Prazo de Entrega', 'infixs-correios-automatico' ),
 			'shipping_product_code' => __( 'Serviço dos Correios', 'infixs-correios-automatico' ),
 		];
@@ -166,6 +167,14 @@ class Order {
 			} else {
 				$display_value = DeliveryServiceCode::getDescription( $meta->value, true );
 			}
+		}
+
+		if ( '_insurance_cost' === $meta->key ) {
+			$display_value = wc_price( $meta->value );
+		}
+
+		if ( '_original_cost' === $meta->key ) {
+			$display_value = wc_price( $meta->value );
 		}
 
 		return $display_value;

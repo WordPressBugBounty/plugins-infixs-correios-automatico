@@ -81,6 +81,7 @@ class Order {
 					'weight' => 0,
 					'delivery_time' => 0,
 					'original_cost' => null,
+					'insurance_cost' => 0,
 					'shipping_product_code' => null,
 				];
 				continue;
@@ -94,6 +95,7 @@ class Order {
 				'weight' => $item->get_meta( '_weight' ) ?: 0,
 				'delivery_time' => $item->get_meta( 'delivery_time' ) ?: 0,
 				'original_cost' => $item->get_meta( '_original_cost' ) ?: null,
+				'insurance_cost' => $item->get_meta( '_insurance_cost' ) ?: 0,
 				'shipping_product_code' => $item->get_meta( 'shipping_product_code' ) ?: null,
 			];
 		}
@@ -427,6 +429,7 @@ class Order {
 			'lenght' => 0,
 			'weight' => 0,
 			'delivery_time' => 0,
+			'insurance_cost' => 0,
 			'original_cost' => null,
 			'shipping_product_code' => null,
 		];
@@ -477,6 +480,7 @@ class Order {
 				'height' => $shipping_metadata['height'],
 				'length' => $shipping_metadata['lenght'],
 				'weight' => Sanitizer::weight( $shipping_metadata['weight'] ),
+				'insurance_cost' => $shipping_metadata['insurance_cost'] ? Sanitizer::money100( $shipping_metadata['insurance_cost'], '.' ) : 0,
 			],
 			'printed' => $this->order->get_meta( '_infixs_correios_automatico_printed', true ) ?: null,
 			'email_tracking_sent' => $this->order->get_meta( '_infixs_correios_automatico_email_tracking_sent', true ) ?: null,

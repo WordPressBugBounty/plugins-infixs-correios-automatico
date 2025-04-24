@@ -43,7 +43,7 @@ class NumberHelper {
 	}
 
 	/**
-	 * Parse a formatted number and return float.
+	 * Parse a formatted string foat number and return float without thousands.
 	 * 
 	 * @param string $formattedNumber Formatted number.
 	 * @param int $precision Number of decimal points.

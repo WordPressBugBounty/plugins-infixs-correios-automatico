@@ -2,7 +2,6 @@
 
 namespace Infixs\CorreiosAutomatico\Services\Correios\Includes;
 
-use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\AddicionalServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
@@ -273,7 +272,7 @@ class ShippingCost {
 		$limits = DeliveryServiceCode::getDeclarationLimits( $this->getProductCode() );
 		$declaration_value = $this->getInsuranceDeclarationValue();
 
-		if ( ! $limits ) {
+		if ( ! $limits || $declaration_value === null ) {
 			return false;
 		}
 
@@ -312,34 +311,9 @@ class ShippingCost {
 		$declaration_value = $this->getInsuranceDeclarationValue();
 
 		if ( $declaration_value && $this->areDeclarationWithinLimits() ) {
-			if ( in_array(
-				$this->getProductCode(),
-				[ 
-					DeliveryServiceCode::SEDEX_HOJE_CONTRATO_AG,
-					DeliveryServiceCode::SEDEX_CONTRATO_AG,
-					DeliveryServiceCode::SEDEX_10_CONTRATO_AG,
-					DeliveryServiceCode::SEDEX_12_CONTRATO_AG,
-				]
-			) ) {
-				$data['servicosAdicionais'][] = AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX;
-				$data['vlDeclarado'] = $declaration_value;
-
-			} else if ( in_array(
-				$this->getProductCode(),
-				[ 
-					DeliveryServiceCode::PAC_CONTRATO_AG,
-					DeliveryServiceCode::PAC
-				]
-			) ) {
-				$data['servicosAdicionais'][] = AddicionalServiceCode::INSURANCE_DECLARATION_PAC;
-				$data['vlDeclarado'] = $declaration_value;
-			} else if ( in_array(
-				$this->getProductCode(),
-				[ 
-					DeliveryServiceCode::CORREIOS_MINI_ENVIOS_CTR_AG,
-				]
-			) ) {
-				$data['servicosAdicionais'][] = AddicionalServiceCode::INSURANCE_DECLARATION_MINI_ENVIOS;
+			$insurance_service_code = AddicionalServiceCode::getInsuranceCode( $this->getProductCode() );
+			if ( $insurance_service_code ) {
+				$data['servicosAdicionais'][] = $insurance_service_code;
 				$data['vlDeclarado'] = $declaration_value;
 			}
 		}

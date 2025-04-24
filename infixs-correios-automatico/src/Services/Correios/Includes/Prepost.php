@@ -306,6 +306,14 @@ class Prepost {
 		}
 	}
 
+	public function getItemsTotal() {
+		$total = 0;
+		foreach ( $this->content_items as $item ) {
+			$total += floatval( $item['total'] );
+		}
+		return $total;
+	}
+
 	/**
 	 * Add additional service.
 	 *

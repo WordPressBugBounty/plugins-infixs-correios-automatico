@@ -107,6 +107,7 @@ class OrderService {
 					'width' => (int) $metas['_width'],
 					'length' => (int) $metas['_length'],
 					'weight' => Sanitizer::weight( $metas['_weight'] ),
+					'insurance_cost' => isset( $metas['_insurance_cost'] ) ? NumberHelper::to100( $metas['_insurance_cost'] ) : 0,
 					'shipping_product_code' => $metas['shipping_product_code'],
 					'delivery_time' => $metas['delivery_time'],
 				] : [ 
@@ -116,6 +117,7 @@ class OrderService {
 					'length' => 0,
 					'weight' => 0,
 					'shipping_product_code' => null,
+					'insurance_cost' => 0,
 					'delivery_time' => 0,
 				];
 		}

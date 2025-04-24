@@ -36,6 +36,10 @@ class SettingsGeneralController {
 		if ( isset( $data['calculate_shipping_product_page_position'] ) )
 			$updated_settings['calculate_shipping_product_page_position'] = sanitize_text_field( $data['calculate_shipping_product_page_position'] );
 
+		if ( isset( $data['consider_quantity'] ) ) {
+			$updated_settings['consider_quantity'] = rest_sanitize_boolean( $data['consider_quantity'] );
+		}
+
 		if ( isset( $data['show_order_tracking_form'] ) )
 			$updated_settings['show_order_tracking_form'] = rest_sanitize_boolean( $data['show_order_tracking_form'] );
 
@@ -259,6 +263,7 @@ class SettingsGeneralController {
 		$sanitized_settings = [ 
 			'autofill_address' => Config::boolean( 'general.autofill_address' ),
 			'calculate_shipping_product_page' => Config::boolean( 'general.calculate_shipping_product_page' ),
+			'consider_quantity' => Config::boolean( 'general.consider_quantity' ),
 			'calculate_shipping_product_page_position' => Config::string( 'general.calculate_shipping_product_page_position' ),
 			'show_order_tracking_form' => Config::boolean( 'general.show_order_tracking_form' ),
 			'show_order_label_form' => Config::boolean( 'general.show_order_label_form' ),

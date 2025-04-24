@@ -110,7 +110,7 @@ class Shipping {
 
 		$postscode = sanitize_text_field( wp_unslash( $_POST['postcode'] ) );
 		$product_id = sanitize_text_field( wp_unslash( $_POST['product_id'] ) );
-		$quantity = isset( $_POST['quantity'] ) ? (int) wp_unslash( $_POST['quantity'] ) : 1;
+		$quantity = Config::boolean( 'general.consider_quantity' ) && isset( $_POST['quantity'] ) ? (int) wp_unslash( $_POST['quantity'] ) : 1;
 
 		$variation_id = isset( $_POST['variation_id'] ) ? sanitize_text_field( wp_unslash( $_POST['variation_id'] ) ) : null;
 
