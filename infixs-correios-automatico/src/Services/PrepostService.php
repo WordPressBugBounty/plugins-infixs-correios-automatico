@@ -284,7 +284,7 @@ class PrepostService {
 		if ( is_wp_error( $response ) )
 			return $response;
 
-		$prazoPostagem = \DateTime::createFromFormat( 'Y-m-d', $response['prazoPostagem'] )->format( 'Y-m-d H:i:s' );
+		$prazoPostagem = ( new \DateTime( $response['prazoPostagem'] ) )->format( 'Y-m-d H:i:s' );
 
 		$created_prepost = $this->prepostRepository->create( [ 
 			'external_id' => $response['id'],

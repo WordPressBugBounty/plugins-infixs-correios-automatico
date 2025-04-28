@@ -142,6 +142,20 @@ class Migration {
 			'sequence' => 'int(10) unsigned DEFAULT NULL',
 			'unit_type' => 'int(2) unsigned DEFAULT NULL',
 			'unit_rfid_code' => 'varchar(30) DEFAULT NULL',
+			'invoice_unit_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.5.7
+			'created_at' => 'datetime NOT NULL',
+			'updated_at' => 'datetime NOT NULL',
+		] );
+
+		/**
+		 * Create table `infixs_correios_automatico_invoice_units`.
+		 * 
+		 * @since 1.5.7
+		 */
+		Database::createOrUpdateTable( 'infixs_correios_automatico_invoice_units', [ 
+			'request_id' => 'varchar(255) DEFAULT NULL',
+			'status' => "varchar(255) DEFAULT 'pending'",
+			'service_code' => 'varchar(8) NOT NULL',
 			'created_at' => 'datetime NOT NULL',
 			'updated_at' => 'datetime NOT NULL',
 		] );

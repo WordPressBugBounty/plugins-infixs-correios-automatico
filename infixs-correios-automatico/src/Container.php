@@ -5,6 +5,7 @@ namespace Infixs\CorreiosAutomatico;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\Unit;
+use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
 use Infixs\CorreiosAutomatico\Services\OrderService;
@@ -60,6 +61,7 @@ class Container {
 		$this->container['logRepository'] = fn( $c ) => new LogRepository( $c['configRepository'] );
 		$this->container['prepostRepository'] = fn() => new PrepostRepository( Prepost::class);
 		$this->container['unitRepository'] = fn() => new UnitRepository( Unit::class);
+		$this->container['invoiceUnitRepository'] = fn() => new InvoiceUnitRepository( Unit::class);
 
 		$this->container['correiosApi'] = fn( $c ) => new CorreiosApi( $c['configRepository'] );
 		$this->container['infixsApi'] = fn() => new InfixsApi();
@@ -71,7 +73,7 @@ class Container {
 		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'] );
 		$this->container['emailService'] = fn() => new EmailService();
 		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'] );
-		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'] );
+		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitRepository'] );
 	}
 
 	/**
@@ -92,6 +94,16 @@ class Container {
 	 */
 	public static function unitRepository() {
 		return self::getInstance()->container['unitRepository'];
+	}
+
+	/**
+	 * Invoice Unit Repository
+	 * 
+	 * @since 1.5.7
+	 * @return InvoiceUnitRepository
+	 */
+	public static function invoiceUnitRepository() {
+		return self::getInstance()->container['invoiceUnitRepository'];
 	}
 
 	/**

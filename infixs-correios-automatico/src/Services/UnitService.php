@@ -7,6 +7,7 @@ use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\Unit;
+use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
@@ -21,7 +22,13 @@ class UnitService {
 	 */
 	private $unitRepository;
 
-	public function __construct( UnitRepository $unitRepository ) {
+	/**
+	 * @var InvoiceUnitRepository
+	 */
+	private $invoiceUnitRepository;
+
+	public function __construct( UnitRepository $unitRepository, InvoiceUnitRepository $invoiceUnitRepository ) {
+		$this->invoiceUnitRepository = $invoiceUnitRepository;
 		$this->unitRepository = $unitRepository;
 	}
 
@@ -254,6 +261,47 @@ class UnitService {
 			$code->unit_id = $unit->id;
 			$code->save();
 		}
+
+		return true;
+	}
+
+	/**
+	 * Add unit to invoice.
+	 * 
+	 * @since 1.5.0
+	 * 
+	 * @param int $unit_id Unit ID.
+	 * @param int $invoice_id Invoice ID.
+	 * 
+	 * @return \WP_Error|bool
+	 */
+	public function addUnitToInvoice( $unit_id, $invoice_id ) {
+		$unit = $this->unitRepository->findById( $unit_id );
+
+		if ( ! $unit ) {
+			return new \WP_Error( 'unit_not_found', __( 'Unit not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
+		/**
+		 * @var \Infixs\CorreiosAutomatico\Models\InvoiceUnit $invoice_unit
+		 */
+		$invoice_unit = $this->invoiceUnitRepository->findById( $invoice_id );
+
+		if ( ! $invoice_unit ) {
+			return new \WP_Error( 'invoice_unit_not_found', __( 'Invoice unit not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
+		if ( $invoice_unit->service_code !== $unit->service_code ) {
+			return new \WP_Error( 'unit_service_code_mismatch', __( 'Unit service code mismatch.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		if ( $invoice_unit->id === $unit->id ) {
+			return new \WP_Error( 'unit_already_added', __( 'Unit already added to invoice.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$unit->invoice_unit_id = $invoice_unit->id;
+
+		$unit->save();
 
 		return true;
 	}

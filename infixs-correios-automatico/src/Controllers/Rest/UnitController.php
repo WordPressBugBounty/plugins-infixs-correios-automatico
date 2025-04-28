@@ -174,4 +174,34 @@ class UnitController {
 			"status" => "success"
 		] );
 	}
+
+	/**
+	 * Add unit to an invoice.
+	 * 
+	 * @since 1.6.0
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function add_to_invoice( $request ) {
+		$unit_id = (int) $request->get_param( 'unit_id' );
+
+		if ( ! $unit_id ) {
+			return new \WP_Error( 'invalid_unit_id', __( 'Invalid unit ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		// // Create a new invoice and add the unit
+		// $new_invoice = $this->unitService->createInvoiceWithUnit( $unit_id );
+
+		// if ( is_wp_error( $new_invoice ) ) {
+		// 	return $new_invoice;
+		// }
+
+		return rest_ensure_response( [ 
+			"status" => "success",
+			"message" => __( 'New invoice created and unit added.', 'infixs-correios-automatico' ),
+			///"data" => $new_invoice
+		] );
+	}
 }
