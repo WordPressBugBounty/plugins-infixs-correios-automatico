@@ -100,12 +100,10 @@ class Shipping {
 	public function calculate_shipping() {
 		WC()->shipping()->reset_shipping();
 
+		// only read, ignore nonce for caching
+		// phpcs:ignore
 		if ( ! isset( $_POST['postcode'] ) || ! isset( $_POST['product_id'] ) ) {
 			return wp_send_json_error( [ 'message' => 'CEP e o produto são obrigatórios' ] );
-		}
-
-		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'infixs_correios_automatico_nonce' ) ) {
-			return wp_send_json_error( [ 'message' => 'Nonce inválido' ] );
 		}
 
 		$postscode = sanitize_text_field( wp_unslash( $_POST['postcode'] ) );
@@ -116,7 +114,7 @@ class Shipping {
 
 		$product = wc_get_product( $variation_id ?: $product_id );
 
-		$package_cost = $product->get_price();
+		$package_cost = $product->get_price() * $quantity;
 
 		$shipping_cost_requires_address = wc_string_to_bool( get_option( 'woocommerce_shipping_cost_requires_address', 'no' ) );
 		$address = Config::boolean( "general.show_full_address_calculate_product" ) || $shipping_cost_requires_address ? $this->shippingService->getAddressByPostcode( $postscode ) : false;

@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Core;
 
 use Infixs\CorreiosAutomatico\Container;
+use Infixs\CorreiosAutomatico\Core\Support\Config;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -34,6 +35,7 @@ class Install {
 	public function activate_plugin() {
 		if ( $this->is_new_install() ) {
 			add_option( '_infixs_correios_automatico_activate', true );
+			self::create_tracking_page();
 		}
 	}
 
@@ -74,5 +76,32 @@ class Install {
 	 */
 	public static function is_new_install() {
 		return is_null( get_option( '_infixs_correios_automatico_version', null ) );
+	}
+
+	/**
+	 * Create tracking page.
+	 *
+	 * @since 1.5.9
+	 * 
+	 * @return void
+	 */
+	public static function create_tracking_page() {
+		$page_title = 'Rastrear Encomenda';
+		$page_slug = 'rastrear-encomenda';
+
+		$pagina_existente = get_page_by_path( $page_slug );
+
+		if ( ! $pagina_existente ) {
+			$nova_pagina = [ 
+				'post_title' => $page_title,
+				'post_name' => $page_slug,
+				'post_content' => '[infixs_correios_automatico_tracking_view]', // Aqui vai o shortcode
+				'post_status' => 'publish',
+				'post_type' => 'page',
+			];
+			$post_id = wp_insert_post( $nova_pagina );
+
+			Config::update( 'general.tracking_page', $post_id );
+		}
 	}
 }

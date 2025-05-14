@@ -2,6 +2,8 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Emails;
 
+use Infixs\CorreiosAutomatico\Core\Support\Config;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -150,6 +152,16 @@ class TrackingCodeEmail extends \WC_Email {
 	 */
 	public function get_tracking_code_url( $tracking_code ) {
 		$html = sprintf( '<a href="%s#wc-correios-tracking">%s</a>', $this->object->get_view_order_url(), $tracking_code );
+
+		$tracking_page_id = Config::integer( 'general.tracking_page' );
+
+		if ( $tracking_page_id && get_post_status( $tracking_page_id ) === 'publish' ) {
+			$tracking_page_url = get_permalink( $tracking_page_id );
+
+			$tracking_page_url = add_query_arg( 'code', $tracking_code, $tracking_page_url );
+
+			$html = sprintf( '<a href="%s">%s</a>', $tracking_page_url, $tracking_code, $tracking_code );
+		}
 
 		return apply_filters( 'infixs_correios_automatico_email_tracking_code_url', $html, $tracking_code, $this->object );
 	}

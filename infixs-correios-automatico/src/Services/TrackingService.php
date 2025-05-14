@@ -470,6 +470,8 @@ class TrackingService {
 					'updated_at' => current_time( 'mysql' ),
 				], $event, $tracking ) );
 
+				do_action( 'infixs_correios_automatico_after_add_tracking_event', $createdEvent, $event, $tracking );
+
 				$tracking->events->push( $createdEvent );
 			}
 		}
@@ -550,7 +552,7 @@ class TrackingService {
 			return new \WP_Error( 'tracking_code_not_found', 'Código de rastreio não encontrado.' );
 		}
 
-		return $this->getObjectTracking( $tracking );
+		return $this->getObjectTracking( $tracking, $sync );
 	}
 
 	/**

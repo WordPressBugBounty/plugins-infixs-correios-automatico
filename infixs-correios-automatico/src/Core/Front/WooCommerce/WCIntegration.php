@@ -62,6 +62,7 @@ class WCIntegration {
 		$this->order = new Order( Container::trackingService() );
 		$this->checkout = new Checkout();
 		$this->cart = new Cart();
+		new TrackingView( Container::trackingService() );
 
 		$this->filters();
 		$this->actions();

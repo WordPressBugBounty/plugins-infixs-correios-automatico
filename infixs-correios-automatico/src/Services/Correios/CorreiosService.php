@@ -64,6 +64,8 @@ class CorreiosService {
 				$shipping_cost, [] );
 
 			if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) ) {
+				Log::debug( "Shipping cost api correios response", $response );
+
 				$shipping_cost_response = [ 
 					'shipping_cost' => Sanitizer::numeric( $response["pcFinal"] ) / 100,
 				];
@@ -118,6 +120,7 @@ class CorreiosService {
 			);
 
 			if ( ! is_wp_error( $response ) && isset( $response["shipping_cost"] ) ) {
+				Log::debug( "Shipping cost api infixs response", $response );
 				return $response;
 			}
 

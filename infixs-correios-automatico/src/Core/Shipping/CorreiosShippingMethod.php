@@ -966,60 +966,58 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		if ( is_array( $this->discount_rules ) ) {
 
-			$rules = $this->discount_rules;
+			$enabled_rules = $this->get_enabled_discount_rules();
 
-			usort( $rules, function ($a, $b) {
+			usort( $enabled_rules, function ($a, $b) {
 				return $b['min_amount'] <=> $a['min_amount'];
 			} );
 
 			$matched = false;
 
-			foreach ( $rules as $rule ) {
-				if ( $rule['enabled'] ) {
-					$min_amount = NumberHelper::from100( $rule['min_amount'] );
-					$max_amount_enabled = $rule['max_amount_enabled'] ?? false;
-					$max_amount = NumberHelper::from100( $rule['max_amount'] ?? 0 );
+			foreach ( $enabled_rules as $rule ) {
+				$min_amount = NumberHelper::from100( $rule['min_amount'] );
+				$max_amount_enabled = $rule['max_amount_enabled'] ?? false;
+				$max_amount = NumberHelper::from100( $rule['max_amount'] ?? 0 );
 
-					$total_compare = $rule['compare'] === 'shipping' ? $original_cost : $shipping_package->get_total();
+				$total_compare = $rule['compare'] === 'shipping' ? $original_cost : $shipping_package->get_total();
 
-					if ( $total_compare < $min_amount
-						|| (
-							$max_amount_enabled &&
-							$min_amount < $max_amount &&
-							$total_compare > $max_amount
-						)
-					) {
-						continue;
-					}
-
-					$matched = true;
-
-					$type = $rule['type'];
-
-					switch ( $type ) {
-						case 'percentage':
-							$discount = (int) $rule['value'];
-							$cost -= $cost * ( $discount / 100 );
-							break;
-						case 'amount':
-							$discount = (int) $rule['value_amount'] / 100;
-							$cost -= $discount;
-							break;
-						case 'fixed':
-							$price = (int) $rule['value_amount'] / 100;
-							$cost = $price;
-							break;
-					}
-
-					if ( $cost < 0 ) {
-						$cost = 0;
-					}
-
-					break;
+				if ( $total_compare < $min_amount
+					|| (
+						$max_amount_enabled &&
+						$min_amount < $max_amount &&
+						$total_compare > $max_amount
+					)
+				) {
+					continue;
 				}
+
+				$matched = true;
+
+				$type = $rule['type'];
+
+				switch ( $type ) {
+					case 'percentage':
+						$discount = (int) $rule['value'];
+						$cost -= $cost * ( $discount / 100 );
+						break;
+					case 'amount':
+						$discount = (int) $rule['value_amount'] / 100;
+						$cost -= $discount;
+						break;
+					case 'fixed':
+						$price = (int) $rule['value_amount'] / 100;
+						$cost = $price;
+						break;
+				}
+
+				if ( $cost < 0 ) {
+					$cost = 0;
+				}
+
+				break;
 			}
 
-			if ( $this->hidden_when_no_match && ! $matched ) {
+			if ( $this->hidden_when_no_match && ! $matched && count( $enabled_rules ) > 0 ) {
 				return;
 			}
 		}
@@ -1084,6 +1082,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		];
 
 		$this->add_rate( apply_filters( 'infixs_correios_automatico_rate', $rate, $package ) );
+	}
+
+	public function get_enabled_discount_rules() {
+		$enabled_rules = array_filter( $this->discount_rules, function ($rule) {
+			return $rule['enabled'] === true;
+		} );
+
+		return $enabled_rules;
 	}
 
 

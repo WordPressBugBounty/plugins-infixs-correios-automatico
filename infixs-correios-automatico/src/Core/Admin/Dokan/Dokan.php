@@ -9,7 +9,7 @@ class Dokan {
 
 	public function __construct() {
 		if ( class_exists( 'WeDevs_Dokan' ) ) {
-			new Calculator();
+			// Silence 
 		}
 	}
 }

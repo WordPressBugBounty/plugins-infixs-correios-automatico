@@ -189,6 +189,42 @@ class SettingsGeneralController {
 			$updated_settings['show_full_address_calculate_product'] = rest_sanitize_boolean( $data['show_full_address_calculate_product'] );
 		}
 
+		if ( isset( $data['tracking_page'] ) ) {
+			$updated_settings['tracking_page'] = (int) $data['tracking_page'];
+		}
+
+		if ( isset( $data['shipping_bar_progress_color'] ) ) {
+			$updated_settings['shipping_bar_progress_color'] = sanitize_text_field( $data['shipping_bar_progress_color'] );
+		}
+
+		if ( isset( $data['shipping_bar_background_color'] ) ) {
+			$updated_settings['shipping_bar_background_color'] = sanitize_text_field( $data['shipping_bar_background_color'] );
+		}
+
+		if ( isset( $data['shipping_bar_text_color'] ) ) {
+			$updated_settings['shipping_bar_text_color'] = sanitize_text_field( $data['shipping_bar_text_color'] );
+		}
+
+		if ( isset( $data['shipping_bar_legend_text_color'] ) ) {
+			$updated_settings['shipping_bar_legend_text_color'] = sanitize_text_field( $data['shipping_bar_legend_text_color'] );
+		}
+
+		if ( isset( $data['shipping_bar_striped_effect'] ) ) {
+			$updated_settings['shipping_bar_striped_effect'] = rest_sanitize_boolean( $data['shipping_bar_striped_effect'] );
+		}
+
+		if ( isset( $data['shipping_bar_animated_effect'] ) ) {
+			$updated_settings['shipping_bar_animated_effect'] = rest_sanitize_boolean( $data['shipping_bar_animated_effect'] );
+		}
+
+		if ( isset( $data['free_shipping_bar_cart_page'] ) ) {
+			$updated_settings['free_shipping_bar_cart_page'] = rest_sanitize_boolean( $data['free_shipping_bar_cart_page'] );
+		}
+
+		if ( isset( $data['hide_bar_until_postcode'] ) ) {
+			$updated_settings['hide_bar_until_postcode'] = rest_sanitize_boolean( $data['hide_bar_until_postcode'] );
+		}
+
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
@@ -307,6 +343,19 @@ class SettingsGeneralController {
 			'email_delivered' => Config::boolean( 'general.email_delivered' ),
 			'auto_change_order_to_completed' => Config::boolean( 'general.auto_change_order_to_completed' ),
 			'show_full_address_calculate_product' => Config::boolean( 'general.show_full_address_calculate_product' ),
+			'tracking_page' => Config::integer( 'general.tracking_page' ),
+			'pages' => array_reduce( get_pages(), function ($result, $page) {
+				$result[ $page->ID ] = $page->post_title;
+				return $result;
+			}, [] ),
+			'shipping_bar_progress_color' => Config::string( 'general.shipping_bar_progress_color' ),
+			'shipping_bar_background_color' => Config::string( 'general.shipping_bar_background_color' ),
+			'shipping_bar_text_color' => Config::string( 'general.shipping_bar_text_color' ),
+			'shipping_bar_legend_text_color' => Config::string( 'general.shipping_bar_legend_text_color' ),
+			'shipping_bar_striped_effect' => Config::boolean( 'general.shipping_bar_striped_effect' ),
+			'shipping_bar_animated_effect' => Config::boolean( 'general.shipping_bar_animated_effect' ),
+			'free_shipping_bar_cart_page' => Config::boolean( 'general.free_shipping_bar_cart_page' ),
+			'hide_bar_until_postcode' => Config::boolean( 'general.hide_bar_until_postcode' ),
 		];
 
 		return apply_filters( 'infixs_correios_automatico_prepare_general_settings', $sanitized_settings );

@@ -116,5 +116,9 @@ class Core {
 				}
 			}
 		}
+
+		if ( version_compare( $version, '1.5.9', '<' ) ) {
+			Install::create_tracking_page();
+		}
 	}
 }

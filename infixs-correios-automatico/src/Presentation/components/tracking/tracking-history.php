@@ -9,6 +9,7 @@ use Infixs\CorreiosAutomatico\Utils\Formatter;
  * 
  * @global array $objects
  * @global \WC_Order $order
+ * @global bool $search
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -162,9 +163,11 @@ defined( 'ABSPATH' ) || exit;
 									uma
 									atualização da entrega.
 								</p>
-								<div class="infixs-caref-date">
-									<?php echo esc_html( Formatter::format_timestamp( $order->get_date_created()->getTimestamp() ) ); ?>
-								</div>
+								<?php if ( isset( $order ) ) : ?>
+									<div class="infixs-caref-date">
+										<?php echo esc_html( Formatter::format_timestamp( $order->get_date_created()->getTimestamp() ) ); ?>
+									</div>
+								<?php endif; ?>
 							</div>
 						</div>
 					</div>
@@ -178,11 +181,19 @@ defined( 'ABSPATH' ) || exit;
 		<?php endforeach; ?>
 	<?php else : ?>
 		<div class="infixs-caref-order-tracking-box">
-			<div class="infixs-caref-order-tracking-info">
-				<p>Ainda não há códigos de rastreamento para esse pedido.</p>
-				<a href="https://rastreamento.correios.com.br/app/index.php" target="_blank"
-					class="button button-primary">Rastrear Site dos Correios</a>
-			</div>
+			<?php if ( $search ) : ?>
+				<div class="infixs-caref-order-tracking-info">
+					<p>Ainda não há eventos de rastreamento para o código selecionado, tente outro.</p>
+					<a href="https://rastreamento.correios.com.br/app/index.php" target="_blank"
+						class="button button-primary">Rastrear Site dos Correios</a>
+				</div>
+			<?php else : ?>
+				<div class="infixs-caref-order-tracking-info">
+					<p>Ainda não há códigos de rastreamento para esse pedido.</p>
+					<a href="https://rastreamento.correios.com.br/app/index.php" target="_blank"
+						class="button button-primary">Rastrear Site dos Correios</a>
+				</div>
+			<?php endif; ?>
 		</div>
 	<?php endif; ?>
 </div>

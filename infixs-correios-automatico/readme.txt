@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.5.7
+Stable tag: 1.5.9
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -48,6 +48,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Frete Internacional Automatizado** - Exporte seu produto com Exporta Fácil, calculo de frete internacional, remessa conforme, etiqueta unitizadora, CN35, CN36 e muito mais.
 - **Pré-Postagem Automática** - Se você tiver um contrato com os correios, a pré-postagem é feita automática.
 - **Alteração de Status do Pedido Automático** - Status do pedido é alterado para concluído automaticamente assim que o cliente receber o pedido, também pode ser configurado para mudar automáticamente para "Em transporte".
+- **Barra de Frete Grátis** - Adiciona uma barra com porcentagem mostrando o quanto falta para o cliente ter frete grátis na loja, a partir das suas configurações de desconto nos Correios Automático.
 - **Declaração de conteúdo** - A declaração pode ser gerada com facilidade com os itens inclusos no pedido.
 - **Devolução Automática de Produto** - Seu cliente solicita a devolução e o plugin faz todo o resto para você.
 - **Rastreamento Automático** - Não se preocupe em adicionar o código de rastreamento, o plugin adiciona automáticamente pra você.
@@ -133,6 +134,12 @@ Apesar de não ser obrigatório para usar o plugin, recomendamos muito que você
 Sim, você consegue integrar os correios automático com o Bling para que apareça o método de entrega, seja PAC, SEDEX ou outros para que você consiga ter seus relátorios e vendas integrados da melhor forma.
 
 == Changelog ==
+
+= 1.5.9 =
+* Barra de Frete Grátis (PRO)
+* Exportar pedidos (PRO)
+* Correções e Melhorias
+* Opção de Exibir email na etiqueta
 
 = 1.5.6 =
 * Novos recursos dos correios

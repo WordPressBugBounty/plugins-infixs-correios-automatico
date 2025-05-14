@@ -240,6 +240,11 @@ class DeliveryServiceCode {
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
 					'max' => [ 'length' => 24, 'width' => 16, 'height' => 4, 'weight' => 0.3 ],
 				];
+			case self::IMPRESSO_MODICO:
+				return [ 
+					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
+					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 2 ],
+				];
 		}
 
 		return null;
