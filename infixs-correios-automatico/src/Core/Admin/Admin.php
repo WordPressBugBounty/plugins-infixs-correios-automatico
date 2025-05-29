@@ -201,13 +201,8 @@ class Admin {
 				$scriptData['nonceNotice'] = wp_create_nonce( 'infixs_correios_automatico_dismiss_notice' );
 				$scriptData['order']['statuses'] = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : [];
 				$scriptData['order']['preferences']['status'] = Config::get( 'preferences.order.status' );
-				$scriptData['activePlugins'] = [];
 				$scriptData['termsAndConditionsOfUseAccepted'] = Config::boolean( 'general.terms_and_conditions_of_use_accepted' );
 				$scriptData['serviceCodes'] = DeliveryServiceCode::getAll();
-
-				if ( class_exists( 'WC_Shipping_Calculator_Improvements' ) ) {
-					$scriptData['activePlugins'][] = 'wc-shipping-calculator-improvements';
-				}
 			}
 			if ( $this->is_print_page() ) {
 				// ...
@@ -228,16 +223,27 @@ class Admin {
 		$url_part = wp_parse_url( admin_url() );
 		$relative_path = $url_part['path'];
 
+		if ( class_exists( 'WC_Shipping_Calculator_Improvements' ) ) {
+			$params['activePlugins'][] = 'wc-shipping-calculator-improvements';
+		}
+
+		if ( class_exists( 'Infixs\CorreiosAutomaticoDokan\Container' ) ) {
+			$params['activePlugins'][] = 'infixs-correios-automatico-dokan';
+		}
+
 		$scriptData = array_merge( $params, [ 
 			'adminEmail' => get_option( 'admin_email' ),
 			'upgradeProUrl' => Plugin::PRO_URL,
 			'siteUrl' => site_url(),
 			'adminUrl' => admin_url(),
+			'activePlugins' => $params['activePlugins'] ?? [],
 			'adminPath' => $relative_path,
 			'restUrl' => Container::routes()->get_rest_url(),
 			'resourcesUrl' => \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/dashboard',
 			'nonce' => wp_create_nonce( 'wp_rest' ),
-			'ceints' => CeintCode::getCeintsOptions()
+			'ceints' => CeintCode::getCeintsOptions(),
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'searchProductsNonce' => wp_create_nonce( 'search-products' )
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {

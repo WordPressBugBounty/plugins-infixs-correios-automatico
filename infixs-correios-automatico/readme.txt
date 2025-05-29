@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.5.9
+Stable tag: 1.5.93
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -52,6 +52,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Declaração de conteúdo** - A declaração pode ser gerada com facilidade com os itens inclusos no pedido.
 - **Devolução Automática de Produto** - Seu cliente solicita a devolução e o plugin faz todo o resto para você.
 - **Rastreamento Automático** - Não se preocupe em adicionar o código de rastreamento, o plugin adiciona automáticamente pra você.
+- **Integração com Dokan** - Integre com o plugin Dokan para marketplace, para que os vendedores tenham autonomia para imprimir etiquetas, e os calculos de fretes sejam baseados na loja do vendedor. 
 - **Suporte Premium Instantâneo** - Fale com nosso suporte diretamente sem precisar esperar.
 
 ### 🔒 **Política de Privacidade e Termos de Uso**
@@ -131,9 +132,17 @@ Apesar de não ser obrigatório para usar o plugin, recomendamos muito que você
 
 = 8 - Consigo integrar com o Bling? =
 
-Sim, você consegue integrar os correios automático com o Bling para que apareça o método de entrega, seja PAC, SEDEX ou outros para que você consiga ter seus relátorios e vendas integrados da melhor forma.
+Sim, você consegue integrar os correios automático com o Bling para que apareça o método de entrega, seja PAC, SEDEX ou outros para que você consiga ter seus relátorios e vendas integrados da melhor forma. Adicione os seguinte IDs Logísticos no Bling: 
+**WC_INFIXS-CORREIOS-AUTOMATICO_PAC**
+**WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.5.93 2025-05-29 =
+* Novas regras de dimensão e peso no método
+* Integração de rastreio com outras plataformas
+* Novo recurso de Regras Avançadas
+* Melhorias na interface UX do usuário
 
 = 1.5.9 =
 * Barra de Frete Grátis (PRO)

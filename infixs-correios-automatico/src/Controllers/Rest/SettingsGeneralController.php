@@ -225,6 +225,10 @@ class SettingsGeneralController {
 			$updated_settings['hide_bar_until_postcode'] = rest_sanitize_boolean( $data['hide_bar_until_postcode'] );
 		}
 
+		if ( isset( $data['when_api_update_tracking_code'] ) ) {
+			$updated_settings['when_api_update_tracking_code'] = sanitize_text_field( $data['when_api_update_tracking_code'] );
+		}
+
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
@@ -356,6 +360,7 @@ class SettingsGeneralController {
 			'shipping_bar_animated_effect' => Config::boolean( 'general.shipping_bar_animated_effect' ),
 			'free_shipping_bar_cart_page' => Config::boolean( 'general.free_shipping_bar_cart_page' ),
 			'hide_bar_until_postcode' => Config::boolean( 'general.hide_bar_until_postcode' ),
+			'when_api_update_tracking_code' => Config::string( 'general.when_api_update_tracking_code' ),
 		];
 
 		return apply_filters( 'infixs_correios_automatico_prepare_general_settings', $sanitized_settings );

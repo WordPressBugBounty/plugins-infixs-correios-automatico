@@ -149,21 +149,21 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	/**
 	 * Minimum height in cm
 	 *
-	 * @var int
+	 * @var float
 	 */
 	protected $minimum_height = 2;
 
 	/**
 	 * Minimum width in cm
 	 *
-	 * @var int
+	 * @var float
 	 */
 	protected $minimum_width = 11;
 
 	/**
 	 * Minimum length in cm
 	 *
-	 * @var int
+	 * @var float
 	 */
 	protected $minimum_length = 16;
 
@@ -244,6 +244,36 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	protected $enable_icms_tax = false;
 
 	/**
+	 * When less minimum
+	 *
+	 * @var string "force"|"hide"|"none"
+	 */
+	protected $when_less_minimum = 'force';
+
+	/**
+	 * Advanced rules
+	 *
+	 * @since 1.5.9
+	 * 
+	 * @var array
+	 */
+	protected $advanced_rules = [];
+
+	/**
+	 * Hidden others when no match
+	 *
+	 * @var bool
+	 */
+	protected $hidden_others_when_match = false;
+
+	/**
+	 * When exceed maximum insurance
+	 *
+	 * @var string "ignore_insurance"|"hide_method"
+	 */
+	protected $when_exceed_maximum_insurance = 'ignore_insurance';
+
+	/**
 	 * Initialize the Correios Automático shipping method.
 	 *
 	 * @param int $instance_id Shipping method instance ID.
@@ -278,9 +308,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->additional_tax_percentage = (int) $this->get_option( 'additional_tax_percentage' );
 		$this->own_hands = Sanitizer::boolean( $this->get_option( 'own_hands' ) );
 		$this->receipt_notice = Sanitizer::boolean( $this->get_option( 'receipt_notice' ) );
-		$this->minimum_height = (int) $this->get_option( 'minimum_height' );
-		$this->minimum_width = (int) $this->get_option( 'minimum_width' );
-		$this->minimum_length = (int) $this->get_option( 'minimum_length' );
+		$this->minimum_height = (float) $this->get_option( 'minimum_height' );
+		$this->minimum_width = (float) $this->get_option( 'minimum_width' );
+		$this->minimum_length = (float) $this->get_option( 'minimum_length' );
 		$this->minimum_weight = (float) $this->get_option( 'minimum_weight' );
 		$this->extra_weight = (float) $this->get_option( 'extra_weight' );
 		$this->insurance = Sanitizer::boolean( $this->get_option( 'insurance' ) );
@@ -294,10 +324,18 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->hide_exceed = Sanitizer::boolean( $this->get_option( 'hide_exceed' ) );
 		$this->enable_import_tax = Sanitizer::boolean( $this->get_option( 'enable_import_tax' ) );
 		$this->enable_icms_tax = Sanitizer::boolean( $this->get_option( 'enable_icms_tax' ) );
+		$this->when_less_minimum = $this->get_option( 'when_less_minimum' );
+		$this->advanced_rules = $this->get_option( 'advanced_rules' ) ?? [];
+		$this->hidden_others_when_match = Sanitizer::boolean( $this->get_option( 'hidden_others_when_match' ) );
+		$this->when_exceed_maximum_insurance = $this->get_option( 'when_exceed_maximum_insurance' );
 	}
 
 	public function get_instance_option_filter( $value, $key ) {
 		if ( $key === 'discount_rules' && is_string( $value ) ) {
+			$value = json_decode( $value, true );
+		}
+
+		if ( $key === 'advanced_rules' && is_string( $value ) ) {
 			$value = json_decode( $value, true );
 		}
 
@@ -471,6 +509,17 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'no',
 			],
+			'when_exceed_maximum_insurance' => [ 
+				'title' => __( 'When Exceed Maximum Insurance', 'infixs-correios-automatico' ),
+				'type' => 'select',
+				'description' => __( 'Select the action when the package exceeds the maximum insurance.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'options' => [ 
+					'ignore_insurance' => __( 'Ignore Insurance', 'infixs-correios-automatico' ),
+					'hide_method' => __( 'Hide Method', 'infixs-correios-automatico' ),
+				],
+				'default' => 'ignore_insurance',
+			],
 			'min_insurance_value' => [ 
 				'title' => __( 'Min Insurance Value', 'infixs-correios-automatico' ),
 				'type' => 'money',
@@ -488,25 +537,25 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			],
 			'minimum_height' => [ 
 				'title' => __( 'Minimum Height', 'infixs-correios-automatico' ),
-				'type' => 'number',
+				'type' => 'float',
 				'description' => __( 'Define the minimum height.', 'infixs-correios-automatico' ),
-				'sanitize_callback' => [ Sanitizer::class, 'numeric_text' ],
+				'sanitize_callback' => [ Sanitizer::class, 'float_text' ],
 				'desc_tip' => true,
 				'default' => '2',
 			],
 			'minimum_width' => [ 
 				'title' => __( 'Minimum Width', 'infixs-correios-automatico' ),
-				'type' => 'number',
+				'type' => 'float',
 				'description' => __( 'Define the minimum width.', 'infixs-correios-automatico' ),
-				'sanitize_callback' => [ Sanitizer::class, 'numeric_text' ],
+				'sanitize_callback' => [ Sanitizer::class, 'float_text' ],
 				'desc_tip' => true,
 				'default' => '11',
 			],
 			'minimum_length' => [ 
 				'title' => __( 'Minimum Length', 'infixs-correios-automatico' ),
-				'type' => 'number',
+				'type' => 'float',
 				'description' => __( 'Define the minimum length.', 'infixs-correios-automatico' ),
-				'sanitize_callback' => [ Sanitizer::class, 'numeric_text' ],
+				'sanitize_callback' => [ Sanitizer::class, 'float_text' ],
 				'desc_tip' => true,
 				'default' => '16',
 			],
@@ -550,10 +599,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'description' => __( 'Add or remove discount rules.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'sanitize_callback' => [ $this, 'sanitize_discount_rules' ],
-				'options' => [ 
-					'order' => __( 'Per Order', 'infixs-correios-automatico' ),
-					'product' => __( 'Per Product', 'infixs-correios-automatico' ),
-				],
 				'default' => [ 
 					[ 
 						'enabled' => false,
@@ -581,6 +626,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'no',
 			],
+			'hidden_others_when_match' => [ 
+				'title' => __( 'Hide Others When no rules match', 'infixs-correios-automatico' ),
+				'type' => 'checkbox',
+				'description' => __( 'Hide the other shipping methods when no rules match.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'default' => 'no',
+			],
 			'hide_exceed' => [ 
 				'title' => __( 'Hide When Exceed', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
@@ -602,11 +654,31 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'no',
 			],
+			'when_less_minimum' => [ 
+				'title' => __( 'Quando menor que o mínimo', 'infixs-correios-automatico' ),
+				'type' => 'select',
+				'description' => __( 'Select the action when the package is less than the minimum weight.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'options' => [ 
+					'force' => __( 'Force', 'infixs-correios-automatico' ),
+					'hide' => __( 'Hide', 'infixs-correios-automatico' ),
+					'none' => __( 'None', 'infixs-correios-automatico' ),
+				],
+				'default' => 'force',
+			],
+			'advanced_rules' => [ 
+				'title' => __( 'Advanced Rules', 'infixs-correios-automatico' ),
+				'type' => 'array',
+				'description' => __( 'Add or remove advanced rules.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'sanitize_callback' => [ $this, 'sanitize_advanced_rules' ],
+				'default' => [],
+			],
 		];
 	}
 
 	protected function sanitizer_shipping_classes( $value ) {
-		$cleaned = Sanitizer::multiselect( $value );
+		$cleaned = Sanitizer::multiselect( $value, 'intval' );
 		$available_classes = array_keys( $this->get_shipping_classes_options() );
 		$cleaned = array_intersect( $cleaned, $available_classes );
 		return $cleaned;
@@ -621,6 +693,28 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$value[ $key ]['min_amount'] = Sanitizer::numeric( $rule['min_amount'] );
 			$value[ $key ]['max_amount'] = Sanitizer::numeric( $rule['max_amount'] );
 			$value[ $key ]['value_amount'] = Sanitizer::numeric( $rule['value_amount'] ?? 0 );
+		}
+
+		return $value;
+	}
+
+	public function sanitize_advanced_rules( $value ) {
+		if ( is_string( $value ) ) {
+			$value = json_decode( stripslashes( $value ), true );
+		}
+
+		foreach ( $value as $key => $rule ) {
+			$value[ $key ]['type'] = sanitize_text_field( $rule['type'] );
+			$value[ $key ]['condition'] = sanitize_text_field( $rule['condition'] );
+			$value[ $key ]['action'] = sanitize_text_field( $rule['action'] );
+
+			if ( $value[ $key ]['type'] === 'cart_shipping_class' ) {
+				$value[ $key ]['value'] = Sanitizer::multiselect( $rule['value'], 'intval' );
+			} elseif ( $value[ $key ]['type'] === 'cart_weight' ) {
+				$value[ $key ]['value'] = floatval( $rule['value'] );
+			} else {
+				$value[ $key ]['value'] = sanitize_text_field( $rule['value'] );
+			}
 		}
 
 		return $value;
@@ -658,6 +752,10 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		return $options;
 	}
 
+	public function get_shipping_classes() {
+		return $this->sanitizer_shipping_classes( $this->shipping_class );
+	}
+
 	protected function has_shipping_class( $package ) {
 		$pass = true;
 
@@ -678,6 +776,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			if ( $qty > 0 && $product && $product->needs_shipping() ) {
 				if ( ! in_array( $product->get_shipping_class_id(), $shipping_classes ) ) {
 					$pass = false;
+					Log::info( "Não foi possível calcular o frete pois a classe requirida no método não existe no produto" );
 					break;
 				}
 			}
@@ -700,6 +799,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				case 'number':
 					$map[ $key ]['value'] = (int) $value;
 					break;
+				case 'float':
+					$map[ $key ]['value'] = (float) $value;
+					break;
 				case 'money':
 					$map[ $key ]['value'] = ( (int) $value ) / 100;
 					break;
@@ -708,6 +810,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					break;
 				case 'multiselect':
 					$map[ $key ]['value'] = is_array( $value ) ? $value : [];
+					break;
+				case 'array':
+					if ( empty( $value ) || ! is_array( $value ) ) {
+						$value = [];
+						$map[ $key ]['value'] = [];
+					} else {
+						$map[ $key ]['value'] = $value;
+					}
 					break;
 				default:
 					$map[ $key ]['value'] = $value;
@@ -726,6 +836,23 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					$map[ $key ]['value'][ $rule_key ]['value_amount'] = isset( $rule['value_amount'] ) ? (int) $rule['value_amount'] / 100 : 0;
 					if ( ! isset( $map[ $key ]['value'][ $rule_key ]['compare'] ) )
 						$map[ $key ]['value'][ $rule_key ]['compare'] = 'total';
+				}
+			}
+
+			if ( $key === 'advanced_rules' ) {
+				foreach ( $value as $rule_key => $rule ) {
+					$map[ $key ]['value'][ $rule_key ]['enabled'] = Sanitizer::boolean( $rule['enabled'] );
+					$map[ $key ]['value'][ $rule_key ]['type'] = sanitize_text_field( $rule['type'] );
+					$map[ $key ]['value'][ $rule_key ]['condition'] = sanitize_text_field( $rule['condition'] );
+					if ( $map[ $key ]['value'][ $rule_key ]['type'] === 'cart_shipping_class' ) {
+						$map[ $key ]['value'][ $rule_key ]['value'] = Sanitizer::multiselect( $rule['value'] );
+					} elseif ( $map[ $key ]['value'][ $rule_key ]['type'] === 'cart_weight' ) {
+						$map[ $key ]['value'][ $rule_key ]['value'] = floatval( $rule['value'] ?? 0 );
+					} else {
+						$map[ $key ]['value'][ $rule_key ]['value'] = sanitize_text_field( $rule['value'] );
+					}
+					$map[ $key ]['value'][ $rule_key ]['action'] = sanitize_text_field( $rule['action'] );
+
 				}
 			}
 
@@ -764,10 +891,20 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	protected function can_be_calculated( $package, $product_code ) {
 		if ( ! in_array( $product_code, DeliveryServiceCode::getInternationals() ) ) {
 			if ( empty( $package['destination']['postcode'] ) || 'BR' !== $package['destination']['country'] ) {
+				Log::info( "Não é possível calcular o frete para o pacote sem CEP de destino ou quando o país não é BR.",
+					[ 
+						'postcode' => $package['destination']['postcode'] ?? '',
+						'product_code' => $product_code,
+					]
+				);
 				return false;
 			}
 		} else {
 			if ( 'BR' === $package['destination']['country'] ) {
+				Log::info( "Não é possível calcular o frete internacional para o pacote com CEP de destino no Brasil.", [ 
+					'product_code' => $product_code,
+					'postcode' => $package['destination']['postcode'] ?? '',
+				] );
 				return false;
 			}
 		}
@@ -824,7 +961,11 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$shipping_package = new Package( $package );
 		$shipping_package->setExtraWeight( $this->extra_weight );
 		$shipping_package->setExtraWeightType( $this->extra_weight_type );
-		$shipping_package->setMinWeight( $this->minimum_weight );
+
+		if ( $this->when_less_minimum == 'force' ) {
+			$shipping_package->setMinWeight( $this->minimum_weight );
+		}
+
 		$shipping_package->setMinHeight( $this->minimum_height );
 		$shipping_package->setMinWidth( $this->minimum_width );
 		$shipping_package->setMinLength( $this->minimum_length );
@@ -868,7 +1009,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	public function calculate_shipping( $package = [] ) {
 		$product_code = $this->get_product_code();
 
-		Log::debug( "Iniciando o cálculo de frete para o serviço $product_code" );
+		Log::debug( "Iniciando o cálculo de frete para o serviço $product_code", [ 
+			'package' => $package,
+		] );
 
 		if ( ! $this->can_be_calculated( $package, $product_code ) ) {
 			return;
@@ -878,13 +1021,15 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			return;
 		}
 
-		//update_user_meta( $store_id, 'dokan_profile_settings', $dokan_settings );
-
 		$origin_postcode = Sanitizer::numeric_text( apply_filters( "infixs_correios_automatico_calculate_shipping_origin_postcode", $this->origin_postcode, $package, $this ) );
 		$destination_postcode = Sanitizer::numeric_text( $package['destination']['postcode'] );
 		$destination_country = sanitize_text_field( $package['destination']['country'] );
 
 		if ( empty( $product_code ) || empty( $origin_postcode ) ) {
+			Log::info( "Não foi possível calcular o frete, código do produto ou CEP de origem não definidos.", [ 
+				'product_code' => $product_code,
+				'origin_postcode' => $origin_postcode,
+			] );
 			return;
 		}
 
@@ -915,7 +1060,24 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			if ( (int) $this->min_insurance_value / 100 <= $content_cost ) {
 				$shipping_cost->setInsuranceDeclarationValue( $content_cost );
 			}
+
+			if ( $this->when_exceed_maximum_insurance == 'hide_method' && ! $shipping_cost->areDeclarationWithinLimits( 'max' ) ) {
+				Log::info( "Frete não calculado, valor da declaração de seguro excede o máximo permitido.", [ 
+					'product_code' => $product_code,
+					'origin_postcode' => $origin_postcode,
+					'destination_postcode' => $destination_postcode,
+					'insurance_value' => $content_cost,
+				] );
+				return;
+			}
 		}
+
+		$passed = apply_filters( 'infixs_correios_automatico_calculate_shipping_cost_passed', true, $shipping_cost, $package, $this );
+
+		if ( ! $passed ) {
+			return;
+		}
+
 
 		if ( $this->hide_exceed && ! $this->are_dimensions_within_limits(
 			$shipping_cost->getLength(),
@@ -924,6 +1086,17 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$shipping_cost->getWeight(),
 			$product_code
 		) ) {
+			Log::info( "Frete não calculado, dimensões excedidas." );
+			return;
+		}
+
+		if ( $this->when_less_minimum == 'hide' && $shipping_cost->getWeight() < $this->minimum_weight ) {
+			Log::info( "Frete não calculado, peso menor que o mínimo.", [ 
+				'weight' => $shipping_cost->getWeight(),
+				'min_weight' => $this->minimum_weight,
+			]
+			);
+
 			return;
 		}
 
@@ -950,6 +1123,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$original_cost = $cost;
 
 		if ( $cost === false ) {
+			Log::info( "Não foi possível calcular o custo do frete." );
 			return;
 		}
 
@@ -963,6 +1137,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		if ( $this->additional_tax > 0 )
 			$cost += $this->additional_tax / 100;
 
+		$meta_data = [ 
+			"_original_cost" => $original_cost,
+			"_weight" => $shipping_cost->getWeight(),
+			"_length" => $shipping_cost->getLength(),
+			"_width" => $shipping_cost->getWidth(),
+			"_height" => $shipping_cost->getHeight(),
+			"shipping_product_code" => $product_code
+		];
 
 		if ( is_array( $this->discount_rules ) ) {
 
@@ -1018,18 +1200,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			}
 
 			if ( $this->hidden_when_no_match && ! $matched && count( $enabled_rules ) > 0 ) {
+				Log::info( "Frete não calculado, nenhuma regra de desconto foi atendida (Você optou por ocultar quando não há regras de desconto)." );
 				return;
 			}
-		}
 
-		$meta_data = [ 
-			"_original_cost" => $original_cost,
-			"_weight" => $shipping_cost->getWeight(),
-			"_length" => $shipping_cost->getLength(),
-			"_width" => $shipping_cost->getWidth(),
-			"_height" => $shipping_cost->getHeight(),
-			"shipping_product_code" => $product_code
-		];
+			if ( $this->hidden_others_when_match && $matched ) {
+				$meta_data['_hide_others_rates'] = true;
+			}
+		}
 
 		if ( $insurance_cost ) {
 			$meta_data['_insurance_cost'] = $insurance_cost;
@@ -1084,8 +1262,21 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->add_rate( apply_filters( 'infixs_correios_automatico_rate', $rate, $package ) );
 	}
 
+	/**
+	 * Get the enabled discount rules.
+	 *
+	 * @return array
+	 */
 	public function get_enabled_discount_rules() {
 		$enabled_rules = array_filter( $this->discount_rules, function ($rule) {
+			return $rule['enabled'] === true;
+		} );
+
+		return $enabled_rules;
+	}
+
+	public function get_enabled_advanced_rules() {
+		$enabled_rules = array_filter( $this->advanced_rules, function ($rule) {
 			return $rule['enabled'] === true;
 		} );
 

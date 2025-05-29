@@ -154,6 +154,51 @@ jQuery( function ( $ ) {
 					this.updateProductShippingPostcode.bind( this )
 				);
 			}
+
+			const self = this;
+
+			$( document.body ).on(
+				'keydown',
+				'input.infixs-correios-automatico-input',
+				function ( e ) {
+					if ( e.key === 'Enter' ) {
+						e.preventDefault();
+						self.calculateShipping( e );
+					}
+				}
+			);
+
+			$( document ).on(
+				'wc_variation_form',
+				function ( event, variationFormInstance ) {
+					self.changeVariation( variationFormInstance );
+					$( document ).on(
+						'change.wc-variation-form',
+						'.variations select',
+						self.changeVariation.bind( self, variationFormInstance )
+					);
+				}
+			);
+		},
+
+		changeVariation( form ) {
+			if ( form && form.variationData ) {
+				const variationData = form.variationData;
+				const currentVariationId = this.getVariantion();
+
+				if ( currentVariationId ) {
+					const found = variationData.find(
+						( variation ) =>
+							variation.variation_id == currentVariationId
+					);
+					if ( found && found.is_virtual === true ) {
+						$( '.infixs-correios-automatico-calculator' ).hide();
+					}
+					if ( found && ! found.is_virtual ) {
+						$( '.infixs-correios-automatico-calculator' ).show();
+					}
+				}
+			}
 		},
 
 		/**

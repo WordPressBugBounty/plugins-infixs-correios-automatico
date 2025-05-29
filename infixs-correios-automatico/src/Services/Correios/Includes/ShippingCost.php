@@ -216,6 +216,13 @@ class ShippingCost {
 		return NumberHelper::parseNumber( wc_get_weight( $weight, $unit, 'kg' ), 3 );
 	}
 
+	/**
+	 * Set the weight
+	 * 
+	 * @param float $weight
+	 * 
+	 * @return void
+	 */
 	public function setWeight( $weight ) {
 		$this->weight = $weight;
 	}
@@ -229,6 +236,13 @@ class ShippingCost {
 		return NumberHelper::parseNumber( $this->height );
 	}
 
+	/**
+	 * Set the height
+	 * 
+	 * @param float $height
+	 * 
+	 * @return void
+	 */
 	public function setHeight( $height ) {
 		$this->height = $height;
 	}
@@ -242,6 +256,13 @@ class ShippingCost {
 		return NumberHelper::parseNumber( $this->width );
 	}
 
+	/**
+	 * Set the width
+	 * 
+	 * @param float $width
+	 * 
+	 * @return void
+	 */
 	public function setWidth( $width ) {
 		$this->width = $width;
 	}
@@ -255,6 +276,13 @@ class ShippingCost {
 		return NumberHelper::parseNumber( $this->length );
 	}
 
+	/**
+	 * Set the length
+	 * 
+	 * @param float $length
+	 * 
+	 * @return void
+	 */
 	public function setLength( $length ) {
 		$this->length = $length;
 	}
@@ -268,7 +296,13 @@ class ShippingCost {
 	 * 
 	 * @return bool
 	 */
-	public function areDeclarationWithinLimits() {
+	/**
+	 * Check if the declaration is within the limits.
+	 *
+	 * @param string $check 'both' (default), 'min', or 'max'
+	 * @return bool
+	 */
+	public function areDeclarationWithinLimits( $check = 'both' ) {
 		$limits = DeliveryServiceCode::getDeclarationLimits( $this->getProductCode() );
 		$declaration_value = $this->getInsuranceDeclarationValue();
 
@@ -276,8 +310,15 @@ class ShippingCost {
 			return false;
 		}
 
-		return $declaration_value >= $limits['min'] &&
-			$declaration_value <= $limits['max'];
+		switch ( $check ) {
+			case 'min':
+				return $declaration_value >= $limits['min'];
+			case 'max':
+				return $declaration_value <= $limits['max'];
+			case 'both':
+			default:
+				return $declaration_value >= $limits['min'] && $declaration_value <= $limits['max'];
+		}
 	}
 
 	public function getData() {
@@ -290,6 +331,16 @@ class ShippingCost {
 			"largura" => $this->getWidth(),
 			"tpObjeto" => $this->getObjectType() === 'label' || $this->getModico() ? 1 : 2,
 		];
+
+		if ( in_array( $this->getProductCode(),
+			[ 
+				DeliveryServiceCode::IMPRESSO_NORMAL,
+				DeliveryServiceCode::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP,
+				DeliveryServiceCode::IMPRESSO_NORMAL_2
+			]
+		) ) {
+			$data['tpObjeto'] = 1;
+		}
 
 		if ( $this->getOwnHands() ) {
 			$data['servicosAdicionais'][] = AddicionalServiceCode::OWN_HANDS;

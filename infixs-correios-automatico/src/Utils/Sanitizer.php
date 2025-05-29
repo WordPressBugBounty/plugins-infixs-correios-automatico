@@ -189,11 +189,11 @@ class Sanitizer {
 		return $postcode;
 	}
 
-	public static function multiselect( $value ) {
+	public static function multiselect( $value, $filter = 'sanitize_text_field' ) {
 		if ( is_array( $value ) ) {
-			return array_filter( array_map( 'sanitize_text_field', $value ) );
+			return array_filter( array_map( $filter, $value ) );
 		} else {
-			return array_filter( array_map( 'sanitize_text_field', explode( ',', $value ) ) );
+			return array_filter( array_map( $filter, explode( ',', $value ) ) );
 		}
 	}
 }

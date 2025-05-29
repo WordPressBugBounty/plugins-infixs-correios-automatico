@@ -6,6 +6,7 @@ use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 use Infixs\CorreiosAutomatico\Utils\Formatter;
 use Infixs\CorreiosAutomatico\Utils\Helper;
+use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -38,6 +39,8 @@ class Shipping {
 		if ( Config::boolean( "general.mask_postcode" ) ) {
 			add_filter( 'woocommerce_customer_get_shipping_postcode', [ $this, 'get_shipping_postcode' ] );
 		}
+
+		add_filter( 'woocommerce_package_rates', [ $this, 'filter_rates' ], 10, 2 );
 	}
 
 	/**
@@ -214,5 +217,29 @@ class Shipping {
 		}
 
 		add_action( $action_hook, [ $this, 'display_shipping_calculator' ], 80 );
+	}
+
+	/**
+	 * Filter rates.
+	 *
+	 * @param array $rates Shipping rates.
+	 * @param array $package Package data.
+	 * 
+	 * @return array
+	 */
+	public function filter_rates( $rates, $package ) {
+
+		foreach ( $rates as $rate_id => $rate ) {
+			$meta_data = $rate->get_meta_data();
+			if ( $meta_data ) {
+				foreach ( $meta_data as $meta_key => $meta_value ) {
+					if ( $meta_key === '_hide_others_rates' && $meta_value ) {
+						return [ $rate_id => $rate ];
+					}
+				}
+			}
+		}
+
+		return $rates;
 	}
 }

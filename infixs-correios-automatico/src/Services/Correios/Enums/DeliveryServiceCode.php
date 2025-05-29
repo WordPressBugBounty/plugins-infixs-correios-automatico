@@ -33,6 +33,7 @@ class DeliveryServiceCode {
 	public const IMPRESSO_NORMAL = '20010';
 
 	public const IMPRESSO_NORMAL_2 = '20133';
+	public const IMPRESSO_NORMAL_NAC_FAT_CHANC_NP = '20117';
 
 	public const IMPRESSO_MODICO = '20192';
 
@@ -53,6 +54,8 @@ class DeliveryServiceCode {
 	public const SEDEX_12_LOG = '06599';
 
 	public const SEDEX_HOJE_LOG = '06602';
+
+	public const CARTA_COML_REG_B1_CHANC_ETIQ = '80250';
 
 
 
@@ -95,6 +98,8 @@ class DeliveryServiceCode {
 		self::SEDEX_HOJE_LOG => 'SEDEX HOJE LOG+',
 		self::PAC_LOG => 'PAC LOG+',
 		self::SEDEX_LOG => 'SEDEX LOG+',
+		self::CARTA_COML_REG_B1_CHANC_ETIQ => 'CARTA COMERCIAL REGISTRADA B1 CHANCELADA ETIQUETA',
+		self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP => 'IMPRESSO NORMAL NAC FAT CHANC NP',
 	];
 
 	/**
@@ -233,7 +238,7 @@ class DeliveryServiceCode {
 			case self::PAC_CONTRATO_AG:
 				return [ 
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.1 ],
-					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 30 ],
+					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 30, 'total_dimensions' => 200 ],
 				];
 			case self::CORREIOS_MINI_ENVIOS_CTR_AG:
 				return [ 
@@ -241,9 +246,16 @@ class DeliveryServiceCode {
 					'max' => [ 'length' => 24, 'width' => 16, 'height' => 4, 'weight' => 0.3 ],
 				];
 			case self::IMPRESSO_MODICO:
+			case self::IMPRESSO_NORMAL:
+			case self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP:
 				return [ 
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
 					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 2 ],
+				];
+			case self::CARTA_COML_REG_B1_CHANC_ETIQ:
+				return [ 
+					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
+					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 0.5 ],
 				];
 		}
 
@@ -282,6 +294,10 @@ class DeliveryServiceCode {
 					'max' => 4184.84,
 				];
 			case self::CORREIOS_MINI_ENVIOS_CTR_AG:
+			case self::IMPRESSO_MODICO:
+			case self::IMPRESSO_NORMAL:
+			case self::CARTA_COML_REG_B1_CHANC_ETIQ:
+			case self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP:
 				return [ 
 					'min' => 12.82,
 					'max' => 104.62,

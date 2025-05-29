@@ -181,7 +181,7 @@ defined( 'ABSPATH' ) || exit;
 		<?php endforeach; ?>
 	<?php else : ?>
 		<div class="infixs-caref-order-tracking-box">
-			<?php if ( $search ) : ?>
+			<?php if ( isset( $search ) && $search ) : ?>
 				<div class="infixs-caref-order-tracking-info">
 					<p>Ainda não há eventos de rastreamento para o código selecionado, tente outro.</p>
 					<a href="https://rastreamento.correios.com.br/app/index.php" target="_blank"
