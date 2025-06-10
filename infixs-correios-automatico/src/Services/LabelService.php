@@ -82,6 +82,7 @@ class LabelService {
 
 			$items[] = [ 
 				'name' => $item->get_name(),
+				'sku' => $product->get_sku() ?: '',
 				'quantity' => $quantity,
 				'weight' => $weight,
 				'ncm' => $product->get_meta( '_infixs_correios_automatico_ncm' ) ?? '',
@@ -276,7 +277,7 @@ class LabelService {
 		foreach ( $tracking_ranges as $tracking_range ) {
 			$data[] = [ 
 				'id' => $tracking_range->id,
-				'service_title' => DeliveryServiceCode::getShortDescription( $tracking_range->service_code ),
+				'service_title' => DeliveryServiceCode::getShortDescription( $tracking_range->service_code ) . " (" . $tracking_range->service_code . ")",
 				'service_code' => $tracking_range->service_code,
 				'range_start' => $tracking_range->range_start,
 				'range_end' => $tracking_range->range_end,
@@ -330,7 +331,9 @@ class LabelService {
 			);
 		}
 
-		$created = $this->trackingService->add( $order_id, $tracking->code );
+		$created = $this->trackingService->add( $order_id, $tracking->code, false, [ 
+			'tracking_range_code_id' => $tracking->id,
+		] );
 
 		if ( is_wp_error( $created ) ) {
 			return new \WP_Error(

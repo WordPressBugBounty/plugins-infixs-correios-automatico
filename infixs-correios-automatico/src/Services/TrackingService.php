@@ -7,6 +7,7 @@ use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\Tracking;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
+use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
 use Infixs\CorreiosAutomatico\Repositories\TrackingRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
 use Infixs\WordpressEloquent\Collection;
@@ -61,7 +62,7 @@ class TrackingService {
 	 * 
 	 * @return TrackingCode|\WP_Error The TrackingCode or false on error.
 	 */
-	public function add( $order_id, $code, $customer_send_email = false ) {
+	public function add( $order_id, $code, $customer_send_email = false, $data = [] ) {
 
 		Log::debug( "Adicionando código de rastreio ao pedido {$order_id}." );
 
@@ -80,6 +81,7 @@ class TrackingService {
 			'order_id' => $order_id,
 			'code' => $code,
 			'user_id' => get_current_user_id(),
+			'tracking_range_code_id' => $data['tracking_range_code_id'] ?? null,
 		] );
 
 		if ( ! $created ) {
@@ -300,7 +302,7 @@ class TrackingService {
 	public function deleteTrackingByCode( $code ) {
 		$tracking = $this->getTrackingByCode( $code );
 
-		return $tracking ? $tracking->delete() : false;
+		return $tracking ? $this->delete( $tracking->id ) : false;
 	}
 
 	/**
@@ -326,11 +328,12 @@ class TrackingService {
 	 * @return int|bool The number of rows affected or false on error.
 	 */
 	public function delete( $tracking_id ) {
+		/**
+		 * @var TrackingCode
+		 */
+		$tracking = $this->trackingRepository->retrieve( $tracking_id );
+
 		if ( Config::boolean( 'general.tracking_compatiblity' ) ) {
-			/**
-			 * @var TrackingCode
-			 */
-			$tracking = $this->trackingRepository->retrieve( $tracking_id );
 			if ( $tracking ) {
 				$order = wc_get_order( $tracking->order_id );
 				if ( $order ) {
@@ -347,6 +350,16 @@ class TrackingService {
 				}
 			}
 		}
+
+		if ( $tracking->tracking_range_code_id ) {
+			$tracking_code = TrackingRangeCode::find( $tracking->tracking_range_code_id );
+
+			if ( $tracking_code ) {
+				$tracking_code->is_used = false;
+				$tracking_code->save();
+			}
+		}
+
 		return $this->trackingRepository->delete( $tracking_id );
 	}
 

@@ -33,6 +33,7 @@ class DeliveryServiceCode {
 	public const IMPRESSO_NORMAL = '20010';
 
 	public const IMPRESSO_NORMAL_2 = '20133';
+	public const IMPRESSO_NORMAL_20KG_NP = '20060';
 	public const IMPRESSO_NORMAL_NAC_FAT_CHANC_NP = '20117';
 
 	public const IMPRESSO_MODICO = '20192';
@@ -99,7 +100,8 @@ class DeliveryServiceCode {
 		self::PAC_LOG => 'PAC LOG+',
 		self::SEDEX_LOG => 'SEDEX LOG+',
 		self::CARTA_COML_REG_B1_CHANC_ETIQ => 'CARTA COMERCIAL REGISTRADA B1 CHANCELADA ETIQUETA',
-		self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP => 'IMPRESSO NORMAL NAC FAT CHANC NP',
+		self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP => 'Impresso Normal NAC FAT CHANC NP',
+		self::IMPRESSO_NORMAL_20KG_NP => 'Impresso Normal Até 20KG NP',
 	];
 
 	/**
@@ -298,6 +300,7 @@ class DeliveryServiceCode {
 			case self::IMPRESSO_NORMAL:
 			case self::CARTA_COML_REG_B1_CHANC_ETIQ:
 			case self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP:
+			case self::IMPRESSO_NORMAL_20KG_NP:
 				return [ 
 					'min' => 12.82,
 					'max' => 104.62,
@@ -347,6 +350,11 @@ class DeliveryServiceCode {
 				return 'miniEnvios';
 			case DeliveryServiceCode::IMPRESSO_MODICO:
 				return 'impressoModico';
+			case DeliveryServiceCode::IMPRESSO_NORMAL:
+			case DeliveryServiceCode::IMPRESSO_NORMAL_2:
+			case DeliveryServiceCode::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP:
+			case DeliveryServiceCode::IMPRESSO_NORMAL_20KG_NP:
+				return 'impressoNormal';
 			case DeliveryServiceCode::PACKET_EXPRESS:
 				return 'packetExpress';
 			case DeliveryServiceCode::PACKET_STANDARD:
@@ -354,6 +362,35 @@ class DeliveryServiceCode {
 			default:
 				return null;
 		}
+	}
+
+	public static function getObjectFormatByProductCode( $product_code ) {
+		if ( self::isLetter( $product_code ) ) {
+			return 1;
+		}
+
+		return 2;
+	}
+
+	public static function isLetter( $product_code ) {
+		return in_array( $product_code, [ 
+			self::CARTA_COML_REG_B1_CHANC_ETIQ,
+			self::IMPRESSO_MODICO,
+			self::IMPRESSO_NORMAL,
+			self::IMPRESSO_NORMAL_2,
+			self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP,
+			self::IMPRESSO_NORMAL_20KG_NP,
+		] );
+	}
+
+	public static function allowRange( $product_code ) {
+		return in_array( $product_code, [ 
+			self::IMPRESSO_MODICO,
+			self::IMPRESSO_NORMAL,
+			self::IMPRESSO_NORMAL_2,
+			self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP,
+			self::IMPRESSO_NORMAL_20KG_NP,
+		] );
 	}
 
 }

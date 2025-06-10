@@ -31,6 +31,7 @@ class Migration {
 			'sync_at' => 'datetime DEFAULT NULL', //@since 1.2.3
 			'customer_email_at' => 'datetime DEFAULT NULL', //@since 1.2.3
 			'unit_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.5.0
+			'tracking_range_code_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.5.94
 			'updated_at' => 'datetime NOT NULL',
 			'created_at' => 'datetime NOT NULL',
 		] );

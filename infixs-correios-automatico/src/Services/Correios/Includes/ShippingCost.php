@@ -336,7 +336,8 @@ class ShippingCost {
 			[ 
 				DeliveryServiceCode::IMPRESSO_NORMAL,
 				DeliveryServiceCode::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP,
-				DeliveryServiceCode::IMPRESSO_NORMAL_2
+				DeliveryServiceCode::IMPRESSO_NORMAL_2,
+				DeliveryServiceCode::IMPRESSO_NORMAL_20KG_NP,
 			]
 		) ) {
 			$data['tpObjeto'] = 1;

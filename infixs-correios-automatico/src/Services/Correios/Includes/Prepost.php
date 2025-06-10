@@ -372,6 +372,12 @@ class Prepost {
 			$data["comprimentoInformado"] = Sanitizer::integer_text( $this->getLength() );
 		}
 
+		if ( in_array( $this->service_code, [ 
+			DeliveryServiceCode::CARTA_COML_REG_B1_CHANC_ETIQ
+		] ) ) {
+			$data['dataPrevistaPostagem'] = date( 'Y-m-d', strtotime( '+1 day' ) );
+		}
+
 
 		return $data;
 	}

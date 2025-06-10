@@ -508,6 +508,9 @@ class Order {
 				];
 			}, $tracking_codes->toArray() );
 		}
+
+		$data = apply_filters( 'infixs_correios_automatico_order_data', $data, $this->order );
+
 		return $data;
 	}
 }

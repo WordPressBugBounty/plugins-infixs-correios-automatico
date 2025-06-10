@@ -231,6 +231,10 @@ class Admin {
 			$params['activePlugins'][] = 'infixs-correios-automatico-dokan';
 		}
 
+		if ( class_exists( 'WeDevs_Dokan' ) ) {
+			$params['activePlugins'][] = 'dokan-lite';
+		}
+
 		$scriptData = array_merge( $params, [ 
 			'adminEmail' => get_option( 'admin_email' ),
 			'upgradeProUrl' => Plugin::PRO_URL,

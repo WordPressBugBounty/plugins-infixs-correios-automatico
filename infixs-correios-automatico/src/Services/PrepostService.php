@@ -137,8 +137,11 @@ class PrepostService {
 			$shipping_method->get_object_type_code()
 		);
 
-		if ( $shippingProductCode === DeliveryServiceCode::IMPRESSO_MODICO ) {
+		if ( DeliveryServiceCode::isLetter( $shippingProductCode ) ) {
 			$prepost->setObjectFormatCode( ObjectFormatCode::ENVELOPE );
+		}
+
+		if ( $shippingProductCode === DeliveryServiceCode::IMPRESSO_MODICO ) {
 			$prepost->addAdditionalService( [ 
 				'code' => '004',
 				'declaredValue' => '0'
@@ -286,7 +289,7 @@ class PrepostService {
 
 		$prazoPostagem = ( new \DateTime( $response['prazoPostagem'] ) )->format( 'Y-m-d H:i:s' );
 
-		$created_prepost = $this->prepostRepository->create( [ 
+		$data = [ 
 			'external_id' => $response['id'],
 			'order_id' => $prepost->getOrderId(),
 			'object_code' => $response['codigoObjeto'],
@@ -305,7 +308,9 @@ class PrepostService {
 			'expire_at' => $prazoPostagem,
 			'updated_at' => current_time( 'mysql' ),
 			'created_at' => current_time( 'mysql' ),
-		] );
+		];
+
+		$created_prepost = $this->prepostRepository->create( $data );
 
 		if ( ! $created_prepost ) {
 			Log::notice( "Erro ao salvar a pré-postagem no banco de dados." );
