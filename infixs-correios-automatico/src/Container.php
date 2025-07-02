@@ -21,6 +21,7 @@ use Infixs\CorreiosAutomatico\Services\LabelService;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
 use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
+use Infixs\CorreiosAutomatico\Services\Correios\Includes\Auth;
 use Infixs\CorreiosAutomatico\Services\EmailService;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 
@@ -63,14 +64,22 @@ class Container {
 		$this->container['unitRepository'] = fn() => new UnitRepository( Unit::class);
 		$this->container['invoiceUnitRepository'] = fn() => new InvoiceUnitRepository( Unit::class);
 
-		$this->container['correiosApi'] = fn( $c ) => new CorreiosApi( $c['configRepository'] );
+		$this->container['correiosApi'] = function ($c) {
+			$auth = new Auth( $c['configRepository']->get( 'auth' ) );
+			$auth->setUpdateTokenCallback( function ($token) use ($c) {
+				$c['configRepository']->update( 'auth.token', $token );
+			} );
+
+			return new CorreiosApi( $auth );
+		};
+
 		$this->container['infixsApi'] = fn() => new InfixsApi();
 
-		$this->container['correiosService'] = fn( $c ) => new CorreiosService( $c['correiosApi'], $c['configRepository'] );
-		$this->container['trackingService'] = fn( $c ) => new TrackingService( $c['trackingRepository'], $c['correiosService'] );
+		$this->container['correiosService'] = fn( $c ) => new CorreiosService( $c['correiosApi'] );
+		$this->container['trackingService'] = fn( $c ) => new TrackingService( $c['trackingRepository'], $c['correiosService'], $c['configRepository'] );
 		$this->container['prepostService'] = fn( $c ) => new PrepostService( $c['prepostRepository'], $c['correiosService'] );
 		$this->container['orderService'] = fn() => new OrderService();
-		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'] );
+		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'] );
 		$this->container['emailService'] = fn() => new EmailService();
 		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitRepository'] );

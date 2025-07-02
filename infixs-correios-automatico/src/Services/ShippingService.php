@@ -6,11 +6,15 @@ use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Models\WoocommerceShippingZoneMethod;
+use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\APIServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
+use Infixs\CorreiosAutomatico\Core\Support\Log;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -31,15 +35,23 @@ class ShippingService {
 	protected $infixsApi;
 
 	/**
+	 * Config Repository
+	 * 
+	 * @var ConfigRepository
+	 */
+	protected $configRepository;
+
+	/**
 	 * Constructor
 	 * 
 	 * @param CorreiosService $correiosService
 	 * @param InfixsApi $infixsApi
 	 * 
 	 */
-	public function __construct( CorreiosService $correiosService, InfixsApi $infixsApi ) {
+	public function __construct( CorreiosService $correiosService, InfixsApi $infixsApi, ConfigRepository $configRepository ) {
 		$this->correiosService = $correiosService;
 		$this->infixsApi = $infixsApi;
+		$this->configRepository = $configRepository;
 	}
 
 	/**
@@ -812,5 +824,49 @@ class ShippingService {
 	public function calculateShippingByMethod( $instance_id, $package = [] ) {
 		$method = \WC_Shipping_Zones::get_shipping_method( $instance_id );
 		return $method->get_rates_for_package( $package );
+	}
+
+	public function calculateShippingCost( $shipping_cost ) {
+		$has_active_contract = $this->configRepository->boolean( 'auth.active' ) && Helper::contractHasService( APIServiceCode::PRECO );
+
+		$has_active_contract = apply_filters( 'infixs_correios_automatico_calculate_shipping_has_active_contract', $has_active_contract, $shipping_cost );
+
+		if ( $has_active_contract ) {
+			return $this->correiosService->get_shipping_cost( $shipping_cost );
+		} else {
+			$request = [ 
+				"origin_postal_code" => $shipping_cost->getOriginPostcode(),
+				"destination_postal_code" => $shipping_cost->getDestinationPostcode(),
+				"product_code" => $shipping_cost->getProductCode(),
+				"type" => $shipping_cost->getObjectType(),
+				'insurance' => $shipping_cost->getInsuranceDeclarationValue(),
+				"package" => [ 
+					"weight" => $shipping_cost->getWeight( 'g' ),
+					"length" => $shipping_cost->getLength(),
+					"width" => $shipping_cost->getWidth(),
+					"height" => $shipping_cost->getHeight(),
+				],
+				"services" => [ 
+					"own_hands" => $shipping_cost->getOwnHands(),
+					"receipt_notice" => $shipping_cost->getReceiptNotice(),
+				],
+			];
+
+			$response = $this->infixsApi->calculateShipping( $request );
+
+			if ( ! is_wp_error( $response ) && isset( $response["shipping_cost"] ) ) {
+				Log::debug( "Shipping cost api infixs response", $response );
+				return $response;
+			}
+
+			if ( is_wp_error( $response ) ) {
+				Log::notice( "Não foi possível calcular o frete via api: " . $response->get_error_message(),
+					$request
+				);
+			}
+
+		}
+
+		return false;
 	}
 }

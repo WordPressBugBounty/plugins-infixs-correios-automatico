@@ -16,7 +16,7 @@ class Helper {
 	 * @return bool
 	 */
 	public static function contractHasService( $service_code ) {
-		return in_array( APIServiceCode::SRO_RASTRO, Config::get( 'auth.allowed_services' ) );
+		return in_array( $service_code, Config::get( 'auth.allowed_services' ) );
 	}
 	public static function extractNumberFromTrackingCode( $code, $without_digit = false ) {
 		if ( preg_match( '/\d+/', $code, $matches ) ) {

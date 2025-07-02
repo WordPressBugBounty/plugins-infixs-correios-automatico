@@ -1108,7 +1108,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$cached_data = get_transient( $transient_key );
 
 		if ( $cached_data === false ) {
-			$cost_response = Container::correiosService()->get_shipping_cost( $shipping_cost );
+			$cost_response = Container::shippingService()->calculateShippingCost( $shipping_cost );
 			if ( $cost_response !== false ) {
 				set_transient( $transient_key, $cost_response, MINUTE_IN_SECONDS );
 			}
@@ -1339,5 +1339,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			return 1;
 		}
 		return 2;
+	}
+
+	public function is_receipt_notice() {
+		return $this->receipt_notice;
 	}
 }

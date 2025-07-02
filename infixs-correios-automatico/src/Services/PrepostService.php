@@ -148,6 +148,13 @@ class PrepostService {
 			] );
 		}
 
+		if ( $shipping_method->is_receipt_notice() ) {
+			$prepost->addAdditionalService( [ 
+				'code' => '001',
+				'declaredValue' => '0'
+			] );
+		}
+
 		$prepost->setItemsFromPackage( $ca_order->getPackage() );
 
 		$shippingItem = $ca_order->getFirstShippingItemData();

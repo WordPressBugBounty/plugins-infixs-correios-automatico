@@ -192,7 +192,6 @@ class WCIntegration {
 	}
 
 	public function woocommerce_declare_compatibility() {
-
 		if ( class_exists( FeaturesUtil::class) ) {
 			FeaturesUtil::declare_compatibility( 'custom_order_tables', \INFIXS_CORREIOS_AUTOMATICO_FILE_NAME, true );
 			FeaturesUtil::declare_compatibility( 'product_block_editor', \INFIXS_CORREIOS_AUTOMATICO_FILE_NAME, true );

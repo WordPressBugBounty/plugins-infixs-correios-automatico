@@ -77,7 +77,7 @@ class Core {
 					$method->init_instance_settings();
 					if ( $method->id === 'infixs-correios-automatico' && $method->get_product_code() === DeliveryServiceCode::IMPRESSO_MODICO ) {
 						$method->instance_settings['modic_use_range'] = 'yes';
-						update_option( $method->get_instance_option_key(), $method->instance_settings, 'yes' );
+						update_option( $method->get_instance_option_key(), $method->instance_settings, true );
 					}
 				}
 			}

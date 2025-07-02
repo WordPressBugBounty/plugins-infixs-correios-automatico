@@ -3,8 +3,8 @@
 namespace Infixs\CorreiosAutomatico\Services\Correios;
 
 use Infixs\CorreiosAutomatico\Core\Support\Log;
-use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\Environment;
+use Infixs\CorreiosAutomatico\Services\Correios\Includes\Auth;
 use Infixs\CorreiosAutomatico\Traits\HttpTrait;
 
 defined( 'ABSPATH' ) || exit;
@@ -12,41 +12,25 @@ defined( 'ABSPATH' ) || exit;
 class CorreiosApi {
 	use HttpTrait;
 
-	/**
-	 * Config Repository
-	 * 
-	 * @var ConfigRepository
-	 */
-	protected $configRepository;
-
-	protected $contract_enabled;
-
-	/**
-	 * Enviroment
-	 * 
-	 * @var Environment::PRODUCTION|Environment::SANDBOX $enviroment
-	 */
-	protected $enviroment;
-
 	protected $sandboxUrl = 'https://apihom.correios.com.br';
 
 	protected $productionUrl = 'https://api.correios.com.br';
+
+	/**
+	 * Auth
+	 * 
+	 * @var Auth
+	 */
+	protected $auth;
 
 
 	/**
 	 * Constructor
 	 * 
-	 * @param ConfigRepository $configRepository
+	 * @param Auth $auth
 	 */
-	public function __construct( $configRepository ) {
-
-		$this->configRepository = $configRepository;
-
-		$this->contract_enabled = $this->configRepository->boolean( 'auth.active' );
-
-		$enviroment = $this->configRepository->get( 'auth.environment', 'production' );
-
-		$this->enviroment = $enviroment === 'production' ? Environment::PRODUCTION : Environment::SANDBOX;
+	public function __construct( $auth ) {
+		$this->auth = $auth;
 	}
 
 	/**
@@ -57,7 +41,7 @@ class CorreiosApi {
 	 * @return string
 	 */
 	public function getApiUrl( $enviroment = null ) {
-		$enviroment = $enviroment ?: $this->enviroment;
+		$enviroment = $enviroment ?: $this->auth->getEnvironment();
 
 		return $enviroment === Environment::PRODUCTION ? $this->productionUrl : $this->sandboxUrl;
 	}
@@ -73,7 +57,7 @@ class CorreiosApi {
 	 * @return array|\WP_Error
 	 */
 	protected function authenticated_post( $endpoint, $data, $headers = [], $retry = true ) {
-		$token = $this->configRepository->get( 'auth.token' );
+		$token = $this->auth->getToken();
 		if ( empty( $token ) ) {
 			$token = $this->get_token();
 		}
@@ -109,7 +93,7 @@ class CorreiosApi {
 	 * @return array|\WP_Error
 	 */
 	protected function authenticated_delete( $endpoint, $params = [], $headers = [], $retry = true ) {
-		$token = $this->configRepository->get( 'auth.token' );
+		$token = $this->auth->getToken();
 		if ( empty( $token ) ) {
 			$token = $this->get_token();
 		}
@@ -192,6 +176,7 @@ class CorreiosApi {
 	 * @since 1.0.0
 	 * 
 	 * @param array $data
+	 * @param Auth|null $auth
 	 * 
 	 * @return array|\WP_Error
 	 */
@@ -224,11 +209,12 @@ class CorreiosApi {
 	 * @param array $params
 	 * @param array $headers
 	 * @param bool $retry
+	 * @param Auth|null $auth
 	 * 
 	 * @return array|\WP_Error
 	 */
 	public function authenticated_get( $endpoint, $params = [], $headers = [], $retry = true ) {
-		$token = $this->configRepository->get( 'auth.token' );
+		$token = $this->auth->getToken();
 		$token = empty( $token ) ? $this->get_token() : $token;
 
 		if ( is_wp_error( $token ) )
@@ -269,9 +255,9 @@ class CorreiosApi {
 	 * @return string|\WP_Error
 	 */
 	protected function get_token() {
-		$user_name = $this->configRepository->get( 'auth.user_name' );
-		$access_code = $this->configRepository->get( 'auth.access_code' );
-		$postcard = $this->configRepository->get( 'auth.postcard' );
+		$user_name = $this->auth->getUserName();
+		$access_code = $this->auth->getAccessCode();
+		$postcard = $this->auth->getPostcard();
 
 		$response = $this->auth_postcard( $user_name, $access_code, $postcard );
 
@@ -316,7 +302,7 @@ class CorreiosApi {
 			return new \WP_Error( 'correios_auth_postcard', "Erro ao autenticar com os correios", [ 'status' => 400 ] );
 		}
 
-		$this->configRepository->update( 'auth.token', $response['token'] );
+		$this->auth->update_token( $response['token'] );
 		return $response;
 	}
 
@@ -361,7 +347,7 @@ class CorreiosApi {
 	 * @return void
 	 */
 	public function setEnvironment( $environment ) {
-		$this->enviroment = $environment;
+		$this->auth->setEnvironment( $environment );
 	}
 
 	/**

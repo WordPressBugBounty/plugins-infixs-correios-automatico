@@ -281,6 +281,7 @@ class DeliveryServiceCode {
 	 */
 	public static function getDeclarationLimits( $service_code ) {
 		switch ( $service_code ) {
+			case self::SEDEX:
 			case self::SEDEX_HOJE_CONTRATO_AG:
 			case self::SEDEX_CONTRATO_AG:
 			case self::SEDEX_10_CONTRATO_AG:

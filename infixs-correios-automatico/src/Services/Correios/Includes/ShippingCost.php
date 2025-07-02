@@ -67,7 +67,7 @@ class ShippingCost {
 	 * 
 	 * @var Package
 	 */
-	private $package;
+	private $package = null;
 
 	/**
 	 * Width in cm
@@ -135,6 +135,15 @@ class ShippingCost {
 		$this->setWidth( $data['width'] );
 		$this->setLength( $data['length'] );
 		$this->setWeight( $data['weight'] );
+	}
+
+	/**
+	 * Get Package
+	 * 
+	 * @return Package|null
+	 */
+	public function getPackage() {
+		return $this->package;
 	}
 
 	/**

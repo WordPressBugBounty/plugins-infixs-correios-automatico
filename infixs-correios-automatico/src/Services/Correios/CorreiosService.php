@@ -2,16 +2,10 @@
 
 namespace Infixs\CorreiosAutomatico\Services\Correios;
 
-use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
-use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\AddicionalServiceCode;
-use Infixs\CorreiosAutomatico\Services\Correios\Enums\APIServiceCode;
-use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\ShippingCost;
 use Infixs\CorreiosAutomatico\Traits\HttpTrait;
-use Infixs\CorreiosAutomatico\Utils\Helper;
-use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -19,10 +13,6 @@ defined( 'ABSPATH' ) || exit;
 class CorreiosService {
 
 	use HttpTrait;
-
-	protected $configRepository;
-
-	protected $contract_enabled;
 
 	/**
 	 * CorreiosApi
@@ -34,15 +24,11 @@ class CorreiosService {
 	/**
 	 * Constructor
 	 * 
-	 * @param ConfigRepository $configRepository
 	 * @param CorreiosApi $correiosApi
 	 * 
 	 */
-	public function __construct( $correiosApi, $configRepository ) {
-		$this->configRepository = $configRepository;
+	public function __construct( $correiosApi ) {
 		$this->correiosApi = $correiosApi;
-		$this->contract_enabled = $this->configRepository->boolean( 'auth.active' );
-
 		add_filter( 'correios_automatico_get_shipping_cost', [ $this, 'calculate_shipping_cost' ], 10, 3 );
 	}
 
@@ -57,80 +43,42 @@ class CorreiosService {
 	public function get_shipping_cost( $shipping_cost ) {
 		do_action( 'infixs_correios_automatico_get_shipping_cost', $this );
 
-		if ( $this->contract_enabled && Helper::contractHasService( APIServiceCode::PRECO ) ) {
+		$response = apply_filters( 'correios_automatico_get_shipping_cost',
+			new \WP_Error( 'correios_automatico_get_shipping_cost', 'Erro ao calcular o frete, método não encontrado.' ),
+			$shipping_cost, [] );
 
-			$response = apply_filters( 'correios_automatico_get_shipping_cost',
-				new \WP_Error( 'correios_automatico_get_shipping_cost', 'Erro ao calcular o frete, método não encontrado.' ),
-				$shipping_cost, [] );
+		if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) ) {
+			Log::debug( "Shipping cost api correios response", $response );
 
-			if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) ) {
-				Log::debug( "Shipping cost api correios response", $response );
-
-				$shipping_cost_response = [ 
-					'shipping_cost' => Sanitizer::numeric( $response["pcFinal"] ) / 100,
-				];
-
-				if ( isset( $response['servicoAdicional'] ) ) {
-					foreach ( $response['servicoAdicional'] as $service ) {
-						if ( isset( $service['coServAdicional'] ) &&
-							isset( $service['pcServicoAdicional'] ) &&
-							in_array( $service['coServAdicional'], [ 
-								AddicionalServiceCode::INSURANCE_DECLARATION_MINI_ENVIOS,
-								AddicionalServiceCode::INSURANCE_DECLARATION_PAC,
-								AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX,
-							] ) ) {
-							$shipping_cost_response['insurance_cost'] = Sanitizer::numeric( $service['pcServicoAdicional'] ) / 100;
-							break;
-						}
-					}
-				}
-
-				return $shipping_cost_response;
-			}
-
-
-			if ( is_wp_error( $response ) ) {
-				Log::notice( "Não foi possível calcular o frete: " . $response->get_error_message(),
-					$shipping_cost->getData()
-				);
-			}
-		} else {
-			$request = [ 
-				"origin_postal_code" => $shipping_cost->getOriginPostcode(),
-				"destination_postal_code" => $shipping_cost->getDestinationPostcode(),
-				"product_code" => $shipping_cost->getProductCode(),
-				"type" => $shipping_cost->getObjectType(),
-				'insurance' => $shipping_cost->getInsuranceDeclarationValue(),
-				"package" => [ 
-					"weight" => $shipping_cost->getWeight( 'g' ),
-					"length" => $shipping_cost->getLength(),
-					"width" => $shipping_cost->getWidth(),
-					"height" => $shipping_cost->getHeight(),
-				],
-				"services" => [ 
-					"own_hands" => $shipping_cost->getOwnHands(),
-					"receipt_notice" => $shipping_cost->getReceiptNotice(),
-				],
+			$shipping_cost_response = [ 
+				'shipping_cost' => Sanitizer::numeric( $response["pcFinal"] ) / 100,
 			];
 
-			$response = $this->post(
-				'https://api.infixs.io/v1/shipping/calculate/correios',
-				$request,
-				[],
-			);
-
-			if ( ! is_wp_error( $response ) && isset( $response["shipping_cost"] ) ) {
-				Log::debug( "Shipping cost api infixs response", $response );
-				return $response;
+			if ( isset( $response['servicoAdicional'] ) ) {
+				foreach ( $response['servicoAdicional'] as $service ) {
+					if ( isset( $service['coServAdicional'] ) &&
+						isset( $service['pcServicoAdicional'] ) &&
+						in_array( $service['coServAdicional'], [ 
+							AddicionalServiceCode::INSURANCE_DECLARATION_MINI_ENVIOS,
+							AddicionalServiceCode::INSURANCE_DECLARATION_PAC,
+							AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX,
+						] ) ) {
+						$shipping_cost_response['insurance_cost'] = Sanitizer::numeric( $service['pcServicoAdicional'] ) / 100;
+						break;
+					}
+				}
 			}
 
-			if ( is_wp_error( $response ) ) {
-				Log::notice( "Não foi possível calcular o frete via api: " . $response->get_error_message(),
-					$request
-				);
-			}
-
+			return $shipping_cost_response;
 		}
+
+
+		if ( is_wp_error( $response ) ) {
+			Log::notice( "Não foi possível calcular o frete: " . $response->get_error_message(),
+				$shipping_cost->getData()
+			);
+		}
+
 
 		return false;
 	}
@@ -152,7 +100,12 @@ class CorreiosService {
 
 		Log::debug( "Shipping cost correios api with code $product_code", $data );
 
-		return $this->correiosApi->precoNacional(
+		/**
+		 * @var  \Infixs\CorreiosAutomatico\Services\Correios\CorreiosApi $correiosApi
+		 */
+		$correiosApi = apply_filters( 'infixs_correios_automatico_calculate_shipping_cost_correios_api', $this->correiosApi, $shipping_cost );
+
+		return $correiosApi->precoNacional(
 			$product_code,
 			$data
 		);
@@ -271,11 +224,7 @@ class CorreiosService {
 	 * @return array|\WP_Error
 	 */
 	public function get_object_tracking( $tracking_code ) {
-		if ( $this->contract_enabled && Helper::contractHasService( APIServiceCode::SRO_RASTRO ) ) {
-			return $this->correiosApi->rastroObjeto( $tracking_code );
-		} else {
-			return Container::infixsApi()->getTrackingHistory( $tracking_code );
-		}
+		return $this->correiosApi->rastroObjeto( $tracking_code );
 	}
 
 	/**
@@ -286,12 +235,7 @@ class CorreiosService {
 	 * @return array|\WP_Error
 	 */
 	public function get_object_trackings( $tracking_codes ) {
-		if ( $this->contract_enabled && Helper::contractHasService( APIServiceCode::SRO_RASTRO ) ) {
-			return $this->correiosApi->rastroObjetos( $tracking_codes );
-		} else {
-			//TODO: Implment API
-			return new \WP_Error( 'correios_automatico_get_object_trackings', 'Serviço de rastreamento indisponível.' );
-		}
+		return $this->correiosApi->rastroObjetos( $tracking_codes );
 	}
 
 	/**

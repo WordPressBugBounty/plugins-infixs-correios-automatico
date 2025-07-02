@@ -2,9 +2,12 @@
 
 namespace Infixs\CorreiosAutomatico\Services;
 
+use Infixs\CorreiosAutomatico\Traits\HttpTrait;
+
 defined( 'ABSPATH' ) || exit;
 
 class InfixsApi {
+	use HttpTrait;
 	protected $api_url = 'https://api.infixs.io';
 	protected $api_version = 'v1';
 
@@ -85,6 +88,14 @@ class InfixsApi {
 		}
 
 		return $data;
+	}
+
+	public function calculateShipping( $data ) {
+		return $this->post(
+			'https://api.infixs.io/v1/shipping/calculate/correios',
+			$data,
+			[],
+		);
 	}
 
 	/**

@@ -2,14 +2,17 @@
 
 namespace Infixs\CorreiosAutomatico\Services;
 
-
+use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\Tracking;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
+use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Repositories\TrackingRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\APIServiceCode;
+use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\WordpressEloquent\Collection;
 
 defined( 'ABSPATH' ) || exit;
@@ -39,14 +42,22 @@ class TrackingService {
 	protected $correiosService;
 
 	/**
+	 * Config repository.
+	 * 
+	 * @var ConfigRepository
+	 */
+	protected $configRepository;
+
+	/**
 	 * Tracking Service constructor.
 	 * 
 	 * @param TrackingRepository $trackingRepository
 	 * @since 1.0.0
 	 */
-	public function __construct( TrackingRepository $trackingRepository, CorreiosService $correiosService ) {
+	public function __construct( TrackingRepository $trackingRepository, CorreiosService $correiosService, ConfigRepository $configRepository ) {
 		$this->trackingRepository = $trackingRepository;
 		$this->correiosService = $correiosService;
+		$this->configRepository = $configRepository;
 	}
 
 	/**
@@ -399,7 +410,10 @@ class TrackingService {
 	 * @return TrackingCode|\WP_Error
 	 */
 	public function sync_remote_tracking_code( TrackingCode $tracking ) {
-		$response = $this->correiosService->get_object_tracking( $tracking->code );
+
+		$response = $this->configRepository->boolean( 'auth.active' ) && Helper::contractHasService( APIServiceCode::SRO_RASTRO )
+			? $this->correiosService->get_object_tracking( $tracking->code )
+			: Container::infixsApi()->getTrackingHistory( $tracking->code );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
@@ -505,6 +519,10 @@ class TrackingService {
 	public function sync_remote_mutiples_tracking_codes( $trackings ) {
 
 		$codes = $trackings->pluck( 'code' )->toArray();
+
+		if ( ! $this->configRepository->boolean( 'auth.active' ) || ! Helper::contractHasService( APIServiceCode::SRO_RASTRO ) ) {
+			return false;
+		}
 
 		$response = $this->correiosService->get_object_trackings( $codes );
 
