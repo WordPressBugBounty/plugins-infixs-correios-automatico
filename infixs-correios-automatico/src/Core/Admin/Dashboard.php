@@ -41,7 +41,8 @@ class Dashboard {
 			esc_html__( 'Correios Automático', 'infixs-correios-automatico' ),
 			'manage_woocommerce',
 			'infixs-correios-automatico',
-			[ $this, 'admin_page' ]
+			[ $this, 'admin_page' ],
+			6
 		);
 	}
 

@@ -48,6 +48,11 @@ class OrderService {
 			'order' => 'DESC'
 		];
 
+		if ( ! empty( $search ) ) {
+			$order_query_args['s'] = $search;
+			$order_query_args['search_filter'] = 'all';
+		}
+
 		$orders = wc_get_orders( $order_query_args );
 
 		$data = $this->transformOrders( $orders->orders );

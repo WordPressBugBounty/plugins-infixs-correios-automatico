@@ -2,7 +2,6 @@
 
 namespace Infixs\CorreiosAutomatico\Controllers\Rest;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
-use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 
 defined( 'ABSPATH' ) || exit;

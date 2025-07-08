@@ -1109,10 +1109,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		if ( $cached_data === false ) {
 			$cost_response = Container::shippingService()->calculateShippingCost( $shipping_cost );
-			if ( $cost_response !== false ) {
+			if ( $cost_response !== false && isset( $cost_response['shipping_cost'] ) && $cost_response['shipping_cost'] !== false ) {
 				set_transient( $transient_key, $cost_response, MINUTE_IN_SECONDS );
 			}
 		} else {
+			Log::debug( "Dados de frete recuperados do cache.", [ 
+				'transient_key' => $transient_key,
+				'cached_data' => $cached_data,
+			] );
 			$cost_response = $cached_data;
 		}
 

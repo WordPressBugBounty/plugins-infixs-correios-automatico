@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Controllers\Rest;
 
 use Infixs\CorreiosAutomatico\Container;
+use Infixs\CorreiosAutomatico\Controllers\Sanitizers\CalculatorStylesSanitizer;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 
@@ -229,6 +230,14 @@ class SettingsGeneralController {
 			$updated_settings['when_api_update_tracking_code'] = sanitize_text_field( $data['when_api_update_tracking_code'] );
 		}
 
+		if ( isset( $data['calculator_style_id'] ) ) {
+			$updated_settings['calculator_style_id'] = sanitize_text_field( $data['calculator_style_id'] );
+		}
+
+		if ( isset( $data['calculator_styles'] ) && is_array( $data['calculator_styles'] ) ) {
+			$updated_settings['calculator_styles'] = CalculatorStylesSanitizer::sanitize( $data['calculator_styles'] );
+		}
+
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
@@ -361,6 +370,8 @@ class SettingsGeneralController {
 			'free_shipping_bar_cart_page' => Config::boolean( 'general.free_shipping_bar_cart_page' ),
 			'hide_bar_until_postcode' => Config::boolean( 'general.hide_bar_until_postcode' ),
 			'when_api_update_tracking_code' => Config::string( 'general.when_api_update_tracking_code' ),
+			'calculator_style_id' => Config::string( 'general.calculator_style_id' ),
+			'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
 		];
 
 		return apply_filters( 'infixs_correios_automatico_prepare_general_settings', $sanitized_settings );

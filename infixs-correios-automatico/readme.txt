@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.5.95
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -34,6 +34,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Frete Grátis e Descontos** - Adicione regras para dar o frete grátis ou descontos para seu cliente a partir do total do carrinho.
 - **Devolução de Produto** - Habilite o botão de devolução de produto no seu site para seu cliente de forma fácil e rápida.
 - **E-mails de rastreio** - Gerencie, customize e automatize emails de rastreio para o seu cliente.
+- **Dias Adicionais** - Insira dias adicionais (prazo de entrega) em cada Produto ou então no método de entrega, ele será somado ao prazo real dos correios.
 - **Modo Offline** - Caso os correios fique fora do ar, nossos servidores ficam responsáveis por calcular o custo de envio aproximado, envitando a perda de vendas.
 - **Compatibilidade com Multisites** - Plugin totalmente compatível com Wordpress Multisites mesmo na versão free.
 - **Compatibilidade com Melhor Envio** - Utilize esse plugin em conjunto com o Melhor Envio, substituindo apenas o método de envio dos correios.
@@ -137,6 +138,11 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.6.0 2025-07-08 =
+* Campo de pesquisa na lista de pedidos
+* Customização de cores, bordas, texto, icone na calculadora da página do produto
+* Pequenas correções da API dos Correios
 
 = 1.5.95 2025-07-02 =
 * Novos serviços dos correios

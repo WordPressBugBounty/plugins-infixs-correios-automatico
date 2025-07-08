@@ -148,6 +148,13 @@ class PrepostService {
 			] );
 		}
 
+		if ( $shippingProductCode === DeliveryServiceCode::CARTA_COML_REG_B1_CHANC_ETIQ ) {
+			$prepost->addAdditionalService( [ 
+				'code' => '025',
+				'declaredValue' => '0'
+			] );
+		}
+
 		if ( $shipping_method->is_receipt_notice() ) {
 			$prepost->addAdditionalService( [ 
 				'code' => '001',

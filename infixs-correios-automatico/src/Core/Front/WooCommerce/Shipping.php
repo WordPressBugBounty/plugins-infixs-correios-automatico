@@ -76,11 +76,14 @@ class Shipping {
 		ob_start();
 
 		if ( is_product() ) {
-			$template = 'infixs-shipping-calculator.php';
+			$calculator_style_id = Config::string( "general.calculator_style_id" );
+			$template = $calculator_style_id === 'custom' ? 'infixs-shipping-calculator-styles.php' : 'infixs-shipping-calculator.php';
 
 			wc_get_template(
 				$template,
-				[],
+				$calculator_style_id === 'custom' ? [ 
+					'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
+				] : [],
 				'infixs-correios-automatico/',
 				\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'templates/'
 			);
@@ -166,10 +169,11 @@ class Shipping {
 		$current_package = reset( $packages_result );
 
 		wc_get_template(
-			'infixs-shipping-calculator-results.php',
+			Config::string( 'general.calculator_style_id' ) === 'custom' ? 'infixs-shipping-calculator-styles-results.php' : 'infixs-shipping-calculator-results.php',
 			[ 
 				'address' => $address,
 				'rates' => $current_package['rates'],
+				'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
 			],
 			'infixs-correios-automatico/',
 			\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'templates/'
