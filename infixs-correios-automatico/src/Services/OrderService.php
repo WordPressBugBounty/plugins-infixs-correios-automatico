@@ -49,8 +49,40 @@ class OrderService {
 		];
 
 		if ( ! empty( $search ) ) {
-			$order_query_args['s'] = $search;
-			$order_query_args['search_filter'] = 'all';
+			if ( function_exists( 'wc_get_container' ) &&
+				class_exists( 'Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController' ) &&
+				wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class)->custom_orders_table_usage_is_enabled() ) {
+				$order_query_args['s'] = $search;
+				$order_query_args['search_filter'] = 'all';
+			} else {
+				$order_query_args['meta_query'] = [ 
+					'relation' => 'OR',
+					[ 
+						'key' => '_billing_first_name',
+						'value' => $search,
+						'compare' => 'LIKE'
+					],
+					[ 
+						'key' => '_billing_last_name',
+						'value' => $search,
+						'compare' => 'LIKE'
+					],
+					[ 
+						'key' => '_billing_email',
+						'value' => $search,
+						'compare' => 'LIKE'
+					],
+					[ 
+						'key' => '_billing_address_1',
+						'value' => $search,
+						'compare' => 'LIKE'
+					],
+				];
+
+				if ( is_numeric( $search ) ) {
+					$order_query_args['post__in'] = [ absint( $search ) ];
+				}
+			}
 		}
 
 		$orders = wc_get_orders( $order_query_args );

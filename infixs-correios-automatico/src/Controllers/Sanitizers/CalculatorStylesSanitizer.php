@@ -26,6 +26,7 @@ class CalculatorStylesSanitizer {
 		'find_postcode',
 		'result_address',
 		'result_title_column',
+		'result_table_header',
 		'result_delivery_time'
 	];
 
