@@ -187,7 +187,7 @@ class CalculatorStylesSanitizer {
 		}
 
 		$result = array_unique( $sanitized );
-		return empty( $result ) ? null : $result;
+		return empty( $result ) ? [] : $result;
 	}
 
 	/**

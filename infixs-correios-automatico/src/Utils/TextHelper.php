@@ -10,6 +10,6 @@ class TextHelper {
 	}
 
 	public static function removeShippingTime( $name ) {
-		return trim( preg_replace( '/ \(\d+ dia[s]? út(eis|il)\)/', '', $name ) );
+		return trim( preg_replace( '/ \(\s*\d+(?: a \d+)? dia[s]? út(eis|il)\s*\)/', '', $name ) );
 	}
 }

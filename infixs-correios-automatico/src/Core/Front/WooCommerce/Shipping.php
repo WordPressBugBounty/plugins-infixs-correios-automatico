@@ -122,14 +122,23 @@ class Shipping {
 
 		$package_cost = $product->get_price() * $quantity;
 
-		$shipping_cost_requires_address = wc_string_to_bool( get_option( 'woocommerce_shipping_cost_requires_address', 'no' ) );
-		$address = Config::boolean( "general.show_full_address_calculate_product" ) || $shipping_cost_requires_address ? $this->shippingService->getAddressByPostcode( $postscode ) : false;
-
 		$state = $this->shippingService->getStateByPostcode( $postscode );
 
-		$package = [ 
+		$address = Config::boolean( "general.show_full_address_calculate_product" ) ? $this->shippingService->getAddressByPostcode( $postscode ) : false;
+
+		if ( ! $address ) {
+			$address = [ 
+				'state' => $state,
+				'postcode' => Sanitizer::numeric_text( $postscode ),
+				'country' => 'BR',
+			];
+		}
+
+		$package = apply_filters( 'infixs_correios_automatico_calculate_single_shipping_package', [ 
 			'contents' => [ 
 				0 => [ 
+					'product_id' => $product->get_id(),
+					'variation_id' => $variation_id,
 					'data' => $product,
 					'quantity' => $quantity,
 				],
@@ -143,28 +152,31 @@ class Shipping {
 				'country' => 'BR',
 				'state' => $state,
 				'postcode' => Sanitizer::numeric_text( $postscode ),
-				'city' => $address ? $address['city'] : '',
-				'address' => $address ? $address['address'] : '',
+				'city' => isset( $address['city'] ) ? $address['city'] : '',
+				'address' => isset( $address['address'] ) ? $address['address'] : '',
 			],
 			'cart_subtotal' => $package_cost,
 			'is_product_page' => true,
-		];
+		], $product );
 
 		if ( ! WC()->customer->get_billing_first_name() ) {
-			WC()->customer->set_billing_location( 'BR', $address ? $address['state'] : $state, $postscode, $address ? $address['city'] : '' );
-			if ( $address )
+			WC()->customer->set_billing_location( 'BR', isset( $address['state'] ) ? $address['state'] : $state, $postscode, isset( $address['city'] ) ? $address['city'] : '' );
+			if ( isset( $address['address'] ) )
 				WC()->customer->set_billing_address( $address['address'] );
 		}
-		WC()->customer->set_shipping_location( 'BR', $address ? $address['state'] : $state, $postscode, $address ? $address['city'] : '' );
-		if ( $address )
+		WC()->customer->set_shipping_location( 'BR', isset( $address['state'] ) ? $address['state'] : $state, $postscode, isset( $address['city'] ) ? $address['city'] : '' );
+		if ( isset( $address['address'] ) )
 			WC()->customer->set_shipping_address( $address['address'] );
+
 		WC()->customer->set_calculated_shipping( true );
 		WC()->customer->save();
 
 		$hash = Helper::generateHashFromArray( $package );
 		$packages[ $hash ] = $package;
-		$packages_result = WC()->shipping()->calculate_shipping( $packages );
 
+		add_filter( 'option_woocommerce_shipping_cost_requires_address', '__return_false', 999 );
+		$packages_result = WC()->shipping()->calculate_shipping( $packages );
+		remove_filter( 'option_woocommerce_shipping_cost_requires_address', '__return_false', 999 );
 
 		$current_package = reset( $packages_result );
 

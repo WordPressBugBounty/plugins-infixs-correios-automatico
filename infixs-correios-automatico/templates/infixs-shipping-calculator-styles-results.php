@@ -23,7 +23,13 @@ require_once __DIR__ . '/infixs-shipping-calculator-shared-styles.php';
 <div class="infixs-correios-automatico-shipping-results">
 	<?php if ( isset( $address ) && $address ) : ?>
 		<div class="infixs-correios-automatico-shipping-results-address" <?php echo InfixsCalculatorStylesHelper::getResultElementInlineStyle( 'result_address', $calculator_styles ); ?>>
-			<?php echo sprintf( "%s%s%s%s", esc_html( isset( $address['address'] ) && $address['address'] ? $address['address'] . ', ' : '' ), esc_html( isset( $address['neighborhood'] ) && $address['neighborhood'] ? $address['neighborhood'] . ', ' : '' ), esc_html( isset( $address['city'] ) && $address['city'] ? $address['city'] . '/' : '' ), esc_html( $address['state'] ?? '' ) ); ?>
+			<?php echo sprintf( "%s%s%s%s%s, Brasil",
+				esc_html( isset( $address['postcode'] ) && $address['postcode'] ? $address['postcode'] . ', ' : '' ),
+				esc_html( isset( $address['address'] ) && $address['address'] ? $address['address'] . ', ' : '' ),
+				esc_html( isset( $address['neighborhood'] ) && $address['neighborhood'] ? $address['neighborhood'] . ', ' : '' ),
+				esc_html( isset( $address['city'] ) && $address['city'] ? $address['city'] . '/' : '' ),
+				esc_html( $address['state'] ?? '' )
+			); ?>
 		</div>
 	<?php endif; ?>
 
@@ -38,14 +44,23 @@ require_once __DIR__ . '/infixs-shipping-calculator-shared-styles.php';
 			<?php
 			foreach ( $rates as $rate ) :
 				$meta_data = $rate->get_meta_data();
+				$delivery_time = isset( $meta_data['delivery_time'] ) ? $meta_data['delivery_time'] : ( isset( $meta_data['_delivery_time'] ) ? $meta_data['_delivery_time'] : false );
 				?>
 				<div>
 					<div class="infixs-correios-automatico-shipping-results-method" <?php echo InfixsCalculatorStylesHelper::getResultElementInlineStyle( 'result_title_column', $calculator_styles ); ?>>
 						<?php echo esc_html( TextHelper::removeShippingTime( $rate->label ) ); ?>
 					</div>
-					<?php if ( isset( $meta_data['delivery_time'] ) ) : ?>
+					<?php if ( $delivery_time !== false ) :
+						$time_is_numeric = is_numeric( $delivery_time );
+						?>
 						<div class="infixs-correios-automatico-shipping-results-time" <?php echo InfixsCalculatorStylesHelper::getResultElementInlineStyle( 'result_delivery_time', $calculator_styles ); ?>>
-							<?php echo sprintf( "Receba até %s %s", esc_html( $meta_data['delivery_time'] ), esc_html( $meta_data['delivery_time'] > 1 ? 'dias úteis' : 'dia útil' ) ); ?>
+							<?php
+							if ( $time_is_numeric ) {
+								echo sprintf( "Receba até %s %s", esc_html( $delivery_time ), esc_html( $delivery_time > 1 ? 'dias úteis' : 'dia útil' ) );
+							} else {
+								echo esc_html( trim( $delivery_time, "()" ) );
+							}
+							?>
 						</div>
 					<?php endif; ?>
 				</div>
