@@ -111,6 +111,8 @@ class TrackingService {
 			}
 		}
 
+		do_action( 'infixs_correios_automatico_after_add_tracking_code', $code, $order_id );
+
 		$order->add_order_note(
 			sprintf(
 				/* translators: %1$s - Tracking code */

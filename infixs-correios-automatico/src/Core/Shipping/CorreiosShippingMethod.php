@@ -1307,7 +1307,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			}
 		}
 
-		return $this->additional_days + $product_additional_days;
+		return intval( $this->additional_days ) + intval( $product_additional_days );
 	}
 
 	public function get_description( $with_code = true ) {

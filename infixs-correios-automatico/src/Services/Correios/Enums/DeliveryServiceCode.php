@@ -360,6 +360,8 @@ class DeliveryServiceCode {
 				return 'packetExpress';
 			case DeliveryServiceCode::PACKET_STANDARD:
 				return 'packetStandart';
+			case DeliveryServiceCode::CARTA_COML_REG_B1_CHANC_ETIQ:
+				return 'cartaRegistrada';
 			default:
 				return null;
 		}
