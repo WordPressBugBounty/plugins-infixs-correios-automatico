@@ -7,6 +7,7 @@ use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Models\TrackingRange;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
+use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
@@ -29,9 +30,17 @@ class LabelService {
 	 */
 	protected $shippingService;
 
-	public function __construct( TrackingService $trackingService, ShippingService $shippingService ) {
+	/**
+	 * Range code repository
+	 * 
+	 * @var RangeCodeRepository
+	 */
+	protected $rangeCodeRepository;
+
+	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository ) {
 		$this->trackingService = $trackingService;
 		$this->shippingService = $shippingService;
+		$this->rangeCodeRepository = $rangeCodeRepository;
 	}
 
 	/**
@@ -208,6 +217,61 @@ class LabelService {
 		}
 
 		return $tracking_range;
+	}
+
+	/**
+	 * Get ranges
+	 * 
+	 * @param array
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function getRange( $id ) {
+
+		$range = TrackingRange::where( 'id', $id )->first();
+
+		if ( ! $range ) {
+			return new \WP_Error( 'range_not_found', 'Range not found.', [ 'status' => 404 ] );
+		}
+
+		return [ 
+			'id' => $range->id
+		];
+	}
+
+	/**
+	 * Get ranges
+	 * 
+	 * @param array
+	 * 
+	 * @return \Infixs\CorreiosAutomatico\Core\Support\Pagination|\WP_Error
+	 */
+	public function getRangeCodes( $range_id, $params = [] ) {
+		$paginate_params = [ 
+			'order_by' => 'tracking_range_id',
+			'order' => 'desc',
+			'where' => [ 
+				'tracking_range_id' => $range_id,
+			]
+		];
+
+		if ( isset( $params['per_page'] ) ) {
+			$paginate_params['per_page'] = $params['per_page'];
+		}
+
+		if ( isset( $params['page'] ) ) {
+			$paginate_params['current_page'] = $params['page'];
+		}
+
+		return $this->rangeCodeRepository->paginate( $paginate_params, [ $this, 'mapRangeCodes' ] );
+	}
+
+	public function mapRangeCodes( TrackingRangeCode $code ) {
+		return [ 
+			'code' => $code->code,
+			'is_used' => Sanitizer::boolean( $code->is_used ),
+			'order_id' => $code->order_id,
+		];
 	}
 
 	/**

@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico;
 
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
+use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
 use Infixs\CorreiosAutomatico\Models\Unit;
 use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
@@ -21,6 +22,7 @@ use Infixs\CorreiosAutomatico\Services\LabelService;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
 use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
+use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Auth;
 use Infixs\CorreiosAutomatico\Services\EmailService;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
@@ -63,6 +65,7 @@ class Container {
 		$this->container['prepostRepository'] = fn() => new PrepostRepository( Prepost::class);
 		$this->container['unitRepository'] = fn() => new UnitRepository( Unit::class);
 		$this->container['invoiceUnitRepository'] = fn() => new InvoiceUnitRepository( Unit::class);
+		$this->container['rangeCodeRepository'] = fn() => new RangeCodeRepository( TrackingRangeCode::class);
 
 		$this->container['correiosApi'] = function ($c) {
 			$auth = new Auth( $c['configRepository']->get( 'auth' ) );
@@ -81,7 +84,7 @@ class Container {
 		$this->container['orderService'] = fn() => new OrderService();
 		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'] );
 		$this->container['emailService'] = fn() => new EmailService();
-		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'] );
+		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitRepository'] );
 	}
 

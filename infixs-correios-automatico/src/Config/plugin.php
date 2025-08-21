@@ -107,7 +107,8 @@ return apply_filters( 'infixs_correios_automatico_settings',
 					'border_color' => '#dddddd',
 					'border_size' => 1,
 				],
-			]
+			],
+			'show_additional_time' => 'no',
 		],
 		'auth' => [ 
 			'active' => 'no',

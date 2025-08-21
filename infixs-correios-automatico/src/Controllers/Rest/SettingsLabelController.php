@@ -137,6 +137,65 @@ class SettingsLabelController {
 	}
 
 	/**
+	 * Get label ranges
+	 * 
+	 * @since 1.6.30
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function getRange( $request ) {
+		$range_id = $request->get_param( 'id' );
+
+		$result = $this->labelService->getRange( $range_id );
+
+		return rest_ensure_response( [ 
+			'data' => $result,
+		] );
+	}
+
+	/**
+	 * Get label ranges codes
+	 * 
+	 * @since 1.6.30
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function getRangeCodes( $request ) {
+		$range_id = $request->get_param( 'id' );
+		$page = $request->get_param( 'page' );
+		$per_page = $request->get_param( 'per_page' );
+		$search = $request->get_param( 'search' );
+
+		$params = [];
+
+		if ( $page !== null ) {
+			$params['page'] = (int) $page;
+		}
+
+		if ( $per_page !== null ) {
+			$params['per_page'] = (int) $per_page;
+		}
+
+		if ( $search !== null ) {
+			$params['search'] = $search;
+		}
+
+		$result = $this->labelService->getRangeCodes( $range_id, $params );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return rest_ensure_response( array_merge( $result->toArray( 'data' ), [ 
+			'totalRows' => $result->getTotalItems()
+		] ) );
+	}
+
+	/**
 	 * Delete label ranges
 	 * 
 	 * @since 1.3.7

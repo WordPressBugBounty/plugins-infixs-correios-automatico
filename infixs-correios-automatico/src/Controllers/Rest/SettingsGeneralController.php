@@ -238,6 +238,10 @@ class SettingsGeneralController {
 			$updated_settings['calculator_styles'] = CalculatorStylesSanitizer::sanitize( $data['calculator_styles'] );
 		}
 
+		if ( isset( $data['show_additional_time'] ) ) {
+			$updated_settings['show_additional_time'] = rest_sanitize_boolean( $data['show_additional_time'] );
+		}
+
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
@@ -372,6 +376,7 @@ class SettingsGeneralController {
 			'when_api_update_tracking_code' => Config::string( 'general.when_api_update_tracking_code' ),
 			'calculator_style_id' => Config::string( 'general.calculator_style_id' ),
 			'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
+			'show_additional_time' => Config::boolean( 'general.show_additional_time' ),
 		];
 
 		return apply_filters( 'infixs_correios_automatico_prepare_general_settings', $sanitized_settings );

@@ -136,6 +136,14 @@ class RestRoutes {
 			}
 		] );
 
+		register_rest_route( $this->namespace, '/settings/label/ranges/(?P<id>\d+)', [ 
+			'methods' => \WP_REST_Server::READABLE,
+			'callback' => [ $label_settings_controller, 'getRangeCodes' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
 		register_rest_route( $this->namespace, '/settings/label/ranges-available', [ 
 			'methods' => \WP_REST_Server::READABLE,
 			'callback' => [ $label_settings_controller, 'getRangesAvailable' ],

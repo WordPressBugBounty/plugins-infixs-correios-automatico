@@ -40,6 +40,10 @@ class Shipping {
 			add_filter( 'woocommerce_customer_get_shipping_postcode', [ $this, 'get_shipping_postcode' ] );
 		}
 
+		if ( Config::boolean( "general.show_additional_time" ) ) {
+			add_action( 'woocommerce_single_product_summary', [ $this, 'add_additional_time' ], 100 );
+		}
+
 		add_filter( 'woocommerce_package_rates', [ $this, 'filter_rates' ], 10, 2 );
 	}
 
@@ -232,6 +236,7 @@ class Shipping {
 				break;
 		}
 
+		//TODO: Change priority dinamically by config
 		add_action( $action_hook, [ $this, 'display_shipping_calculator' ], 80 );
 	}
 
@@ -257,5 +262,31 @@ class Shipping {
 		}
 
 		return $rates;
+	}
+
+	public function add_additional_time() {
+		if ( is_product() ) {
+			global $product;
+			if ( $product->needs_shipping() ) {
+				echo $this->additional_time_shortcode();
+			}
+		}
+	}
+
+	public function additional_time_shortcode() {
+		ob_start();
+
+
+		if ( is_product() ) {
+			global $product;
+
+			$additional_days = intval( $product->get_meta( '_infixs_correios_automatico_additional_days', true ) );
+
+			if ( $additional_days > 0 ) {
+				echo sprintf( __( 'Prazo de produção: %d dias úteis', 'infixs-correios-automatico' ), $additional_days );
+			}
+		}
+
+		return ob_get_clean();
 	}
 }
