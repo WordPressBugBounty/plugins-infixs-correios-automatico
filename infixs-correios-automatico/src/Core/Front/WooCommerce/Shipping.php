@@ -124,7 +124,7 @@ class Shipping {
 
 		$product = wc_get_product( $variation_id ?: $product_id );
 
-		$package_cost = $product->get_price() * $quantity;
+		$package_cost = (float) $product->get_price() * $quantity;
 
 		$state = $this->shippingService->getStateByPostcode( $postscode );
 
