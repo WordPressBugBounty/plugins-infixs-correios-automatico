@@ -357,6 +357,14 @@ class RestRoutes {
 			}
 		] );
 
+		register_rest_route( $this->namespace, '/invoice-units', [ 
+			'methods' => \WP_REST_Server::READABLE,
+			'callback' => [ $unit_controller, 'listInvoices' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
 		register_rest_route( $this->namespace, '/units/(?P<id>\d+)', [ 
 			'methods' => \WP_REST_Server::EDITABLE,
 			'callback' => [ $unit_controller, 'update' ],

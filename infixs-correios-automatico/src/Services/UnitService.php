@@ -144,13 +144,15 @@ class UnitService {
 
 		$weight = 0;
 
-		/** @var TrackingCode $code */
-		foreach ( $data->codes->all() as $code ) {
-			$order = Order::fromId( $code->order_id );
-			$items = $order->getShippingItemsData();
+		if ( isset( $data->codes ) ) {
+			/** @var TrackingCode $code */
+			foreach ( $data->codes->all() as $code ) {
+				$order = Order::fromId( $code->order_id );
+				$items = $order->getShippingItemsData();
 
-			foreach ( $items as $item ) {
-				$weight += $item['weight'];
+				foreach ( $items as $item ) {
+					$weight += $item['weight'];
+				}
 			}
 		}
 
@@ -161,10 +163,10 @@ class UnitService {
 			'service_name' => DeliveryServiceCode::getShortDescription( $data->service_code ),
 			'service_code' => $data->service_code,
 			'unit_code' => $data->unit_code,
-			'total_codes' => $data->codes->count(),
-			'codes' => array_filter( $data->codes->map( [ $this, 'prepareCodeData' ] ) ),
+			'total_codes' => isset( $data->codes ) ? $data->codes->count() : 0,
+			'codes' => isset( $data->codes ) ? array_filter( $data->codes->map( [ $this, 'prepareCodeData' ] ) ) : [],
 			'weight' => $weight,
-			'ceint' => $ceint
+			'ceint' => $ceint,
 		];
 	}
 
@@ -304,5 +306,12 @@ class UnitService {
 		$unit->save();
 
 		return true;
+	}
+
+	public function listInvoices() {
+		return $this->invoiceUnitRepository->find( [ 
+			'order_by' => 'id',
+			'order' => 'desc'
+		] );
 	}
 }

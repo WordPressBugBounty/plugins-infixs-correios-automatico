@@ -49,7 +49,11 @@ class PrepostRepository extends Repository {
 	 * 
 	 * @return \Infixs\WordpressEloquent\Collection
 	 */
-	public function paginate( $per_page = 10, $page = 1 ) {
-		return Prepost::select( "*" )->limit( 10 )->offset( 10 * ( $page - 1 ) )->orderBy( 'created_at', 'desc' )->get();
+	public function paginate( $per_page = 10, $page = 1, $search = null ) {
+		$query = Prepost::select( "*" );
+		if ( $search ) {
+			$query->where( 'object_code', 'like', "%{$search}%" );
+		}
+		return $query->limit( 10 )->offset( 10 * ( $page - 1 ) )->orderBy( 'created_at', 'desc' )->get();
 	}
 }

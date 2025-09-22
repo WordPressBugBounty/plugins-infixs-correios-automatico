@@ -204,4 +204,22 @@ class UnitController {
 			///"data" => $new_invoice
 		] );
 	}
+
+	/**
+	 * List invoices.
+	 * 
+	 * @since 1.6.41
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function listInvoices( $request ) {
+		$result = $this->unitService->listInvoices();
+
+		return rest_ensure_response( [ 
+			"status" => "success",
+			"data" => $result
+		] );
+	}
 }

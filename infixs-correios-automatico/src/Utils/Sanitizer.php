@@ -36,6 +36,10 @@ class Sanitizer {
 	 * 
 	 * R$ 1.234,56 => 123456
 	 * 
+	 * Important: Only works if decimal point is ',' (Brazilian format).
+	 * 
+	 * Deprecated Use NumberHelper::moneyToCents() instead.
+	 * 
 	 * @since 1.0.0
 	 * 
 	 * @param mixed $value

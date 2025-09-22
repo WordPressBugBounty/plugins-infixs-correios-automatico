@@ -10,6 +10,7 @@ use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
 use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Utils\Helper;
+use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -127,15 +128,15 @@ class LabelService {
 			'address_postalcode' => $address->getPostCode(),
 			'address_country' => $address->getCountry(),
 			'total_weight' => $shipping_metadata['weight'],
-			'subtotal_amount' => Sanitizer::money100( $order->getSubtotal(), '.' ),
-			'total_amount' => Sanitizer::money100( $order->getTotal(), '.' ),
+			'subtotal_amount' => NumberHelper::numericToCents( $order->getSubtotal() ),
+			'total_amount' => NumberHelper::numericToCents( $order->getTotal() ),
 			'items_count' => $package->get_items_count(),
 			'contract_number' => Config::string( 'auth.contract_number' ),
 			'postcard' => Config::string( 'auth.postcard' ),
 			'tracking_code' => $order->getLastTrackingCode() ?: '',
 			'website' => site_url(),
 			'order_id' => $order->get_id(),
-			'shipping_cost' => round( floatval( $order->getShippingTotal() ), 2 ),
+			'shipping_cost' => NumberHelper::numericToCents( $order->getShippingTotal() ),
 			'products_total_amount' => $products_total_amount,
 			'declaration_total_amount' => $declaration_total_amount,
 			'invoice_number' => $order->getOrder()->get_meta( '_infixs_correios_automatico_invoice_number', true ) ?: null,

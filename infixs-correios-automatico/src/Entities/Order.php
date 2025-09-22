@@ -120,7 +120,7 @@ class Order {
 
 			return new Address(
 				Sanitizer::numeric_text( $this->order->get_shipping_postcode() ),
-				$address,
+				TextHelper::removeAddressNumber( $address ),
 				$address_number,
 				$this->order->get_meta( '_shipping_neighborhood' ),
 				$this->order->get_shipping_city(),
@@ -136,7 +136,7 @@ class Order {
 
 			return new Address(
 				Sanitizer::numeric_text( $this->order->get_billing_postcode() ),
-				$address,
+				TextHelper::removeAddressNumber( $address ),
 				$address_number,
 				$this->order->get_meta( '_billing_neighborhood' ),
 				$this->order->get_billing_city(),
@@ -167,7 +167,7 @@ class Order {
 
 	//TODO: use getTrackings in TrackingService
 	public function getTrackingCodes() {
-		return TrackingCode::where( 'order_id', $this->order->get_id() )->get();
+		return TrackingCode::with( 'unit' )->where( 'order_id', $this->order->get_id() )->get();
 	}
 
 	/**
@@ -502,10 +502,15 @@ class Order {
 		$tracking_codes = $this->getTrackingCodes();
 		if ( ! empty( $tracking_codes ) ) {
 			$data['tracking_codes'] = array_map( function ($tracking_code) {
-				return [ 
+				$tracking_code_data = [ 
 					'id' => $tracking_code['id'],
-					'code' => $tracking_code['code']
+					'code' => $tracking_code['code'],
 				];
+				if ( isset( $tracking_code['unit'] ) ) {
+					$tracking_code_data['unit'] = Container::unitService()->prepareData( $tracking_code['unit'] );
+				}
+
+				return $tracking_code_data;
 			}, $tracking_codes->toArray() );
 		}
 

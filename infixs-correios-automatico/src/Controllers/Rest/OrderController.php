@@ -245,17 +245,24 @@ class OrderController {
 		}
 
 		$updated_orders = [];
+		$error_orders = [];
 
 		foreach ( $params['orders'] as $order_id ) {
 			$created = Container::unitService()->unitPacketByOrder( $order_id );
 			if ( ! is_wp_error( $created ) ) {
 				$updated_orders[] = $order_id;
+			} else {
+				$error_orders[] = [ 
+					'order_id' => $order_id,
+					'message' => $created->get_error_message(),
+				];
 			}
 		}
 
 		return rest_ensure_response( [ 
 			'status' => 'success',
 			'updated_orders' => $updated_orders,
+			'error_orders' => $error_orders,
 		] );
 	}
 

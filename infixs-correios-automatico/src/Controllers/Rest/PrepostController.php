@@ -29,7 +29,9 @@ class PrepostController {
 	 * @return \WP_REST_Response
 	 */
 	public function list( $request ) {
-		$preposts = $this->prepostService->listPreposts();
+		$search = sanitize_text_field( $request->get_param( 'search' ) );
+
+		$preposts = $this->prepostService->listPreposts( [ 'search' => $search ] );
 
 		return rest_ensure_response( $preposts );
 	}

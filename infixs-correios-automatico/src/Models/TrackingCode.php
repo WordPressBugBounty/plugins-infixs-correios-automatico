@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Models;
 
 use Infixs\WordpressEloquent\Model;
+use Infixs\WordpressEloquent\Relations\BelongsTo;
 use Infixs\WordpressEloquent\Relations\HasMany;
 
 defined( 'ABSPATH' ) || exit;
@@ -33,6 +34,10 @@ class TrackingCode extends Model {
 
 	public function events(): HasMany {
 		return $this->hasMany( TrackingCodeEvent::class);
+	}
+
+	public function unit(): BelongsTo {
+		return $this->belongsTo( Unit::class);
 	}
 }
 

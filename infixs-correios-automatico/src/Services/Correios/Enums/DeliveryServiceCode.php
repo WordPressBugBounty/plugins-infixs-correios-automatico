@@ -284,6 +284,7 @@ class DeliveryServiceCode {
 			case self::SEDEX:
 			case self::SEDEX_HOJE_CONTRATO_AG:
 			case self::SEDEX_CONTRATO_AG:
+			case self::SEDEX_CONTRATO_AG_CC:
 			case self::SEDEX_10_CONTRATO_AG:
 			case self::SEDEX_12_CONTRATO_AG:
 				return [ 
@@ -324,12 +325,18 @@ class DeliveryServiceCode {
 		switch ( $product_code ) {
 			case DeliveryServiceCode::PAC:
 			case DeliveryServiceCode::PAC_CONTRATO_AG:
+			case DeliveryServiceCode::PAC_CONTRATO_AG_CC:
+			case DeliveryServiceCode::PAC_CONTRATO_AG_TA:
+			case DeliveryServiceCode::PAC_CONTRATO_AG_VAREJO:
 			case DeliveryServiceCode::PAC_CONTRATO_GRANDE_FORMATO:
 			case DeliveryServiceCode::PAC_CONTRATO_PGTO_ENTREGA:
 			case DeliveryServiceCode::PAC_LOG:
 				return 'pac';
 			case DeliveryServiceCode::SEDEX:
 			case DeliveryServiceCode::SEDEX_CONTRATO_AG:
+			case DeliveryServiceCode::SEDEX_CONTRATO_AG_CC:
+			case DeliveryServiceCode::SEDEX_CONTRATO_AG_TA:
+			case DeliveryServiceCode::SEDEX_CONTRATO_AG_VAREJO:
 			case DeliveryServiceCode::SEDEX_CONTRATO_GRANDE_FORMATO:
 			case DeliveryServiceCode::SEDEX_CONTRATO_PGTO_ENTREGA:
 			case DeliveryServiceCode::SEDEX_LOG:

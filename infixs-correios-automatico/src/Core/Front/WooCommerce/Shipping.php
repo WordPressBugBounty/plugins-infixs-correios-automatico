@@ -45,6 +45,10 @@ class Shipping {
 		}
 
 		add_filter( 'woocommerce_package_rates', [ $this, 'filter_rates' ], 10, 2 );
+
+		if ( Config::boolean( "general.force_shipping_cost" ) ) {
+			add_filter( 'woocommerce_package_rates', [ $this, 'force_shipping_cost' ], 999, 2 );
+		}
 	}
 
 	/**
@@ -256,6 +260,35 @@ class Shipping {
 				foreach ( $meta_data as $meta_key => $meta_value ) {
 					if ( $meta_key === '_hide_others_rates' && $meta_value ) {
 						return [ $rate_id => $rate ];
+					}
+				}
+			}
+		}
+
+		return $rates;
+	}
+
+	/**
+	 * Prevent other plugins to change shipping cost.
+	 * 
+	 * @param \WC_Shipping_Rate[] $rates Shipping rates.
+	 * @param array $package Package data.
+	 * 
+	 * @return array
+	 */
+	public function force_shipping_cost( $rates, $package ) {
+
+		foreach ( $rates as $rate_id => $rate ) {
+			if ( $rate->get_method_id() !== 'infixs-correios-automatico' ) {
+				continue;
+			}
+
+			$meta_data = $rate->get_meta_data();
+			if ( $meta_data ) {
+				foreach ( $meta_data as $meta_key => $meta_value ) {
+					if ( $meta_key === '_original_cost' ) {
+						$rate->set_cost( (float) $meta_value );
+						$rates[ $rate_id ] = $rate;
 					}
 				}
 			}

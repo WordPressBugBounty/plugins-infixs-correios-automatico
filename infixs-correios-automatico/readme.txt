@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: 1.6.40
+Stable tag: 1.6.41
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -60,7 +60,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 
 Nosso plugin garante a privacidade de seus dados, saiba mais nos links abaixo:
 
-[Política de Privacidade](https://infixs.io/products/correios-automatico-wordpress-plugin/privacy-policy)
+[Política de Privacidade](https://infixs.io/politica-de-privacidade/)
 
 ### 🌍 **Serviços Externos**
 
@@ -138,6 +138,12 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.6.41 2025-09-22 =
+* Ajuste nos valores da etiqueta
+* Melhoria na tela Pré-Postagens
+* Novos recursos de frete internacional
+* Correções Gerais
 
 = 1.6.30 2025-08-21 =
 * Melhoria no frete módico e range de etiquetas dos correios

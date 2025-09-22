@@ -360,13 +360,13 @@ class PrepostService {
 	 * 
 	 * @return array
 	 */
-	public function listPreposts() {
+	public function listPreposts( $query = [] ) {
 		$page = $query['page'] ?? 1;
 		$per_page = $query['per_page'] ?? 10;
 		$search = $query['search'] ?? null;
 
 		$total_count = $this->prepostRepository->count();
-		$data = $this->prepostRepository->paginate( $per_page, $page );
+		$data = $this->prepostRepository->paginate( $per_page, $page, $search );
 
 		$items = [];
 

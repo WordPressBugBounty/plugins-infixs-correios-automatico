@@ -242,6 +242,10 @@ class SettingsGeneralController {
 			$updated_settings['show_additional_time'] = rest_sanitize_boolean( $data['show_additional_time'] );
 		}
 
+		if ( isset( $data['force_shipping_cost'] ) ) {
+			$updated_settings['force_shipping_cost'] = rest_sanitize_boolean( $data['force_shipping_cost'] );
+		}
+
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
@@ -377,6 +381,7 @@ class SettingsGeneralController {
 			'calculator_style_id' => Config::string( 'general.calculator_style_id' ),
 			'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
 			'show_additional_time' => Config::boolean( 'general.show_additional_time' ),
+			'force_shipping_cost' => Config::boolean( 'general.force_shipping_cost' ),
 		];
 
 		return apply_filters( 'infixs_correios_automatico_prepare_general_settings', $sanitized_settings );

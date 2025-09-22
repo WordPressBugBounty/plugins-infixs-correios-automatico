@@ -109,6 +109,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 				],
 			],
 			'show_additional_time' => 'no',
+			'force_shipping_cost' => 'no',
 		],
 		'auth' => [ 
 			'active' => 'no',
