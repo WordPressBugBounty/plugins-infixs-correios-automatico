@@ -347,11 +347,19 @@ class RestRoutes {
 			}
 		] );
 
-		$unit_controller = new UnitController( Container::unitService(), Container::trackingService() );
+		$unit_controller = new UnitController( Container::unitService(), Container::trackingService(), Container::invoiceUnitService() );
 
 		register_rest_route( $this->namespace, '/units', [ 
 			'methods' => \WP_REST_Server::READABLE,
 			'callback' => [ $unit_controller, 'list' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/units/invoice-units', [ 
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $unit_controller, 'addToInvoiceUnits' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}

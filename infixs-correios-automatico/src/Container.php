@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico;
 
+use Infixs\CorreiosAutomatico\Models\InvoiceUnit;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
@@ -25,6 +26,7 @@ use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Auth;
 use Infixs\CorreiosAutomatico\Services\EmailService;
+use Infixs\CorreiosAutomatico\Services\InvoiceUnitService;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 
 defined( 'ABSPATH' ) || exit;
@@ -64,7 +66,7 @@ class Container {
 		$this->container['logRepository'] = fn( $c ) => new LogRepository( $c['configRepository'] );
 		$this->container['prepostRepository'] = fn() => new PrepostRepository( Prepost::class);
 		$this->container['unitRepository'] = fn() => new UnitRepository( Unit::class);
-		$this->container['invoiceUnitRepository'] = fn() => new InvoiceUnitRepository( Unit::class);
+		$this->container['invoiceUnitRepository'] = fn() => new InvoiceUnitRepository( InvoiceUnit::class);
 		$this->container['rangeCodeRepository'] = fn() => new RangeCodeRepository( TrackingRangeCode::class);
 
 		$this->container['correiosApi'] = function ($c) {
@@ -85,7 +87,8 @@ class Container {
 		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'] );
 		$this->container['emailService'] = fn() => new EmailService();
 		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'] );
-		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitRepository'] );
+		$this->container['invoiceUnitService'] = fn( $c ) => new InvoiceUnitService( $c['invoiceUnitRepository'] );
+		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
 	}
 
 	/**
@@ -116,6 +119,16 @@ class Container {
 	 */
 	public static function invoiceUnitRepository() {
 		return self::getInstance()->container['invoiceUnitRepository'];
+	}
+
+	/**
+	 * Invoice Unit Service
+	 * 
+	 * @since 1.6.41
+	 * @return InvoiceUnitService
+	 */
+	public static function invoiceUnitService() {
+		return self::getInstance()->container['invoiceUnitService'];
 	}
 
 	/**

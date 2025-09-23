@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Controllers\Rest;
 
+use Infixs\CorreiosAutomatico\Services\InvoiceUnitService;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
 use Infixs\CorreiosAutomatico\Services\UnitService;
 
@@ -17,6 +18,15 @@ class UnitController {
 	private $unitService;
 
 	/**
+	 * Invoice Unit service instance.
+	 * 
+	 * @since 1.6.41
+	 * 
+	 * @var \Infixs\CorreiosAutomatico\Services\InvoiceUnitService
+	 */
+	private $invoiceUnitService;
+
+	/**
 	 * Tracking service instance.
 	 * 
 	 * @since 1.5.1
@@ -25,9 +35,10 @@ class UnitController {
 	 */
 	private $trackingService;
 
-	public function __construct( UnitService $unitService, TrackingService $trackingService ) {
+	public function __construct( UnitService $unitService, TrackingService $trackingService, InvoiceUnitService $invoiceUnitService ) {
 		$this->unitService = $unitService;
 		$this->trackingService = $trackingService;
+		$this->invoiceUnitService = $invoiceUnitService;
 	}
 
 	/**
@@ -176,7 +187,7 @@ class UnitController {
 	}
 
 	/**
-	 * Add unit to an invoice.
+	 * Add units to an invoice units.
 	 * 
 	 * @since 1.6.0
 	 * 
@@ -184,19 +195,18 @@ class UnitController {
 	 * 
 	 * @return \WP_Error|\WP_REST_Response
 	 */
-	public function add_to_invoice( $request ) {
-		$unit_id = (int) $request->get_param( 'unit_id' );
+	public function addToInvoiceUnits( $request ) {
+		$unit_ids = (int) $request->get_param( 'unit_ids' );
 
-		if ( ! $unit_id ) {
+		$unit_ids = is_array( $unit_ids ) ? $unit_ids : [ $unit_ids ];
+
+		if ( empty( $unit_ids ) ) {
 			return new \WP_Error( 'invalid_unit_id', __( 'Invalid unit ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
 		}
 
-		// // Create a new invoice and add the unit
-		// $new_invoice = $this->unitService->createInvoiceWithUnit( $unit_id );
-
-		// if ( is_wp_error( $new_invoice ) ) {
-		// 	return $new_invoice;
-		// }
+		foreach ( $unit_ids as $unit_id ) {
+			$this->unitService->addUnitToInvoice( $unit_id );
+		}
 
 		return rest_ensure_response( [ 
 			"status" => "success",
@@ -215,7 +225,7 @@ class UnitController {
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function listInvoices( $request ) {
-		$result = $this->unitService->listInvoices();
+		$result = $this->invoiceUnitService->listInvoices();
 
 		return rest_ensure_response( [ 
 			"status" => "success",

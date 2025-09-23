@@ -7,7 +7,6 @@ use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\Unit;
-use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
@@ -23,12 +22,13 @@ class UnitService {
 	private $unitRepository;
 
 	/**
-	 * @var InvoiceUnitRepository
+	 * @var InvoiceUnitService
 	 */
-	private $invoiceUnitRepository;
+	private $invoiceUnitService;
 
-	public function __construct( UnitRepository $unitRepository, InvoiceUnitRepository $invoiceUnitRepository ) {
-		$this->invoiceUnitRepository = $invoiceUnitRepository;
+
+	public function __construct( UnitRepository $unitRepository, InvoiceUnitService $invoiceUnitService ) {
+		$this->invoiceUnitService = $invoiceUnitService;
 		$this->unitRepository = $unitRepository;
 	}
 
@@ -268,50 +268,79 @@ class UnitService {
 	}
 
 	/**
-	 * Add unit to invoice.
+	 * Add unit to invoice (creates invoice if not provided)
 	 * 
-	 * @since 1.5.0
+	 * @since 1.6.41
 	 * 
 	 * @param int $unit_id Unit ID.
-	 * @param int $invoice_id Invoice ID.
+	 * @param int|null $invoice_id Invoice ID (optional - will create if not provided).
 	 * 
-	 * @return \WP_Error|bool
+	 * @return \WP_Error|array Success response with invoice and unit data
 	 */
-	public function addUnitToInvoice( $unit_id, $invoice_id ) {
+	public function addUnitToInvoice( $unit_id, $invoice_id = null ) {
 		$unit = $this->unitRepository->findById( $unit_id );
 
 		if ( ! $unit ) {
 			return new \WP_Error( 'unit_not_found', __( 'Unit not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
 		}
 
-		/**
-		 * @var \Infixs\CorreiosAutomatico\Models\InvoiceUnit $invoice_unit
-		 */
-		$invoice_unit = $this->invoiceUnitRepository->findById( $invoice_id );
+		$invoice = $this->resolveInvoice( $invoice_id, $unit->service_code );
 
-		if ( ! $invoice_unit ) {
-			return new \WP_Error( 'invoice_unit_not_found', __( 'Invoice unit not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		if ( is_wp_error( $invoice ) ) {
+			return $invoice;
 		}
 
-		if ( $invoice_unit->service_code !== $unit->service_code ) {
-			return new \WP_Error( 'unit_service_code_mismatch', __( 'Unit service code mismatch.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		if ( $invoice->service_code !== $unit->service_code ) {
+			return new \WP_Error(
+				'unit_service_code_mismatch',
+				__( 'Unit service code does not match invoice service code.', 'infixs-correios-automatico' ),
+				[ 'status' => 400 ]
+			);
 		}
 
-		if ( $invoice_unit->id === $unit->id ) {
-			return new \WP_Error( 'unit_already_added', __( 'Unit already added to invoice.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		if ( $unit->invoice_unit_id === $invoice->id ) {
+			return new \WP_Error(
+				'unit_already_added',
+				__( 'Unit is already assigned to this invoice.', 'infixs-correios-automatico' ),
+				[ 'status' => 400 ]
+			);
 		}
 
-		$unit->invoice_unit_id = $invoice_unit->id;
+		$unit->invoice_unit_id = $invoice->id;
 
-		$unit->save();
+		if ( ! $unit->save() ) {
+			return new \WP_Error(
+				'unit_assignment_failed',
+				__( 'Failed to assign unit to invoice.', 'infixs-correios-automatico' ),
+				[ 'status' => 500 ]
+			);
+		}
 
-		return true;
+		return [ 
+			'success' => true,
+			'message' => __( 'Unit successfully added to invoice.', 'infixs-correios-automatico' ),
+			'data' => [ 
+				'unit_id' => $unit->id,
+				'invoice_id' => $invoice->id,
+				'invoice_created' => $invoice_id === null
+			]
+
+		];
 	}
 
-	public function listInvoices() {
-		return $this->invoiceUnitRepository->find( [ 
-			'order_by' => 'id',
-			'order' => 'desc'
-		] );
+	/**
+	 * Resolve invoice - get existing or create new one
+	 * 
+	 * @param int|null $invoice_id Invoice ID (optional)
+	 * @param string $service_code Service code for invoice creation
+	 * 
+	 * @return \Infixs\CorreiosAutomatico\Models\InvoiceUnit|\WP_Error
+	 */
+	private function resolveInvoice( $invoice_id, $service_code ) {
+		if ( $invoice_id ) {
+			return $this->invoiceUnitService->getInvoiceById( $invoice_id );
+		}
+
+		return $this->invoiceUnitService->findOrCreateInvoice( $service_code );
 	}
 }
