@@ -33,10 +33,10 @@ class UnitService {
 	}
 
 	public function getUnits( $params ) {
-		$paginate_params = [ 
+		$paginate_params = [
 			'order_by' => 'id',
 			'order' => 'desc',
-			'relations' => [ 'codes' ],
+			'relations' => [ 'codes', 'invoice_unit' ],
 		];
 
 		if ( isset( $params['per_page'] ) ) {
@@ -59,7 +59,7 @@ class UnitService {
 	}
 
 	public function getAllUnits( $params ) {
-		$default_params = [ 
+		$default_params = [
 			'order_by' => 'id',
 			'order' => 'desc',
 			'relations' => [ 'codes' ],
@@ -75,7 +75,7 @@ class UnitService {
 		/**
 		 * @var Unit $unit
 		 */
-		$unit = $this->unitRepository->findById( $unit_id, [ 
+		$unit = $this->unitRepository->findById( $unit_id, [
 			'relations' => [ 'codes' ]
 		] );
 
@@ -87,17 +87,18 @@ class UnitService {
 		$operator_name = $this->processOperatorName( Config::string( 'sender.name' ) );
 		$service = DeliveryServiceCode::PACKET_EXPRESS === $unit->service_code ? 'IX' : 'NX';
 
-		$result = Container::correiosService()->register_packet_unit( [ 
+		/** TODO: Sequence and Unit Type */
+		$result = Container::correiosService()->register_packet_unit( [
 			'dispatchNumber' => (int) $unit->dispatch_number,
 			'originCountry' => $origin_country,
 			'originOperatorName' => $operator_name,
 			'destinationOperatorName' => 'CWBA',
 			'postalCategoryCode' => 'D',
 			'serviceSubclassCode' => $service,
-			'unitList' => [ 
-				0 => [ 
+			'unitList' => [
+				0 => [
 					'sequence' => 1,
-					'unitType' => 1,
+					'unitType' => 2,  //pallet = 2, bag = 1
 					'trackingNumbers' => $unit->codes->pluck( 'code' )->toArray()
 				]
 			]
@@ -120,12 +121,25 @@ class UnitService {
 		return $result;
 	}
 
+
+	/**
+	 * Create pending unit
+	 * 
+	 * @since 1.5.1
+	 * 
+	 * @param int $ceint_id Ceint ID
+	 * @param string $service_code Service code
+	 * 
+	 * @return Unit
+	 */
 	public function createPendingUnit( $ceint_id, $service_code ) {
-		$this->unitRepository->create( [ 
-			'dispatch_number' => 0,
-			'service_code' => $service_code,
+		return $this->unitRepository->create( [
+			'dispatch_number' => $this->getAndIncrementDispatchNumber(),
+			'status' => 'pending',
 			'ceint_id' => $ceint_id,
-			'status' => 'pending'
+			'service_code' => $service_code,
+			'created_at' => current_time( 'mysql' ),
+			'updated_at' => current_time( 'mysql' ),
 		] );
 	}
 
@@ -156,7 +170,7 @@ class UnitService {
 			}
 		}
 
-		return [ 
+		return [
 			'id' => $data->id,
 			'status' => $data->status,
 			'dispatch_number' => $data->dispatch_number,
@@ -165,8 +179,10 @@ class UnitService {
 			'unit_code' => $data->unit_code,
 			'total_codes' => isset( $data->codes ) ? $data->codes->count() : 0,
 			'codes' => isset( $data->codes ) ? array_filter( $data->codes->map( [ $this, 'prepareCodeData' ] ) ) : [],
-			'weight' => $weight,
+			'weight' => $weight, //TODO: temp, use unit_items, deprecated
 			'ceint' => $ceint,
+			'invoice_unit' => isset( $data->invoice_unit ) ? Container::invoiceUnitService()->prepareData( $data->invoice_unit ) : null,
+			'created_at' => $data->created_at,
 		];
 	}
 
@@ -174,7 +190,7 @@ class UnitService {
 		if ( ! $data->order_id )
 			return null;
 
-		return [ 
+		return [
 			'id' => (int) $data->id,
 			'code' => $data->code,
 			'order_id' => (int) $data->order_id,
@@ -189,12 +205,13 @@ class UnitService {
 		}
 
 		$success = Unit::update(
-			[ 
+			[
 				'dispatch_number' => $data['dispatch_number'],
 				'service_code' => $data['service_code'],
-				'ceint_id' => $data['ceint_code']
+				'ceint_id' => $data['ceint_code'],
+				'updated_at' => current_time( 'mysql' )
 			],
-			[ 
+			[
 				'id' => $id
 			]
 		);
@@ -242,29 +259,39 @@ class UnitService {
 			return new \WP_Error( 'invalid_product_code', 'Invalid Product Code. Need international packet service.', [ 'status' => 400 ] );
 		}
 
-		$unit = $this->unitRepository->findOne( [ 
-			'where' => [ 
+
+		$unit = $this->unitRepository->findOne( [
+			'where' => [
 				'status' => 'pending',
 				'ceint_id' => $ceint['id'],
 				'service_code' => $product_code
 			]
-		] ) ?? $this->unitRepository->create( [ 
-						'status' => 'pending',
-						'ceint_id' => $ceint['id'],
-						'service_code' => $product_code
-					] );
+		] ) ?? $this->createPendingUnit( $ceint['id'], $product_code );
 
-		$codes = Container::trackingService()->getTrackings( $order_id );
+		$codes = Container::trackingService()->getTrackings( $order_id, false, true );
 
 		foreach ( $codes->all() as $code ) {
 			if ( $code->unit_id == $unit->id ) {
 				continue;
 			}
+
+			if ( isset( $code->unit ) && $code->unit->status != 'open' ) {
+				continue;
+			}
+
 			$code->unit_id = $unit->id;
 			$code->save();
 		}
 
 		return true;
+	}
+
+	public function getAndIncrementDispatchNumber() {
+		$currentDispatchNumber = Config::integer( 'unit.current_dispatch_number', 1 );
+		$dispatchNumber = $currentDispatchNumber;
+		$currentDispatchNumber++;
+		Config::update( 'unit.current_dispatch_number', $currentDispatchNumber );
+		return $dispatchNumber;
 	}
 
 	/**
@@ -278,10 +305,26 @@ class UnitService {
 	 * @return \WP_Error|array Success response with invoice and unit data
 	 */
 	public function addUnitToInvoice( $unit_id, $invoice_id = null ) {
-		$unit = $this->unitRepository->findById( $unit_id );
+		$unit = $this->unitRepository->findById( $unit_id, [ 'relations' => [ 'invoice_unit' ] ] );
 
 		if ( ! $unit ) {
 			return new \WP_Error( 'unit_not_found', __( 'Unit not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
+		if ( $unit->status !== 'registered' ) {
+			return new \WP_Error(
+				'unit_not_registered',
+				__( 'Only registered units can be added to an invoice.', 'infixs-correios-automatico' ),
+				[ 'status' => 400 ]
+			);
+		}
+
+		if ( isset( $unit->invoice_unit ) && $unit->invoice_unit->status !== 'open' ) {
+			return new \WP_Error(
+				'unit_already_assigned',
+				__( 'Unit is already assigned to a non-open invoice.', 'infixs-correios-automatico' ),
+				[ 'status' => 400 ]
+			);
 		}
 
 		$invoice = $this->resolveInvoice( $invoice_id, $unit->service_code );
@@ -316,10 +359,10 @@ class UnitService {
 			);
 		}
 
-		return [ 
+		return [
 			'success' => true,
 			'message' => __( 'Unit successfully added to invoice.', 'infixs-correios-automatico' ),
-			'data' => [ 
+			'data' => [
 				'unit_id' => $unit->id,
 				'invoice_id' => $invoice->id,
 				'invoice_created' => $invoice_id === null
@@ -342,5 +385,27 @@ class UnitService {
 		}
 
 		return $this->invoiceUnitService->findOrCreateInvoice( $service_code );
+	}
+
+	public function cancel( $unit_id ) {
+		$unit = $this->unitRepository->findById( $unit_id );
+
+		if ( ! $unit ) {
+			return new \WP_Error( 'unit_not_found', __( 'Unit not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
+		$response = Container::correiosService()->cancel_packet_unit( $unit->unit_code );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$unit->status = 'pending';
+		$unit->unit_code = null;
+		$unit->invoice_unit_id = null;
+
+		$unit->save();
+
+		return true;
 	}
 }

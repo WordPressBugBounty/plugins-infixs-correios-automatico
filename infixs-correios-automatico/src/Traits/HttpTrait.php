@@ -14,10 +14,10 @@ trait HttpTrait {
 	 * @return array|\WP_Error
 	 */
 	protected function post( $url, $data, $headers = [] ) {
-		$response = wp_safe_remote_post( $url, [ 
+		$response = wp_safe_remote_post( $url, [
 			'body' => wp_json_encode( $data ),
 			'timeout' => 20,
-			'headers' => array_merge( [ 
+			'headers' => array_merge( [
 				'Content-Type' => 'application/json',
 			], $headers ),
 		] );
@@ -30,7 +30,8 @@ trait HttpTrait {
 		$data = json_decode( $body, true );
 		$code = wp_remote_retrieve_response_code( $response );
 
-		if ( ! in_array( wp_remote_retrieve_response_code( $response ), [ 200, 201 ], true ) ) {
+		$accepted_codes = [ 200, 201, 202, 204 ];
+		if ( ! in_array( wp_remote_retrieve_response_code( $response ), $accepted_codes, true ) ) {
 			$message = 'Erro ao enviar solicitação post.';
 			if ( isset( $data['msgs'] ) && is_array( $data['msgs'] ) ) {
 				$message = join( '. ', $data['msgs'] );
@@ -74,14 +75,33 @@ trait HttpTrait {
 			$url = add_query_arg( $params, $url );
 		}
 
-		$response = wp_safe_remote_get( $url,
-			[ 
-				'timeout' => 20,
-				'headers' => $headers,
-			]
-		);
+		$response = wp_safe_remote_get( $url, [
+			'timeout' => 20,
+			'headers' => array_merge( [
+				'Content-Type' => 'application/json',
+			], $headers ),
+		] );
 
-		return $response;
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+		$code = wp_remote_retrieve_response_code( $response );
+
+		$accepted_codes = [ 200, 201, 202, 204 ];
+		if ( ! in_array( wp_remote_retrieve_response_code( $response ), $accepted_codes, true ) ) {
+			$message = 'Erro ao enviar solicitação get.';
+			if ( isset( $data['msgs'] ) && is_array( $data['msgs'] ) ) {
+				$message = join( '. ', $data['msgs'] );
+			} elseif ( isset( $data['message'] ) ) {
+				$message = $data['message'];
+			}
+			return new \WP_Error( "http_error", $message, [ 'status' => $code ] );
+		}
+
+		return $data;
 	}
 
 	/**
@@ -91,14 +111,16 @@ trait HttpTrait {
 	 * 
 	 * @param string $url
 	 * @param array $params
+	 * @param array $headers
 	 * 
 	 * @return array|\WP_Error
 	 */
 	public function delete( $url, $params = [], $headers = [] ) {
-		$default_args = [ 
+		$default_args = [
 			'method' => 'DELETE',
+			'timeout' => 20,
 			'headers' => array_merge(
-				[ 
+				[
 					'Content-Type' => 'application/json',
 				],
 				$headers
@@ -109,6 +131,25 @@ trait HttpTrait {
 		$params = wp_parse_args( $params, $default_args );
 		$response = wp_remote_request( $url, $params );
 
-		return $response;
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$body = wp_remote_retrieve_body( $response );
+		$data = json_decode( $body, true );
+		$code = wp_remote_retrieve_response_code( $response );
+
+		$accepted_codes = [ 200, 201, 202, 204 ];
+		if ( ! in_array( wp_remote_retrieve_response_code( $response ), $accepted_codes, true ) ) {
+			$message = 'Erro ao enviar solicitação delete.';
+			if ( isset( $data['msgs'] ) && is_array( $data['msgs'] ) ) {
+				$message = join( '. ', $data['msgs'] );
+			} elseif ( isset( $data['message'] ) ) {
+				$message = $data['message'];
+			}
+			return new \WP_Error( "http_error", $message, [ 'status' => $code ] );
+		}
+
+		return $data;
 	}
 }

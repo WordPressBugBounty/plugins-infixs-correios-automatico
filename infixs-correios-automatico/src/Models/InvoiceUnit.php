@@ -19,8 +19,10 @@ defined( 'ABSPATH' ) || exit;
  * @property string $request_id
  * @property string $status
  * @property string $service_code
+ * @property string $cn38_code
  * @property string $created_at
  * @property string $updated_at
+ * @property-read \Infixs\WordpressEloquent\Collection|\Infixs\CorreiosAutomatico\Models\Unit[] $units
  */
 class InvoiceUnit extends Model {
 	protected $prefix = 'infixs_correios_automatico_';

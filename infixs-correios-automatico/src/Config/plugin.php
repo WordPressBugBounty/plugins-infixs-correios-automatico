@@ -3,8 +3,8 @@
 defined( 'ABSPATH' ) || exit;
 
 return apply_filters( 'infixs_correios_automatico_settings',
-	[ 
-		'general' => [ 
+	[
+		'general' => [
 			'autofill_address' => 'yes',
 			'calculate_shipping_product_page' => 'yes',
 			'calculate_shipping_product_page_position' => 'description_before',
@@ -54,13 +54,13 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'hide_bar_until_postcode' => 'no',
 			'when_api_update_tracking_code' => 'update_code',
 			'calculator_style_id' => 'default',
-			'calculator_styles' => [ 
-				'title' => [ 
+			'calculator_styles' => [
+				'title' => [
 					'text_color' => '#000000',
 					'text_decoration' => [ 'bold' ],
 					'font_size' => 16,
 				],
-				'input' => [ 
+				'input' => [
 					'border_color' => '#dddddd',
 					'border_size' => 1,
 					'font_size' => 14,
@@ -71,7 +71,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 					'width' => 200,
 					'border_radius' => 0,
 				],
-				'button' => [ 
+				'button' => [
 					'background_color' => '#1d81d7',
 					'text_color' => '#ffffff',
 					'font_size' => 14,
@@ -80,28 +80,28 @@ return apply_filters( 'infixs_correios_automatico_settings',
 					'border_size' => 0,
 					'border_radius' => 0,
 				],
-				'result_title_column' => [ 
+				'result_title_column' => [
 					'text_decoration' => [ 'bold' ],
 					'text_color' => '#333333',
 					'font_size' => 15,
 				],
-				'find_postcode' => [ 
+				'find_postcode' => [
 					'font_size' => 12,
 					'text_color' => '#333333',
 				],
-				'result_price' => [ 
+				'result_price' => [
 					'text_decoration' => [ 'bold' ],
 					'font_size' => 16,
 				],
-				'result_delivery_time' => [ 
+				'result_delivery_time' => [
 					'font_size' => 13,
 					'text_color' => '#333333',
 				],
-				'result_address' => [ 
+				'result_address' => [
 					'font_size' => 13,
 					'text_color' => '#333333',
 				],
-				'result_table_header' => [ 
+				'result_table_header' => [
 					'text_color' => '#333333',
 					'font_size' => 15,
 					'border_color' => '#dddddd',
@@ -111,7 +111,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'show_additional_time' => 'no',
 			'force_shipping_cost' => 'no',
 		],
-		'auth' => [ 
+		'auth' => [
 			'active' => 'no',
 			'environment' => 'production',
 			'user_name' => '',
@@ -122,7 +122,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'contract_type' => '',
 			'contract_document' => '',
 		],
-		'sender' => [ 
+		'sender' => [
 			'name' => '',
 			'legal_name' => '',
 			'email' => '',
@@ -138,23 +138,26 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'address_state' => '',
 			'address_country' => 'BR',
 		],
-		'label' => [ 
-			'profiles' => [ 
-				'default' => [ 
+		'label' => [
+			'profiles' => [
+				'default' => [
 					"id" => "default",
 				],
-				'unit' => [ 
+				'unit' => [
 					"id" => "unit"
+				],
+				'invoice_unit' => [
+					"id" => "invoice_unit"
 				]
 			]
 		],
-		'return' => [ 
+		'return' => [
 			'active' => 'yes',
 			'days' => '7',
 			'auto_return' => 'no',
 			'same_service' => 'yes',
 		],
-		'debug' => [ 
+		'debug' => [
 			'active' => 'yes',
 			'debug_log' => 'no',
 			'info_log' => 'no',
@@ -165,10 +168,13 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'alert_log' => 'yes',
 			'emergency_log' => 'yes',
 		],
-		'preferences' => [ 
-			'order' => [ 
+		'unit' => [
+			'current_dispatch_number' => 1,
+		],
+		'preferences' => [
+			'order' => [
 				'per_page' => 10,
-				'status' => [ 
+				'status' => [
 					'wc-pending',
 					'wc-processing',
 					'wc-on-hold',

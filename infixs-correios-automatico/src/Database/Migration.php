@@ -21,7 +21,7 @@ class Migration {
 		 * 
 		 * @since 1.0.0
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_codes', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_codes', [
 			'order_id' => 'bigint(20) unsigned NOT NULL',
 			'user_id' => 'bigint(20) unsigned DEFAULT NULL',
 			'code' => 'varchar(255) DEFAULT NULL',
@@ -30,7 +30,8 @@ class Migration {
 			'expected_date' => 'datetime DEFAULT NULL', //@since 1.2.1
 			'sync_at' => 'datetime DEFAULT NULL', //@since 1.2.3
 			'customer_email_at' => 'datetime DEFAULT NULL', //@since 1.2.3
-			'unit_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.5.0
+			'unit_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.5.0 Deprecated since 1.6.51
+			'unit_item_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.6.51
 			'tracking_range_code_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.5.94
 			'updated_at' => 'datetime NOT NULL',
 			'created_at' => 'datetime NOT NULL',
@@ -41,7 +42,7 @@ class Migration {
 		 * 
 		 * @since 1.2.1
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_code_events', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_code_events', [
 			'tracking_code_id' => 'bigint(20) unsigned NOT NULL',
 			'code' => 'varchar(255) NOT NULL',
 			'type' => 'varchar(255) NOT NULL',
@@ -64,7 +65,7 @@ class Migration {
 		 * 
 		 * @since 1.0.0
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_preposts', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_preposts', [
 			'external_id' => 'varchar(255) NOT NULL',
 			'order_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.1.3
 			'object_code' => 'varchar(255) DEFAULT NULL',
@@ -91,7 +92,7 @@ class Migration {
 		 * 
 		 * @since 1.0.0
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_postcodes', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_postcodes', [
 			'postcode' => 'char(8) DEFAULT NULL',
 			'address' => 'varchar(255) DEFAULT NULL',
 			'city' => 'varchar(255) DEFAULT NULL',
@@ -105,7 +106,7 @@ class Migration {
 		 * 
 		 * @since 1.3.7
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_ranges', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_ranges', [
 			'service_code' => 'varchar(8) NOT NULL',
 			'range_start' => 'varchar(255) NOT NULL',
 			'range_end' => 'varchar(255) NOT NULL',
@@ -117,7 +118,7 @@ class Migration {
 		 * 
 		 * @since 1.3.7
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_range_codes', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_range_codes', [
 			'tracking_range_id' => 'bigint(20) unsigned NOT NULL',
 			'code' => 'varchar(255) NOT NULL',
 			'order_id' => 'bigint(20) unsigned DEFAULT NULL',
@@ -129,7 +130,7 @@ class Migration {
 		 * 
 		 * @since 1.5.0
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_units', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_units', [
 			'dispatch_number' => 'int(10) unsigned DEFAULT NULL',
 			'ceint_id' => 'int(10) unsigned DEFAULT NULL',
 			'unit_code' => 'varchar(255) DEFAULT NULL',
@@ -153,10 +154,28 @@ class Migration {
 		 * 
 		 * @since 1.5.7
 		 */
-		Database::createOrUpdateTable( 'infixs_correios_automatico_invoice_units', [ 
+		Database::createOrUpdateTable( 'infixs_correios_automatico_invoice_units', [
 			'request_id' => 'varchar(255) DEFAULT NULL',
+			'cn38_code' => 'varchar(255) DEFAULT NULL',
 			'status' => "varchar(255) DEFAULT 'pending'",
+			'contract_number' => 'varchar(20) NOT NULL',
 			'service_code' => 'varchar(8) NOT NULL',
+			'created_at' => 'datetime NOT NULL',
+			'updated_at' => 'datetime NOT NULL',
+		] );
+
+		/**
+		 * Create table `infixs_correios_automatico_unit_items`.
+		 * 
+		 * @since 1.6.51
+		 */
+		Database::createOrUpdateTable( 'infixs_correios_automatico_unit_items', [
+			'unit_id' => 'bigint(20) unsigned NOT NULL',
+			'sequence' => 'smallint unsigned NOT NULL',
+			'type' => 'varchar(20) NOT NULL',
+			'rfid' => 'varchar(50) DEFAULT NULL',
+			'weight' => "varchar(8) DEFAULT NULL",
+			'code' => 'varchar(255) DEFAULT NULL',
 			'created_at' => 'datetime NOT NULL',
 			'updated_at' => 'datetime NOT NULL',
 		] );

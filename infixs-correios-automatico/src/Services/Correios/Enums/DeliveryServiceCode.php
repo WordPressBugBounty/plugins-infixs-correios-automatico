@@ -60,7 +60,7 @@ class DeliveryServiceCode {
 
 
 
-	private static $descriptions = [ 
+	private static $descriptions = [
 		self::PAC => 'PAC (Sem Contrato)',
 		self::PAC_CONTRATO_AG => 'PAC (Contrato Agência)',
 		self::PAC_CONTRATO_AG_CC => 'PAC CC (Contrato Agência CC)',
@@ -88,9 +88,9 @@ class DeliveryServiceCode {
 		self::IMPRESSO_NORMAL => 'Impresso Normal (Com ou sem Contrato)',
 		self::IMPRESSO_NORMAL_2 => 'Impresso Normal G (Com ou sem Contrato)',
 		self::IMPRESSO_MODICO => 'Impresso Módico (Com ou sem Contrato)',
-		self::PACKET_STANDARD => 'PACKET STANDART (Contrato)',
-		self::PACKET_EXPRESS => 'PACKET EXPRESS (Contrato)',
-		self::EXPORTA_FACIL_STANDARD => 'EXPORTA FÁCIL STANDART',
+		self::PACKET_STANDARD => 'Packet Standard (Contrato)',
+		self::PACKET_EXPRESS => 'Packet Express (Contrato)',
+		self::EXPORTA_FACIL_STANDARD => 'EXPORTA FÁCIL STANDARD',
 		self::EXPORTA_FACIL_PREMIUM => 'EXPORTA FÁCIL PREMIUM',
 		self::EXPORTA_FACIL_ECNOMICO => 'EXPORTA FÁCIL ECONÔMICO',
 		self::EXPORTA_FACIL_EXPRESSO => 'EXPORTA FÁCIL EXPRESSO',
@@ -139,7 +139,7 @@ class DeliveryServiceCode {
 	}
 
 	public static function getInternationals() {
-		return [ 
+		return [
 			self::EXPORTA_FACIL_ECNOMICO,
 			self::EXPORTA_FACIL_EXPRESSO,
 			self::EXPORTA_FACIL_PREMIUM,
@@ -148,7 +148,7 @@ class DeliveryServiceCode {
 	}
 
 	public static function getDefaultLabel() {
-		return [ 
+		return [
 			self::PAC,
 			self::SEDEX,
 			self::SEDEX_10,
@@ -175,7 +175,7 @@ class DeliveryServiceCode {
 	 */
 	public static function getAll() {
 		$keys = array_keys( self::$descriptions );
-		$values = array_map( function ($key, $value) {
+		$values = array_map( function ( $key, $value ) {
 			return "$key - $value";
 		}, $keys, self::$descriptions );
 
@@ -183,8 +183,8 @@ class DeliveryServiceCode {
 	}
 
 	public static function getGroups() {
-		return [ 
-			'most_used' => [ 
+		return [
+			'most_used' => [
 				self::PAC,
 				self::PAC_CONTRATO_AG,
 				self::SEDEX,
@@ -238,24 +238,24 @@ class DeliveryServiceCode {
 			case self::SEDEX_CONTRATO_AG:
 			case self::PAC:
 			case self::PAC_CONTRATO_AG:
-				return [ 
+				return [
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.1 ],
 					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 30, 'total_dimensions' => 200 ],
 				];
 			case self::CORREIOS_MINI_ENVIOS_CTR_AG:
-				return [ 
+				return [
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
 					'max' => [ 'length' => 24, 'width' => 16, 'height' => 4, 'weight' => 0.3 ],
 				];
 			case self::IMPRESSO_MODICO:
 			case self::IMPRESSO_NORMAL:
 			case self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP:
-				return [ 
+				return [
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
 					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 2 ],
 				];
 			case self::CARTA_COML_REG_B1_CHANC_ETIQ:
-				return [ 
+				return [
 					'min' => [ 'length' => 1, 'width' => 1, 'height' => 1, 'weight' => 0.001 ],
 					'max' => [ 'length' => 100, 'width' => 100, 'height' => 100, 'weight' => 0.5 ],
 				];
@@ -287,13 +287,13 @@ class DeliveryServiceCode {
 			case self::SEDEX_CONTRATO_AG_CC:
 			case self::SEDEX_10_CONTRATO_AG:
 			case self::SEDEX_12_CONTRATO_AG:
-				return [ 
+				return [
 					'min' => 25.63,
 					'max' => 35571.17,
 				];
 			case self::PAC_CONTRATO_AG:
 			case self::PAC:
-				return [ 
+				return [
 					'min' => 25.63,
 					'max' => 4184.84,
 				];
@@ -303,7 +303,7 @@ class DeliveryServiceCode {
 			case self::CARTA_COML_REG_B1_CHANC_ETIQ:
 			case self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP:
 			case self::IMPRESSO_NORMAL_20KG_NP:
-				return [ 
+				return [
 					'min' => 12.82,
 					'max' => 104.62,
 				];
@@ -383,7 +383,7 @@ class DeliveryServiceCode {
 	}
 
 	public static function isLetter( $product_code ) {
-		return in_array( $product_code, [ 
+		return in_array( $product_code, [
 			self::CARTA_COML_REG_B1_CHANC_ETIQ,
 			self::IMPRESSO_MODICO,
 			self::IMPRESSO_NORMAL,
@@ -394,7 +394,7 @@ class DeliveryServiceCode {
 	}
 
 	public static function allowRange( $product_code ) {
-		return in_array( $product_code, [ 
+		return in_array( $product_code, [
 			self::IMPRESSO_MODICO,
 			self::IMPRESSO_NORMAL,
 			self::IMPRESSO_NORMAL_2,

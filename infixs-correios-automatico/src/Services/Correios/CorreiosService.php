@@ -50,7 +50,7 @@ class CorreiosService {
 		if ( ! is_wp_error( $response ) && isset( $response["pcFinal"] ) ) {
 			Log::debug( "Shipping cost api correios response", $response );
 
-			$shipping_cost_response = [ 
+			$shipping_cost_response = [
 				'shipping_cost' => Sanitizer::numeric( $response["pcFinal"] ) / 100,
 			];
 
@@ -58,7 +58,7 @@ class CorreiosService {
 				foreach ( $response['servicoAdicional'] as $service ) {
 					if ( isset( $service['coServAdicional'] ) &&
 						isset( $service['pcServicoAdicional'] ) &&
-						in_array( $service['coServAdicional'], [ 
+						in_array( $service['coServAdicional'], [
 							AddicionalServiceCode::INSURANCE_DECLARATION_MINI_ENVIOS,
 							AddicionalServiceCode::INSURANCE_DECLARATION_PAC,
 							AddicionalServiceCode::INSURANCE_DECLARATION_SEDEX,
@@ -135,8 +135,8 @@ class CorreiosService {
 	 */
 	public function create_packet( $prepost ) {
 		return $this->correiosApi->packages(
-			[ 
-				'packageList' => [ 
+			[
+				'packageList' => [
 					0 => $prepost->getPacketData()
 				]
 			]
@@ -205,7 +205,7 @@ class CorreiosService {
 			return $response;
 		}
 
-		$address = [ 
+		$address = [
 			'postcode' => $response['cep'],
 			'address' => $response['logradouro'],
 			'neighborhood' => $response['bairro'],
@@ -271,5 +271,33 @@ class CorreiosService {
 	 */
 	public function register_packet_unit( $data ) {
 		return $this->correiosApi->registerPacketUnit( $data );
+	}
+
+	/**
+	 * Cancel packet unit
+	 * 
+	 * @param string $unit_code
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function cancel_packet_unit( $unit_code ) {
+		return $this->correiosApi->cancelPacketUnit( $unit_code );
+	}
+
+	/**
+	 * Register invoice unit
+	 * 
+	 * @param array {
+	 * 			dispatchNumbers: string[],
+	 * } $data
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function register_invoice_unit( $data ) {
+		return $this->correiosApi->registerInvoiceUnit( $data );
+	}
+
+	public function get_invoice_unit_by_request( $request_id ) {
+		return $this->correiosApi->getInvoiceUnitByRequest( $request_id );
 	}
 }

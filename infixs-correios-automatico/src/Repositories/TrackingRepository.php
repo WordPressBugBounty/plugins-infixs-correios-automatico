@@ -71,6 +71,10 @@ class TrackingRepository extends Repository {
 			$builder->with( 'events' );
 		}
 
+		if ( isset( $config['with_unit'] ) && $config['with_unit'] ) {
+			$builder->with( 'unit' );
+		}
+
 		if ( isset( $config['order'] ) ) {
 			$builder->orderBy( $config['order']['column'], $config['order']['order'] );
 		}

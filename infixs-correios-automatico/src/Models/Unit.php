@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Models;
 
 use Infixs\WordpressEloquent\Model;
+use Infixs\WordpressEloquent\Relations\BelongsTo;
 use Infixs\WordpressEloquent\Relations\HasMany;
 
 defined( 'ABSPATH' ) || exit;
@@ -32,6 +33,8 @@ defined( 'ABSPATH' ) || exit;
  * @property int $sequence
  * @property string $unit_type
  * @property string $unit_rfid_code
+ * @property int $invoice_unit_id
+ * @property InvoiceUnit $invoice_unit
  * @property string $created_at
  * @property string $updated_at
  */
@@ -40,6 +43,10 @@ class Unit extends Model {
 
 	public function codes(): HasMany {
 		return $this->hasMany( TrackingCode::class);
+	}
+
+	public function invoice_unit(): BelongsTo {
+		return $this->belongsTo( InvoiceUnit::class);
 	}
 }
 

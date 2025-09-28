@@ -66,7 +66,7 @@ class CorreiosApi {
 			return $token;
 		}
 
-		$response = $this->post( $this->join_url( $this->getApiUrl(), $endpoint ), $data, array_merge( [ 
+		$response = $this->post( $this->join_url( $this->getApiUrl(), $endpoint ), $data, array_merge( [
 			'Authorization' => "Bearer $token",
 		], $headers ) );
 
@@ -102,30 +102,20 @@ class CorreiosApi {
 			return $token;
 		}
 
-		$response = $this->delete( $this->join_url( $this->getApiUrl(), $endpoint ), $params, array_merge( [ 
+		$response = $this->delete( $this->join_url( $this->getApiUrl(), $endpoint ), $params, array_merge( [
 			'Authorization' => "Bearer $token",
 		], $headers ) );
 
 
-		if ( is_wp_error( $response ) )
-			return $response;
-
-		$code = wp_remote_retrieve_response_code( $response );
-
-		if ( $code == 403 && $retry ) {
-			$token = $this->get_token();
-			$response = $this->authenticated_delete( $endpoint, $params, $headers, false );
+		if ( is_wp_error( $response ) && $retry === true ) {
+			$error_data = $response->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) && $error_data['status'] == 403 ) {
+				$token = $this->get_token();
+				$response = $this->authenticated_delete( $endpoint, $params, $headers, false );
+			}
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( in_array( $code, [ 200, 201 ], true ) ) {
-			return $data;
-		}
-
-		$message = $data['msgs'][0] ?? $data['msg'] ?? 'Problema na solicitação com os correios';
-		return new \WP_Error( "http_error", $message, [ 'status' => $code ] );
+		return $response;
 	}
 
 
@@ -220,30 +210,19 @@ class CorreiosApi {
 		if ( is_wp_error( $token ) )
 			return $token;
 
-		$response = $this->get( $this->join_url( $this->getApiUrl(), $endpoint ), $params, array_merge( [ 
+		$response = $this->get( $this->join_url( $this->getApiUrl(), $endpoint ), $params, array_merge( [
 			'Authorization' => "Bearer $token",
 		], $headers ) );
 
-		if ( is_wp_error( $response ) )
-			return $response;
-
-		$code = wp_remote_retrieve_response_code( $response );
-
-		if ( $code == 403 && $retry ) {
-			$token = $this->get_token();
-			$response = $this->authenticated_get( $endpoint, $params, $headers, false );
+		if ( is_wp_error( $response ) && $retry === true ) {
+			$error_data = $response->get_error_data();
+			if ( is_array( $error_data ) && isset( $error_data['status'] ) && $error_data['status'] == 403 ) {
+				$token = $this->get_token();
+				$response = $this->authenticated_get( $endpoint, $params, $headers, false );
+			}
 		}
 
-		$body = wp_remote_retrieve_body( $response );
-		$data = json_decode( $body, true );
-
-		if ( in_array( $code, [ 200, 201 ], true ) ) {
-			return $data;
-		}
-
-
-		$message = $data['msgs'][0] ?? $data['msg'] ?? 'Problema na solicitação com os correios';
-		return new \WP_Error( "http_error", $message, [ 'status' => $code ] );
+		return $response;
 	}
 
 
@@ -282,16 +261,16 @@ class CorreiosApi {
 	public function auth_postcard( $user_name, $access_code, $postcard, $enviroment = null ) {
 		$credentials = base64_encode( "{$user_name}:{$access_code}" );
 		$response = $this->post( $this->join_url( $this->getApiUrl( $enviroment ), 'token/v1/autentica/cartaopostagem' ),
-			[ 
+			[
 				'numero' => $postcard
 			],
-			[ 
+			[
 				'Authorization' => "Basic $credentials",
 			]
 		);
 
 		if ( is_wp_error( $response ) ) {
-			Log::error( 'Erro ao autenticar com cartão postagem nos correios, verifque as credenciais', [ 
+			Log::error( 'Erro ao autenticar com cartão postagem nos correios, verifque as credenciais', [
 				'message' => $response->get_error_message(),
 			] );
 			return $response;
@@ -368,6 +347,26 @@ class CorreiosApi {
 		return $this->authenticated_post(
 			"packet/v1/units",
 			$data
+		);
+	}
+
+	public function cancelPacketUnit( $unit_code ) {
+		return $this->authenticated_delete(
+			"packet/v1/units/{$unit_code}"
+		);
+	}
+
+	public function registerInvoiceUnit( $data ) {
+		return $this->authenticated_post(
+			"packet/v1/cn38request",
+			$data
+		);
+	}
+
+	public function getInvoiceUnitByRequest( $request_id ) {
+		return $this->authenticated_get(
+			"packet/v1/cn38request",
+			[ 'requestId' => $request_id ]
 		);
 	}
 }

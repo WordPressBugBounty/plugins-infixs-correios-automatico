@@ -27,6 +27,7 @@ use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Auth;
 use Infixs\CorreiosAutomatico\Services\EmailService;
 use Infixs\CorreiosAutomatico\Services\InvoiceUnitService;
+use Infixs\CorreiosAutomatico\Services\SettingsService;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 
 defined( 'ABSPATH' ) || exit;
@@ -69,9 +70,9 @@ class Container {
 		$this->container['invoiceUnitRepository'] = fn() => new InvoiceUnitRepository( InvoiceUnit::class);
 		$this->container['rangeCodeRepository'] = fn() => new RangeCodeRepository( TrackingRangeCode::class);
 
-		$this->container['correiosApi'] = function ($c) {
+		$this->container['correiosApi'] = function ( $c ) {
 			$auth = new Auth( $c['configRepository']->get( 'auth' ) );
-			$auth->setUpdateTokenCallback( function ($token) use ($c) {
+			$auth->setUpdateTokenCallback( function ( $token ) use ( $c ) {
 				$c['configRepository']->update( 'auth.token', $token );
 			} );
 
@@ -89,6 +90,7 @@ class Container {
 		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'] );
 		$this->container['invoiceUnitService'] = fn( $c ) => new InvoiceUnitService( $c['invoiceUnitRepository'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
+		$this->container['settingsService'] = fn() => new SettingsService();
 	}
 
 	/**
@@ -238,5 +240,16 @@ class Container {
 	 */
 	public static function routes() {
 		return self::getInstance()->container['routes'];
+	}
+
+	/**
+	 * Settings Service
+	 * 
+	 * @since 1.6.43
+	 * 
+	 * @return SettingsService
+	 */
+	public static function settingsService() {
+		return self::getInstance()->container['settingsService'];
 	}
 }

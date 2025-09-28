@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Controllers\Rest;
 
+use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 use Infixs\CorreiosAutomatico\Validators\SettingsSenderValidator;
@@ -16,6 +17,19 @@ defined( 'ABSPATH' ) || exit;
  * @package Infixs\CorreiosAutomatico\Controllers\Rest
  */
 class SettingsSenderController {
+
+	/**
+	 * Settings service instance.
+	 * 
+	 * @since 1.6.43
+	 * 
+	 * @var \Infixs\CorreiosAutomatico\Services\SettingsService
+	 */
+	private $settingsService;
+
+	public function __construct() {
+		$this->settingsService = Container::settingsService();
+	}
 
 	/**
 	 * Sender settings save
@@ -34,7 +48,7 @@ class SettingsSenderController {
 
 		$data = $validator->all();
 
-		$updated_settings = [ 
+		$updated_settings = [
 			'name' => sanitize_text_field( $data['name'] ),
 			'legal_name' => sanitize_text_field( $data['legal_name'] ),
 			'email' => sanitize_text_field( $data['email'] ),
@@ -55,7 +69,7 @@ class SettingsSenderController {
 
 		$response_data = $this->prepare_data();
 
-		$response = [ 
+		$response = [
 			'status' => 'success',
 			'sender' => $response_data,
 		];
@@ -76,23 +90,6 @@ class SettingsSenderController {
 	 * @return array
 	 */
 	public function prepare_data() {
-		$sanitized_settings = [ 
-			'name' => Config::string( 'sender.name' ),
-			'legal_name' => Config::string( 'sender.legal_name' ),
-			'email' => Config::string( 'sender.email' ),
-			'phone' => Config::string( 'sender.phone' ),
-			'celphone' => Config::string( 'sender.celphone' ),
-			'document' => Config::string( 'sender.document' ),
-			'address_postalcode' => Config::string( 'sender.address_postalcode' ),
-			'address_street' => Config::string( 'sender.address_street' ),
-			'address_complement' => Config::string( 'sender.address_complement' ),
-			'address_number' => Config::string( 'sender.address_number' ),
-			'address_neighborhood' => Config::string( 'sender.address_neighborhood' ),
-			'address_city' => Config::string( 'sender.address_city' ),
-			'address_state' => Config::string( 'sender.address_state' ),
-			'address_country' => Config::string( 'sender.address_country' ),
-		];
-
-		return $sanitized_settings;
+		return $this->settingsService->getSenderData();
 	}
 }

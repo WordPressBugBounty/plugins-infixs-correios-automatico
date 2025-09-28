@@ -88,7 +88,7 @@ class TrackingService {
 			return new \WP_Error( 'tracking_code_exists', 'Já existe o mesmo código de rastreio neste pedido, tente adicionar outro.' );
 		}
 
-		$created = $this->trackingRepository->create( [ 
+		$created = $this->trackingRepository->create( [
 			'order_id' => $order_id,
 			'code' => $code,
 			'user_id' => get_current_user_id(),
@@ -173,7 +173,7 @@ class TrackingService {
 	 * @return bool
 	 */
 	public function sendWaitingPickupNotification( $order_id ) {
-		$tracking_codes = TrackingCode::query()->with( 'events' )->whereHas( 'events', function ($query) {
+		$tracking_codes = TrackingCode::query()->with( 'events' )->whereHas( 'events', function ( $query ) {
 			$query->where( 'code', 'LDI' );
 		} )->where( 'order_id', $order_id )->get();
 
@@ -273,8 +273,15 @@ class TrackingService {
 	 * 
 	 * @return Collection|false
 	 */
-	public function getTrackings( $order_id, $with_events = false ) {
-		return $this->trackingRepository->findBy( [ 'order_id' => $order_id ], $with_events ? [ 'with_events' => true ] : [] );
+	public function getTrackings( $order_id, $with_events = false, $with_unit = false ) {
+		$options = [];
+		if ( $with_events ) {
+			$options['with_events'] = true;
+		}
+		if ( $with_unit ) {
+			$options['with_unit'] = true;
+		}
+		return $this->trackingRepository->findBy( [ 'order_id' => $order_id ], $options );
 	}
 
 	/**
@@ -394,7 +401,7 @@ class TrackingService {
 	}
 
 	public function getByUnit( $unit_id ) {
-		return $this->trackingRepository->paginate( [ 
+		return $this->trackingRepository->paginate( [
 			'relations' => [ 'events' ],
 			'where' => [ 'unit_id' => $unit_id ],
 		],
@@ -482,7 +489,7 @@ class TrackingService {
 				if ( ! isset( $tracking->events ) || $tracking->events->contains( 'event_date', $newEventDateSql ) )
 					continue;
 
-				$createdEvent = $tracking->events()->create( apply_filters( "infixs_correios_automatico_add_tracking_event", [ 
+				$createdEvent = $tracking->events()->create( apply_filters( "infixs_correios_automatico_add_tracking_event", [
 					'code' => $event['codigo'],
 					'type' => $event['tipo'],
 					'description' => $event['descricao'],
@@ -618,9 +625,9 @@ class TrackingService {
 	}
 
 	public function get_order_tracking_history( $order_id, $sync = true ) {
-		$tracking_codes = $this->list( $order_id, [ 
+		$tracking_codes = $this->list( $order_id, [
 			'with_events' => true,
-			'order' => [ 
+			'order' => [
 				'column' => 'created_at',
 				'order' => 'desc',
 			],
@@ -650,7 +657,7 @@ class TrackingService {
 	 * @return array
 	 */
 	public function prepare_tracking_data( TrackingCode $tracking ) {
-		$history = [ 
+		$history = [
 			'id' => $tracking->id,
 			'code' => $tracking->code,
 			'category' => $tracking->category,
@@ -666,12 +673,12 @@ class TrackingService {
 		$events_by_date = $tracking->events->sortByDesc( 'event_date' );
 
 		foreach ( $events_by_date as $event ) {
-			$history['events'][] = [ 
+			$history['events'][] = [
 				'code' => $event->code,
 				'type' => $event->type,
 				'description' => $event->description,
 				'detail' => $event->detail,
-				'location' => [ 
+				'location' => [
 					'type' => $event->location_type,
 					'address' => $event->location_address,
 					'number' => $event->location_number,
@@ -697,9 +704,9 @@ class TrackingService {
 	 * @return TrackingCode|false
 	 */
 	public function get_last_tracking_order( $order_id ) {
-		$tracking_codes = $this->list( $order_id, [ 
+		$tracking_codes = $this->list( $order_id, [
 			'with_events' => true,
-			'order' => [ 
+			'order' => [
 				'column' => 'created_at',
 				'order' => 'desc',
 			],

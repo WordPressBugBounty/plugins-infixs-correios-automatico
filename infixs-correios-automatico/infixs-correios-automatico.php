@@ -2,6 +2,8 @@
 
 /**
  * Correios Automático - Rastreio, Frete, Etiqueta, Declaração e Devolução
+ * 
+ * This plugin uses AvelPress Framework (https://avelpress.com)
  *
  * @link              https://infixs.io
  * @since             1.0.0
@@ -10,7 +12,7 @@
  * @wordpress-plugin
  * Plugin Name:       		Correios Automático - Rastreio, Frete, Etiqueta, Declaração e Devolução
  * Description:       		Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
- * Version:           		1.6.42
+ * Version:           		1.6.80
  * Requires at least: 		6.0
  * Requires PHP:      		7.4
  * WC requires at least:	7.7
@@ -27,7 +29,7 @@ defined( 'ABSPATH' ) || exit;
 
 //Define globals
 define( 'INFIXS_CORREIOS_AUTOMATICO_PLUGIN_NAME', 'infixs-correios-automatico' );
-define( 'INFIXS_CORREIOS_AUTOMATICO_PLUGIN_VERSION', '1.6.42' );
+define( 'INFIXS_CORREIOS_AUTOMATICO_PLUGIN_VERSION', '1.6.80' );
 define( 'INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 define( 'INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define( 'INFIXS_CORREIOS_AUTOMATICO_BASE_NAME', plugin_basename( __FILE__ ) );

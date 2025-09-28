@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Controllers\Rest;
 
+use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Services\InvoiceUnitService;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
 use Infixs\CorreiosAutomatico\Services\UnitService;
@@ -18,15 +19,6 @@ class UnitController {
 	private $unitService;
 
 	/**
-	 * Invoice Unit service instance.
-	 * 
-	 * @since 1.6.41
-	 * 
-	 * @var \Infixs\CorreiosAutomatico\Services\InvoiceUnitService
-	 */
-	private $invoiceUnitService;
-
-	/**
 	 * Tracking service instance.
 	 * 
 	 * @since 1.5.1
@@ -35,10 +27,9 @@ class UnitController {
 	 */
 	private $trackingService;
 
-	public function __construct( UnitService $unitService, TrackingService $trackingService, InvoiceUnitService $invoiceUnitService ) {
+	public function __construct( UnitService $unitService, TrackingService $trackingService ) {
 		$this->unitService = $unitService;
 		$this->trackingService = $trackingService;
-		$this->invoiceUnitService = $invoiceUnitService;
 	}
 
 	/**
@@ -123,7 +114,7 @@ class UnitController {
 			return new \WP_Error( 'tracking_code_not_found', __( 'Tracking code not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			"status" => "success",
 		] );
 	}
@@ -150,7 +141,7 @@ class UnitController {
 			return $registered;
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			"status" => "success",
 			"data" => $registered
 		] );
@@ -171,7 +162,7 @@ class UnitController {
 		$service_code = $request->get_param( 'service_code' );
 		$ceint_code = $request->get_param( 'ceint_code' );
 
-		$updated = $this->unitService->update( $unit_id, [ 
+		$updated = $this->unitService->update( $unit_id, [
 			'dispatch_number' => $dispatch_number,
 			'service_code' => $service_code,
 			'ceint_code' => $ceint_code
@@ -181,7 +172,7 @@ class UnitController {
 			return $updated;
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			"status" => "success"
 		] );
 	}
@@ -196,7 +187,7 @@ class UnitController {
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function addToInvoiceUnits( $request ) {
-		$unit_ids = (int) $request->get_param( 'unit_ids' );
+		$unit_ids = $request->get_param( 'unit_ids' );
 
 		$unit_ids = is_array( $unit_ids ) ? $unit_ids : [ $unit_ids ];
 
@@ -204,32 +195,74 @@ class UnitController {
 			return new \WP_Error( 'invalid_unit_id', __( 'Invalid unit ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
 		}
 
+		$errors = [];
+		$completed = 0;
+
 		foreach ( $unit_ids as $unit_id ) {
-			$this->unitService->addUnitToInvoice( $unit_id );
+			$result = $this->unitService->addUnitToInvoice( $unit_id );
+
+			if ( is_wp_error( $result ) ) {
+				$errors[] = $result;
+			} else {
+				$completed++;
+			}
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			"status" => "success",
 			"message" => __( 'New invoice created and unit added.', 'infixs-correios-automatico' ),
-			///"data" => $new_invoice
+			"completed" => $completed,
+			"errors" => $errors,
 		] );
 	}
 
 	/**
-	 * List invoices.
-	 * 
-	 * @since 1.6.41
-	 * 
+	 * Update plugin settings from REST request data.
+	 *
 	 * @param \WP_REST_Request $request
-	 * 
-	 * @return \WP_Error|\WP_REST_Response
+	 * @return \WP_REST_Response
 	 */
-	public function listInvoices( $request ) {
-		$result = $this->invoiceUnitService->listInvoices();
+	public function updateSettings( $request ) {
+		$params = $request->get_params();
 
-		return rest_ensure_response( [ 
-			"status" => "success",
-			"data" => $result
+		if ( isset( $params['currentDispatchNumber'] ) ) {
+			Config::update( 'unit.current_dispatch_number', (int) $params['currentDispatchNumber'] );
+		}
+
+		return $this->getSettings();
+	}
+
+	/**
+	 * Get plugin settings.
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function getSettings() {
+		$settings = [
+			'currentDispatchNumber' => Config::integer( 'unit.current_dispatch_number', 1 ),
+		];
+
+		return rest_ensure_response( [
+			'status' => 'success',
+			'settings' => $settings,
+		] );
+	}
+
+	public function cancel( $request ) {
+		$unit_id = (int) $request->get_param( 'id' );
+
+		if ( ! $unit_id ) {
+			return new \WP_Error( 'invalid_unit_id', __( 'Invalid unit ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$cancelled = $this->unitService->cancel( $unit_id );
+
+		if ( is_wp_error( $cancelled ) ) {
+			return $cancelled;
+		}
+
+		return rest_ensure_response( [
+			"status" => "success"
 		] );
 	}
 }

@@ -31,6 +31,13 @@ class Repository {
 		return $this->modelClass::where( 'id', $id )->limit( 1 )->delete();
 	}
 
+	/**
+	 * Find a model by its primary key.
+	 *
+	 * @param  mixed  $id
+	 * @param  array  $options
+	 * @return Model|null
+	 */
 	public function findById( $id, $options = [] ) {
 		$query = $this->modelClass::query();
 

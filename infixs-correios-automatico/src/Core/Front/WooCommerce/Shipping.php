@@ -6,7 +6,6 @@ use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 use Infixs\CorreiosAutomatico\Utils\Formatter;
 use Infixs\CorreiosAutomatico\Utils\Helper;
-use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -89,7 +88,7 @@ class Shipping {
 
 			wc_get_template(
 				$template,
-				$calculator_style_id === 'custom' ? [ 
+				$calculator_style_id === 'custom' ? [
 					'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
 				] : [],
 				'infixs-correios-automatico/',
@@ -135,16 +134,16 @@ class Shipping {
 		$address = Config::boolean( "general.show_full_address_calculate_product" ) ? $this->shippingService->getAddressByPostcode( $postscode ) : false;
 
 		if ( ! $address ) {
-			$address = [ 
+			$address = [
 				'state' => $state,
 				'postcode' => Sanitizer::numeric_text( $postscode ),
 				'country' => 'BR',
 			];
 		}
 
-		$package = apply_filters( 'infixs_correios_automatico_calculate_single_shipping_package', [ 
-			'contents' => [ 
-				0 => [ 
+		$package = apply_filters( 'infixs_correios_automatico_calculate_single_shipping_package', [
+			'contents' => [
+				0 => [
 					'product_id' => $product->get_id(),
 					'variation_id' => $variation_id,
 					'data' => $product,
@@ -153,10 +152,10 @@ class Shipping {
 			],
 			'contents_cost' => $package_cost,
 			'applied_coupons' => false,
-			'user' => [ 
+			'user' => [
 				'ID' => get_current_user_id(),
 			],
-			'destination' => [ 
+			'destination' => [
 				'country' => 'BR',
 				'state' => $state,
 				'postcode' => Sanitizer::numeric_text( $postscode ),
@@ -190,7 +189,7 @@ class Shipping {
 
 		wc_get_template(
 			Config::string( 'general.calculator_style_id' ) === 'custom' ? 'infixs-shipping-calculator-styles-results.php' : 'infixs-shipping-calculator-results.php',
-			[ 
+			[
 				'address' => $address,
 				'rates' => $current_package['rates'],
 				'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
@@ -254,6 +253,8 @@ class Shipping {
 	 */
 	public function filter_rates( $rates, $package ) {
 
+		Log::debug( 'Filtering rates', [ 'rates' => $rates, 'package' => $package ] );
+
 		foreach ( $rates as $rate_id => $rate ) {
 			$meta_data = $rate->get_meta_data();
 			if ( $meta_data ) {
@@ -278,6 +279,8 @@ class Shipping {
 	 */
 	public function force_shipping_cost( $rates, $package ) {
 
+		Log::debug( 'Forcing shipping cost, initial', [ 'rates' => $rates, 'package' => $package ] );
+
 		foreach ( $rates as $rate_id => $rate ) {
 			if ( $rate->get_method_id() !== 'infixs-correios-automatico' ) {
 				continue;
@@ -293,6 +296,8 @@ class Shipping {
 				}
 			}
 		}
+
+		Log::debug( 'Forcing shipping cost, final', [ 'rates' => $rates, 'package' => $package ] );
 
 		return $rates;
 	}
