@@ -97,6 +97,12 @@ class Admin {
 		if ( ! class_exists( 'WooCommerce' ) ) {
 			add_action( 'admin_notices', [ $this, 'woocommerce_missing_notice' ] );
 		}
+
+		if ( class_exists( 'EnergyPlus' ) && ( $this->is_print_page() || $this->is_starter_page() ) ) {
+			add_filter( 'pre_option_energyplus_feature-full', fn( $_pre ) => '0' );
+			add_filter( 'pre_option_energyplus_feature-use-administrator', fn( $_pre ) => '0' );
+			add_filter( 'pre_option_energyplus_feature-use-shop_manager', fn( $_pre ) => '0' );
+		}
 	}
 
 	/**
@@ -181,7 +187,7 @@ class Admin {
 				'infixs-correios-automatico-orders',
 				'infixsCorreiosAutomaticoOrdersParams',
 				apply_filters( "infixs_correios_automatico_admin_script_orders_params",
-					[ 
+					[
 						'restUrl' => Container::routes()->get_rest_url(),
 						'nonce' => wp_create_nonce( 'wp_rest' ),
 						'adminUrl' => admin_url( 'admin.php?page=infixs-correios-automatico' )
@@ -235,7 +241,11 @@ class Admin {
 			$params['activePlugins'][] = 'dokan-lite';
 		}
 
-		$scriptData = array_merge( $params, [ 
+		if ( class_exists( 'Infixs\PingoNotify\Services\NotificationService' ) ) {
+			$params['activePlugins'][] = 'infixs-pingo-notify';
+		}
+
+		$scriptData = array_merge( $params, [
 			'adminEmail' => get_option( 'admin_email' ),
 			'upgradeProUrl' => Plugin::PRO_URL,
 			'siteUrl' => site_url(),
@@ -314,7 +324,7 @@ class Admin {
 		$email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
 		$description = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
 
-		$response = $this->infixsApi->postDeactivationPlugin( [ 
+		$response = $this->infixsApi->postDeactivationPlugin( [
 			'plugin_id' => 'infixs-correios-automatico',
 			'plugin_version' => \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_VERSION,
 			'php_version' => phpversion(),
@@ -372,5 +382,4 @@ class Admin {
 	public static function woocommerce_missing_notice() {
 		Template::adminView( 'notices/html-missing-woocommerce.php' );
 	}
-
 }

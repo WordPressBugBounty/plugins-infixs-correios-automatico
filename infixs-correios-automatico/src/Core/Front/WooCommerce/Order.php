@@ -2,7 +2,6 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Front\WooCommerce;
 
-use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
 use Infixs\CorreiosAutomatico\Entities\Order as CAOrder;
 
@@ -84,7 +83,7 @@ class Order {
 
 		wc_get_template(
 			$template,
-			[ 
+			[
 				'objects' => $objects,
 				'order' => $order->getOrder(),
 			],

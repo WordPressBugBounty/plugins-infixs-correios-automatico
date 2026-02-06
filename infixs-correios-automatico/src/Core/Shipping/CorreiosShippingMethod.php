@@ -283,7 +283,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->instance_id = absint( $instance_id );
 		$this->method_title = __( 'Correios Automático', 'infixs-correios-automatico' );
 		$this->method_description = __( 'Método de envio dos Correios Automático.', 'infixs-correios-automatico' );
-		$this->supports = [ 
+		$this->supports = [
 			'shipping-zones',
 			'instance-settings',
 		];
@@ -349,9 +349,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			return $value;
 		}
 
-		WooCommerceShippingZoneMethod::update( [ 
+		WooCommerceShippingZoneMethod::update( [
 			"is_enabled" => $value['enabled'] === 'yes' ? 1 : 0,
-		], [ 
+		], [
 			"instance_id" => $this->instance_id,
 		] );
 
@@ -364,51 +364,51 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	}
 
 	public function init_form_fields() {
-		$this->instance_form_fields = [ 
-			'enabled' => [ 
+		$this->instance_form_fields = [
+			'enabled' => [
 				'title' => __( 'Enable/Disable', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'label' => __( 'Enable this shipping method', 'infixs-correios-automatico' ),
 				'default' => 'yes',
 			],
-			'title' => [ 
+			'title' => [
 				'title' => __( 'Title', 'infixs-correios-automatico' ),
 				'type' => 'text',
 				'description' => __( 'This controls the title which the user sees during checkout.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => $this->method_title,
 			],
-			'advanced_mode' => [ 
+			'advanced_mode' => [
 				'title' => __( 'Advanced Mode', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Advanded mode controls', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'object_type' => [ 
+			'object_type' => [
 				'title' => __( 'Object Type', 'infixs-correios-automatico' ),
 				'type' => 'select',
 				'description' => __( 'Select the object type.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
-				'options' => [ 
+				'options' => [
 					'package' => __( 'Pacote', 'infixs-correios-automatico' ),
 					'letter' => __( 'Carta', 'infixs-correios-automatico' ),
 				],
 				'default' => 'package',
 			],
-			'international' => [ 
+			'international' => [
 				'title' => __( 'International', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable international shipping.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'basic_service' => [ 
+			'basic_service' => [
 				'title' => __( 'Basic Services', 'infixs-correios-automatico' ),
 				'type' => 'select',
 				'description' => __( 'Select the basic services that will be available for the user.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
-				'options' => [ 
+				'options' => [
 					'pac' => __( 'PAC', 'infixs-correios-automatico' ),
 					'sedex' => __( 'SEDEX', 'infixs-correios-automatico' ),
 					'sedex10' => __( 'SEDEX 10', 'infixs-correios-automatico' ),
@@ -426,7 +426,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				],
 				'default' => '',
 			],
-			'advanced_service' => [ 
+			'advanced_service' => [
 				'title' => __( 'Advanced Services', 'infixs-correios-automatico' ),
 				'type' => 'select',
 				'description' => __( 'Enter the advanced services that will be available for the user.', 'infixs-correios-automatico' ),
@@ -434,14 +434,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'options' => DeliveryServiceCode::getAll(),
 				'default' => '',
 			],
-			'modic_use_range' => [ 
+			'modic_use_range' => [
 				'title' => __( 'Modic Use Range', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the modic use range.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'shipping_class' => [ 
+			'shipping_class' => [
 				'title' => __( 'Shipping Class', 'infixs-correios-automatico' ),
 				'type' => 'multiselect',
 				'description' => __( 'Select for which shipping class this method will be applied.', 'infixs-correios-automatico' ),
@@ -450,7 +450,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'sanitize_callback' => [ $this, 'sanitizer_shipping_classes' ],
 				'options' => $this->get_shipping_classes_options(),
 			],
-			'origin_postcode' => [ 
+			'origin_postcode' => [
 				'title' => __( 'Postcode', 'infixs-correios-automatico' ),
 				'type' => 'text',
 				'description' => __( 'Enter the postcode of the sender.', 'infixs-correios-automatico' ),
@@ -458,21 +458,21 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => Sanitizer::numeric_text( get_option( 'woocommerce_store_postcode' ) ),
 			],
-			'estimated_delivery' => [ 
+			'estimated_delivery' => [
 				'title' => __( 'Estimated Delivery', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the estimated delivery.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'yes',
 			],
-			'additional_days' => [ 
+			'additional_days' => [
 				'title' => __( 'Additional Days', 'infixs-correios-automatico' ),
 				'type' => 'number',
 				'description' => __( 'Enter the additional days for the estimated delivery.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => '0',
 			],
-			'additional_tax' => [ 
+			'additional_tax' => [
 				'title' => __( 'Additional Tax', 'infixs-correios-automatico' ),
 				'type' => 'money',
 				'description' => __( 'Enter the additional tax for the shipping.', 'infixs-correios-automatico' ),
@@ -480,7 +480,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'default' => '0',
 				'sanitize_callback' => [ Sanitizer::class, 'money100' ],
 			],
-			'additional_tax_percentage' => [ 
+			'additional_tax_percentage' => [
 				'title' => __( 'Additional Tax Percentage', 'infixs-correios-automatico' ),
 				'type' => 'number',
 				'description' => __( 'Enter the additional tax percentage for the shipping.', 'infixs-correios-automatico' ),
@@ -488,39 +488,39 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'default' => '0',
 				'sanitize_callback' => [ Sanitizer::class, 'numeric_text' ],
 			],
-			'own_hands' => [ 
+			'own_hands' => [
 				'title' => __( 'Own Hands', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the own hands.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'receipt_notice' => [ 
+			'receipt_notice' => [
 				'title' => __( 'Receipt Notice', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the receipt notice.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'insurance' => [ 
+			'insurance' => [
 				'title' => __( 'Insuranse', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the insurance for package.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'when_exceed_maximum_insurance' => [ 
+			'when_exceed_maximum_insurance' => [
 				'title' => __( 'When Exceed Maximum Insurance', 'infixs-correios-automatico' ),
 				'type' => 'select',
 				'description' => __( 'Select the action when the package exceeds the maximum insurance.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
-				'options' => [ 
+				'options' => [
 					'ignore_insurance' => __( 'Ignore Insurance', 'infixs-correios-automatico' ),
 					'hide_method' => __( 'Hide Method', 'infixs-correios-automatico' ),
 				],
 				'default' => 'ignore_insurance',
 			],
-			'min_insurance_value' => [ 
+			'min_insurance_value' => [
 				'title' => __( 'Min Insurance Value', 'infixs-correios-automatico' ),
 				'type' => 'money',
 				'description' => __( 'Min insurance value for order.', 'infixs-correios-automatico' ),
@@ -528,14 +528,14 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'default' => '50',
 				'sanitize_callback' => [ Sanitizer::class, 'money100' ],
 			],
-			'insurance_customer_cost' => [ 
+			'insurance_customer_cost' => [
 				'title' => __( 'Insurance Customer Cost', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the insurance customer cost.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'yes',
 			],
-			'minimum_height' => [ 
+			'minimum_height' => [
 				'title' => __( 'Minimum Height', 'infixs-correios-automatico' ),
 				'type' => 'float',
 				'description' => __( 'Define the minimum height.', 'infixs-correios-automatico' ),
@@ -543,7 +543,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => '2',
 			],
-			'minimum_width' => [ 
+			'minimum_width' => [
 				'title' => __( 'Minimum Width', 'infixs-correios-automatico' ),
 				'type' => 'float',
 				'description' => __( 'Define the minimum width.', 'infixs-correios-automatico' ),
@@ -551,7 +551,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => '11',
 			],
-			'minimum_length' => [ 
+			'minimum_length' => [
 				'title' => __( 'Minimum Length', 'infixs-correios-automatico' ),
 				'type' => 'float',
 				'description' => __( 'Define the minimum length.', 'infixs-correios-automatico' ),
@@ -559,7 +559,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => '16',
 			],
-			'minimum_weight' => [ 
+			'minimum_weight' => [
 				'title' => __( 'Minimum Weight', 'infixs-correios-automatico' ),
 				'type' => 'float',
 				'description' => __( 'Define the minimum weight.', 'infixs-correios-automatico' ),
@@ -567,7 +567,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'sanitize_callback' => [ Sanitizer::class, 'float_text' ],
 				'default' => '0.100',
 			],
-			'extra_weight' => [ 
+			'extra_weight' => [
 				'title' => __( 'Extra Weight', 'infixs-correios-automatico' ),
 				'type' => 'float',
 				'description' => __( 'Define the extra weight.', 'infixs-correios-automatico' ),
@@ -575,32 +575,32 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'sanitize_callback' => [ Sanitizer::class, 'float_text' ],
 				'default' => '0',
 			],
-			'auto_prepost' => [ 
+			'auto_prepost' => [
 				'title' => __( 'Insuranse', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the insurance for package.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'yes',
 			],
-			'extra_weight_type' => [ 
+			'extra_weight_type' => [
 				'title' => __( 'Extra Weight Type', 'infixs-correios-automatico' ),
 				'type' => 'select',
 				'description' => __( 'Select the extra weight type.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
-				'options' => [ 
+				'options' => [
 					'order' => __( 'Per Order', 'infixs-correios-automatico' ),
 					'product' => __( 'Per Product', 'infixs-correios-automatico' ),
 				],
 				'default' => 'order',
 			],
-			'discount_rules' => [ 
+			'discount_rules' => [
 				'title' => __( 'Discount Rules', 'infixs-correios-automatico' ),
 				'type' => 'array',
 				'description' => __( 'Add or remove discount rules.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'sanitize_callback' => [ $this, 'sanitize_discount_rules' ],
-				'default' => [ 
-					[ 
+				'default' => [
+					[
 						'enabled' => false,
 						'min_amount' => 10000,
 						'max_amount' => 0,
@@ -612,61 +612,61 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					]
 				],
 			],
-			'discount_free_title' => [ 
+			'discount_free_title' => [
 				'title' => __( 'Título quando grátis', 'infixs-correios-automatico' ),
 				'type' => 'text',
 				'description' => __( 'Título do método quando for grátis.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'Frete Grátis',
 			],
-			'hidden_when_no_match' => [ 
+			'hidden_when_no_match' => [
 				'title' => __( 'Hide When no rules match', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Hide the shipping method when no rules match.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'hidden_others_when_match' => [ 
+			'hidden_others_when_match' => [
 				'title' => __( 'Hide Others When no rules match', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Hide the other shipping methods when no rules match.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'hide_exceed' => [ 
+			'hide_exceed' => [
 				'title' => __( 'Hide When Exceed', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Hide the shipping method when the package exceeds the maximum weight.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'enable_import_tax' => [ 
+			'enable_import_tax' => [
 				'title' => __( 'Enable Import Tax', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the import tax.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'enable_icms_tax' => [ 
+			'enable_icms_tax' => [
 				'title' => __( 'Enable ICMS Tax', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
 				'description' => __( 'Enable the ICMS tax.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'no',
 			],
-			'when_less_minimum' => [ 
+			'when_less_minimum' => [
 				'title' => __( 'Quando menor que o mínimo', 'infixs-correios-automatico' ),
 				'type' => 'select',
 				'description' => __( 'Select the action when the package is less than the minimum weight.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
-				'options' => [ 
+				'options' => [
 					'force' => __( 'Force', 'infixs-correios-automatico' ),
 					'hide' => __( 'Hide', 'infixs-correios-automatico' ),
 					'none' => __( 'None', 'infixs-correios-automatico' ),
 				],
 				'default' => 'force',
 			],
-			'advanced_rules' => [ 
+			'advanced_rules' => [
 				'title' => __( 'Advanced Rules', 'infixs-correios-automatico' ),
 				'type' => 'array',
 				'description' => __( 'Add or remove advanced rules.', 'infixs-correios-automatico' ),
@@ -726,7 +726,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		wp_localize_script(
 			'infixs-correios-automatico-admin',
 			'infixsCorreiosAutomaticoWCSettings',
-			[ 
+			[
 				'fields' => $this->map_options(),
 				'prefix' => "{$this->plugin_id}{$this->id}_",
 				'advanced_service_groups' => DeliveryServiceCode::getGroups(),
@@ -892,7 +892,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		if ( ! in_array( $product_code, DeliveryServiceCode::getInternationals() ) ) {
 			if ( empty( $package['destination']['postcode'] ) || 'BR' !== $package['destination']['country'] ) {
 				Log::info( "Não é possível calcular o frete para o pacote sem CEP de destino ou quando o país não é BR.",
-					[ 
+					[
 						'postcode' => $package['destination']['postcode'] ?? '',
 						'product_code' => $product_code,
 					]
@@ -901,7 +901,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			}
 		} else {
 			if ( 'BR' === $package['destination']['country'] ) {
-				Log::info( "Não é possível calcular o frete internacional para o pacote com CEP de destino no Brasil.", [ 
+				Log::info( "Não é possível calcular o frete internacional para o pacote com CEP de destino no Brasil.", [
 					'product_code' => $product_code,
 					'postcode' => $package['destination']['postcode'] ?? '',
 				] );
@@ -1009,7 +1009,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	public function calculate_shipping( $package = [] ) {
 		$product_code = $this->get_product_code();
 
-		Log::debug( "Iniciando o cálculo de frete para o serviço $product_code", [ 
+		Log::debug( "Iniciando o cálculo de frete para o serviço $product_code", [
 			'package' => $package,
 		] );
 
@@ -1026,7 +1026,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$destination_country = sanitize_text_field( $package['destination']['country'] );
 
 		if ( empty( $product_code ) || empty( $origin_postcode ) ) {
-			Log::info( "Não foi possível calcular o frete, código do produto ou CEP de origem não definidos.", [ 
+			Log::info( "Não foi possível calcular o frete, código do produto ou CEP de origem não definidos.", [
 				'product_code' => $product_code,
 				'origin_postcode' => $origin_postcode,
 			] );
@@ -1050,8 +1050,8 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$shipping_cost->setModico( true );
 		}
 
-		if ( $this->insurance && isset( $package['contents_cost'] ) ) {
-			$content_cost = NumberHelper::parseNumber( $package['contents_cost'] );
+		if ( $this->insurance && ( isset( $package['contents_cost'] ) || isset( $package['cart_subtotal'] ) ) ) {
+			$content_cost = NumberHelper::parseNumber( $package['cart_subtotal'] ?? $package['contents_cost'] );
 
 			if ( Config::boolean( 'general.consider_quantity' ) && isset( $package['contents'], $package['contents'][0], $package['contents'][0]['quantity'] ) ) {
 				$content_cost = $content_cost * (int) $package['contents'][0]['quantity'];
@@ -1062,7 +1062,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			}
 
 			if ( $this->when_exceed_maximum_insurance == 'hide_method' && ! $shipping_cost->areDeclarationWithinLimits( 'max' ) ) {
-				Log::info( "Frete não calculado, valor da declaração de seguro excede o máximo permitido.", [ 
+				Log::info( "Frete não calculado, valor da declaração de seguro excede o máximo permitido.", [
 					'product_code' => $product_code,
 					'origin_postcode' => $origin_postcode,
 					'destination_postcode' => $destination_postcode,
@@ -1091,7 +1091,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		}
 
 		if ( $this->when_less_minimum == 'hide' && $shipping_cost->getWeight() < $this->minimum_weight ) {
-			Log::info( "Frete não calculado, peso menor que o mínimo.", [ 
+			Log::info( "Frete não calculado, peso menor que o mínimo.", [
 				'weight' => $shipping_cost->getWeight(),
 				'min_weight' => $this->minimum_weight,
 			]
@@ -1100,7 +1100,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			return;
 		}
 
-		$transient_key = 'shipping_cost_' . Helper::generateHashFromArray( [ 
+		$transient_key = 'shipping_cost_' . Helper::generateHashFromArray( [
 			'data' => $shipping_cost->getData(),
 			'product' => $shipping_cost->getProductCode()
 		] );
@@ -1113,7 +1113,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				set_transient( $transient_key, $cost_response, MINUTE_IN_SECONDS );
 			}
 		} else {
-			Log::debug( "Dados de frete recuperados do cache.", [ 
+			Log::debug( "Dados de frete recuperados do cache.", [
 				'transient_key' => $transient_key,
 				'cached_data' => $cached_data,
 			] );
@@ -1141,7 +1141,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		if ( $this->additional_tax > 0 )
 			$cost += $this->additional_tax / 100;
 
-		$meta_data = [ 
+		$meta_data = [
 			"_original_cost" => $original_cost,
 			"_weight" => $shipping_cost->getWeight(),
 			"_length" => $shipping_cost->getLength(),
@@ -1154,7 +1154,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 			$enabled_rules = $this->get_enabled_discount_rules();
 
-			usort( $enabled_rules, function ($a, $b) {
+			usort( $enabled_rules, function ( $a, $b ) {
 				return $b['min_amount'] <=> $a['min_amount'];
 			} );
 
@@ -1228,7 +1228,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					$destination_postcode
 				);
 
-				$transient_key = 'shipping_time_' . Helper::generateHashFromArray( [ 
+				$transient_key = 'shipping_time_' . Helper::generateHashFromArray( [
 					$product_code,
 					$origin_postcode,
 					$destination_postcode
@@ -1255,7 +1255,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		$cost = Currency::toCurrentCurrency( $cost, 'BRL' ) ?: $cost;
 
-		$rate = [ 
+		$meta_data['_final_cost'] = $cost;
+
+		$rate = [
 			'id' => "{$this->id}_{$this->instance_id}",
 			'label' => ( $cost > 0 ? $this->title : $this->discount_free_title ) . ( empty( $delivery_time_text ) ? '' : " ({$delivery_time_text})" ),
 			'cost' => $cost,
@@ -1272,7 +1274,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @return array
 	 */
 	public function get_enabled_discount_rules() {
-		$enabled_rules = array_filter( $this->discount_rules, function ($rule) {
+		$enabled_rules = array_filter( $this->discount_rules, function ( $rule ) {
 			return $rule['enabled'] === true;
 		} );
 
@@ -1280,7 +1282,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	}
 
 	public function get_enabled_advanced_rules() {
-		$enabled_rules = array_filter( $this->advanced_rules, function ($rule) {
+		$enabled_rules = array_filter( $this->advanced_rules, function ( $rule ) {
 			return $rule['enabled'] === true;
 		} );
 

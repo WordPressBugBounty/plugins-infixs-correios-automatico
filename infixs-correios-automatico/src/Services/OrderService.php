@@ -38,7 +38,7 @@ class OrderService {
 		$search = $query['search'] ?? null;
 		$status = isset( $query['status'] ) ? explode( ",", $query['status'] ) : Config::get( 'preferences.order.status' );
 
-		$order_query_args = [ 
+		$order_query_args = [
 			'limit' => $per_page,
 			'page' => $page,
 			'paginate' => true,
@@ -55,24 +55,24 @@ class OrderService {
 				$order_query_args['s'] = $search;
 				$order_query_args['search_filter'] = 'all';
 			} else {
-				$order_query_args['meta_query'] = [ 
+				$order_query_args['meta_query'] = [
 					'relation' => 'OR',
-					[ 
+					[
 						'key' => '_billing_first_name',
 						'value' => $search,
 						'compare' => 'LIKE'
 					],
-					[ 
+					[
 						'key' => '_billing_last_name',
 						'value' => $search,
 						'compare' => 'LIKE'
 					],
-					[ 
+					[
 						'key' => '_billing_email',
 						'value' => $search,
 						'compare' => 'LIKE'
 					],
-					[ 
+					[
 						'key' => '_billing_address_1',
 						'value' => $search,
 						'compare' => 'LIKE'
@@ -91,7 +91,7 @@ class OrderService {
 
 		$max_num_pages = $orders->max_num_pages;
 
-		return [ 
+		return [
 			'page' => $page,
 			'per_page' => $per_page,
 			'total_results' => count( $data ),
@@ -138,7 +138,7 @@ class OrderService {
 
 			$response[] =
 				$rate->get_method_id() === 'infixs-correios-automatico' ?
-				[ 
+				[
 					'cost' => NumberHelper::to100( $metas['_original_cost'] ),
 					'height' => (int) $metas['_height'],
 					'width' => (int) $metas['_width'],
@@ -147,7 +147,7 @@ class OrderService {
 					'insurance_cost' => isset( $metas['_insurance_cost'] ) ? NumberHelper::to100( $metas['_insurance_cost'] ) : 0,
 					'shipping_product_code' => $metas['shipping_product_code'],
 					'delivery_time' => $metas['delivery_time'],
-				] : [ 
+				] : [
 					'cost' => NumberHelper::to100( $rate->get_cost() ),
 					'height' => 0,
 					'width' => 0,
@@ -199,15 +199,20 @@ class OrderService {
 		}
 		if ( Config::boolean( 'general.active_preparing_to_ship' ) && $order->get_status() === 'processing' ) {
 			Log::debug( "Adicionando um agendamento para mudança de status automática de 'processando' para 'preparando para envio', order_id: $order_id." );
-			wp_schedule_single_event( time() + 10, 'infixs_correios_automatico_update_status_schedule', [ 
-				$order_id
-			] );
+			if ( function_exists( 'as_schedule_single_action' ) ) {
+				Log::debug( "Usando agendador do WooCommerce" );
+				as_schedule_single_action( time() + 10, 'infixs_correios_automatico_update_status_schedule', [ $order_id ] );
+			} else {
+				Log::debug( "Usando agendador do WordPress" );
+				wp_schedule_single_event( time() + 10, 'infixs_correios_automatico_update_status_schedule', [ $order_id ] );
+			}
 		}
 	}
 
 	public function update_status_schedule( $order_id ) {
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
+			Log::alert( "Problema ao mudar o status para 'preparando para envio': $order_id." );
 			return;
 		}
 		Log::debug( "Schedule: Mudando status do pedido para 'preparando para envio' order_id: $order_id." );

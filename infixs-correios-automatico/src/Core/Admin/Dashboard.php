@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Core\Admin;
 
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\BuyProNotice;
+use Infixs\CorreiosAutomatico\Core\Admin\Notices\PingoNotifyNotice;
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\PluginDeactivation;
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\RequiredPluginNotice;
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\ShippingMethod;
@@ -65,6 +66,7 @@ class Dashboard {
 		$notices[] = new RequiredPluginNotice();
 		$notices[] = new BuyProNotice();
 		$notices[] = new PluginDeactivation();
+		$notices[] = new PingoNotifyNotice();
 		return $notices;
 	}
 
@@ -98,7 +100,7 @@ class Dashboard {
 
 		foreach ( $notices as $notice ) {
 			if ( ! $notice->isDismissed() && $notice->shouldDisplay() ) {
-				$displayed[] = [ 
+				$displayed[] = [
 					'id' => $notice->getId(),
 					'title' => $notice->getTitle(),
 					'message' => $notice->getMessage(),

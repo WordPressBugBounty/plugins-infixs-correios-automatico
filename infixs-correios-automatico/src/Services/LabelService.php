@@ -90,7 +90,7 @@ class LabelService {
 			$amount = Sanitizer::money100( $item->get_total(), '.' );
 			$unit_amount = Sanitizer::money100( $product->get_price(), '.' );
 
-			$items[] = [ 
+			$items[] = [
 				'name' => $item->get_name(),
 				'sku' => $product->get_sku() ?: '',
 				'quantity' => $quantity,
@@ -113,12 +113,13 @@ class LabelService {
 
 		$product_code = $order->getShippingProductCode() ?? ( $shipping_method ? $shipping_method->get_product_code() : '00000' );
 
-		return [ 
+		return [
 			'name' => $order->getCustomerFullName(),
 			'document' => $order->getCustomerDocument(),
 			'shipping_product_id' => DeliveryServiceCode::getCommonId( $product_code ),
 			'shipping_product_code' => $product_code,
 			'phone' => $order->getAlwaysPhone() ?: '',
+			'shipping_address_1' => $order->getOrder()->get_shipping_address_1() ? $order->getOrder()->get_shipping_address_1() : $order->getOrder()->get_billing_address_1(),
 			'address_street' => $address->getStreet(),
 			'address_number' => $address->getNumber(),
 			'address_complement' => $address->getComplement(),
@@ -137,6 +138,7 @@ class LabelService {
 			'website' => site_url(),
 			'order_id' => $order->get_id(),
 			'shipping_cost' => NumberHelper::numericToCents( $order->getShippingTotal() ),
+			'shipping_insurance' => NumberHelper::numericToCents( $shipping_metadata['insurance_cost'] ?? 0 ),
 			'products_total_amount' => $products_total_amount,
 			'declaration_total_amount' => $declaration_total_amount,
 			'invoice_number' => $order->getOrder()->get_meta( '_infixs_correios_automatico_invoice_number', true ) ?: null,
@@ -189,7 +191,7 @@ class LabelService {
 		}
 
 		/** @var TrackingRange $tracking_range */
-		$tracking_range = TrackingRange::create( [ 
+		$tracking_range = TrackingRange::create( [
 			'service_code' => $service_code,
 			'range_start' => $range_start,
 			'range_end' => $range_end,
@@ -211,7 +213,7 @@ class LabelService {
 				$check_digit = ( $remainder == 0 || $remainder == 1 ) ? ( $remainder == 0 ? 5 : 0 ) : ( 11 - $remainder );
 
 				$tracking_code = $start_prefix . $number . $check_digit . $start_suffix;
-				$tracking_range->codes()->create( [ 
+				$tracking_range->codes()->create( [
 					'code' => $tracking_code,
 				] );
 			}
@@ -235,7 +237,7 @@ class LabelService {
 			return new \WP_Error( 'range_not_found', 'Range not found.', [ 'status' => 404 ] );
 		}
 
-		return [ 
+		return [
 			'id' => $range->id
 		];
 	}
@@ -248,10 +250,10 @@ class LabelService {
 	 * @return \Infixs\CorreiosAutomatico\Core\Support\Pagination|\WP_Error
 	 */
 	public function getRangeCodes( $range_id, $params = [] ) {
-		$paginate_params = [ 
+		$paginate_params = [
 			'order_by' => 'tracking_range_id',
 			'order' => 'desc',
-			'where' => [ 
+			'where' => [
 				'tracking_range_id' => $range_id,
 			]
 		];
@@ -268,7 +270,7 @@ class LabelService {
 	}
 
 	public function mapRangeCodes( TrackingRangeCode $code ) {
-		return [ 
+		return [
 			'code' => $code->code,
 			'is_used' => Sanitizer::boolean( $code->is_used ),
 			'order_id' => $code->order_id,
@@ -322,7 +324,7 @@ class LabelService {
 	 */
 	public function getRangesAvailable( $service_code ) {
 		/** @var TrackingRangeCode $tracking */
-		$range_count = TrackingRangeCode::where( 'is_used', '0' )->whereHas( 'range', function ($query) use ($service_code) {
+		$range_count = TrackingRangeCode::where( 'is_used', '0' )->whereHas( 'range', function ( $query ) use ( $service_code ) {
 			$query->where( 'service_code', $service_code );
 		} )->count();
 
@@ -340,7 +342,7 @@ class LabelService {
 		$data = [];
 
 		foreach ( $tracking_ranges as $tracking_range ) {
-			$data[] = [ 
+			$data[] = [
 				'id' => $tracking_range->id,
 				'service_title' => DeliveryServiceCode::getShortDescription( $tracking_range->service_code ) . " (" . $tracking_range->service_code . ")",
 				'service_code' => $tracking_range->service_code,
@@ -364,7 +366,7 @@ class LabelService {
 	 */
 	public function useRangeCode( $service_code ) {
 		/** @var TrackingRangeCode $tracking */
-		$tracking = TrackingRangeCode::where( 'is_used', '0' )->whereHas( 'range', function ($query) use ($service_code) {
+		$tracking = TrackingRangeCode::where( 'is_used', '0' )->whereHas( 'range', function ( $query ) use ( $service_code ) {
 			$query->where( 'service_code', $service_code );
 		} )->first();
 
@@ -396,7 +398,7 @@ class LabelService {
 			);
 		}
 
-		$created = $this->trackingService->add( $order_id, $tracking->code, false, [ 
+		$created = $this->trackingService->add( $order_id, $tracking->code, false, [
 			'tracking_range_code_id' => $tracking->id,
 		] );
 

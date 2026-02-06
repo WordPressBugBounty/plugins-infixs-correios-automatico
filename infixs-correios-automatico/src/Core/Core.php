@@ -40,6 +40,8 @@ class Core {
 		if ( Config::boolean( 'general.autofill_address' ) ) {
 			new AutofillAddress( Container::shippingService() );
 		}
+
+		Container::whatsappService();
 	}
 
 	/**
@@ -106,7 +108,7 @@ class Core {
 					$allowed_services = array_column( $postcard_response['cartaoPostagem']['apis'], 'api' );
 
 					if ( ! empty( $allowed_services ) ) {
-						Config::update( 'auth', [ 
+						Config::update( 'auth', [
 							'contract_number' => sanitize_text_field( isset( $postcard_response['cartaoPostagem']['contrato'] ) ? $postcard_response['cartaoPostagem']['contrato'] : '' ),
 							'allowed_services' => $allowed_services ?? [],
 							'contract_type' => sanitize_text_field( $postcard_response['perfil'] ),

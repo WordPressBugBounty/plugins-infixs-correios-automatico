@@ -49,8 +49,8 @@ class Tracking {
 
 
 	public function get_tracking_code( $tracking_code, $order ) {
-		return implode( ",", $this->trackingService->list( $order->get_id(), [ 
-			'order' => [ 
+		return implode( ",", $this->trackingService->list( $order->get_id(), [
+			'order' => [
 				'column' => 'created_at',
 				'order' => 'desc',
 			],
@@ -152,8 +152,8 @@ class Tracking {
 
 		$order_id = $order->get_id();
 
-		$trackings = $this->trackingService->list( $order_id, [ 
-			'order' => [ 
+		$trackings = $this->trackingService->list( $order_id, [
+			'order' => [
 				'column' => 'created_at',
 				'order' => 'desc',
 			],
@@ -249,6 +249,19 @@ class Tracking {
 
 		if ( 'yes' === $notification->enabled ) {
 			return $notification->trigger( $order_id, $tracking_code );
+		}
+
+		return false;
+	}
+
+	public static function trigger_delivered_email( $order_id ) {
+		$mailer = WC()->mailer();
+
+		/** @var \Infixs\CorreiosAutomatico\Core\Emails\DeliveredEmail $notification */
+		$notification = $mailer->emails['Correios_Automatico_Delivered_Email'];
+
+		if ( 'yes' === $notification->enabled ) {
+			return $notification->trigger( $order_id );
 		}
 
 		return false;

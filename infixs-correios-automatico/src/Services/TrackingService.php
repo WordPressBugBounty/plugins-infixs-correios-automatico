@@ -264,6 +264,22 @@ class TrackingService {
 		return $success;
 	}
 
+	public function sendDeliveredNotification( $order_id ) {
+		$success = Tracking::trigger_delivered_email( $order_id );
+
+		if ( $success ) {
+			$order = wc_get_order( $order_id );
+			$order->update_meta_data( '_infixs_correios_automatico_email_delivered_sent', current_time( 'mysql' ) );
+			$order->add_order_note(
+				__( 'Correios Automático - Email de Entrega enviado para o cliente', 'infixs-correios-automatico' ),
+				false
+			);
+			$order->save();
+		}
+
+		return $success;
+	}
+
 	/**
 	 * Get trackings codes.
 	 * 

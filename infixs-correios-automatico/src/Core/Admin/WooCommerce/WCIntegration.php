@@ -84,6 +84,17 @@ class WCIntegration {
 		add_filter( 'woocommerce_shipping_methods', [ $this->shipping, 'include_methods' ] );
 		add_filter( 'bulk_actions-edit-shop_order', [ $this, 'register_bulk_actions' ] ); // Compatibility with old woocommerce
 		add_filter( 'handle_bulk_actions-edit-shop_order', [ $this, 'handle_bulk_actions' ], 10, 3 );
+		add_filter( 'woocommerce_reports_order_statuses', [ $this, 'add_order_statuses_to_reports' ] );
+	}
+
+	public function add_order_statuses_to_reports( $statuses ) {
+		$statuses[] = 'preparing-to-ship';
+		$statuses[] = 'in-transit';
+		$statuses[] = 'waiting-pickup';
+		$statuses[] = 'returning';
+		$statuses[] = 'delivered';
+
+		return $statuses;
 	}
 
 	public static function get_shop_order_screen() {
@@ -161,7 +172,7 @@ class WCIntegration {
 			$redirect_to = admin_url( sprintf( 'admin.php?page=infixs-correios-automatico&path=/print&orders=%s', implode( ',', $post_ids ) ) );
 		}
 
-		$status_actions = [ 
+		$status_actions = [
 			'infixs_correios_automatico_mark_preparing_to_ship' => 'wc-preparing-to-ship',
 			'infixs_correios_automatico_mark_in_transit' => 'wc-in-transit',
 			'infixs_correios_automatico_mark_waiting_pickup' => 'wc-waiting-pickup',

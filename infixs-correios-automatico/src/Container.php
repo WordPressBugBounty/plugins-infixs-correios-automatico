@@ -29,6 +29,7 @@ use Infixs\CorreiosAutomatico\Services\EmailService;
 use Infixs\CorreiosAutomatico\Services\InvoiceUnitService;
 use Infixs\CorreiosAutomatico\Services\SettingsService;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
+use Infixs\CorreiosAutomatico\Services\WhatsappService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -91,6 +92,7 @@ class Container {
 		$this->container['invoiceUnitService'] = fn( $c ) => new InvoiceUnitService( $c['invoiceUnitRepository'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
 		$this->container['settingsService'] = fn() => new SettingsService();
+		$this->container['whatsappService'] = fn( $c ) => new WhatsappService( $c['trackingService'] );
 	}
 
 	/**
@@ -251,5 +253,16 @@ class Container {
 	 */
 	public static function settingsService() {
 		return self::getInstance()->container['settingsService'];
+	}
+
+	/**
+	 * Whatsapp Service
+	 * 
+	 * @since 1.6.95
+	 * 
+	 * @return WhatsappService
+	 */
+	public static function whatsappService() {
+		return self::getInstance()->container['whatsappService'];
 	}
 }

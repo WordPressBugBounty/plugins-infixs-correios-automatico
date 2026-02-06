@@ -148,6 +148,17 @@ class Shipping {
 					'variation_id' => $variation_id,
 					'data' => $product,
 					'quantity' => $quantity,
+					'formatted_data' => (object) [
+						'id' => $product->get_id(),
+						'name' => $product->get_name(),
+						'is_virtual' => $product->get_virtual(),
+						'unitary_value' => (float) $product->get_price(),
+						'quantity' => $quantity,
+						'width' => $product->get_width(),
+						'height' => $product->get_height(),
+						'length' => $product->get_length(),
+						'weight' => $product->get_weight(),
+					],
 				],
 			],
 			'contents_cost' => $package_cost,
@@ -278,7 +289,6 @@ class Shipping {
 	 * @return array
 	 */
 	public function force_shipping_cost( $rates, $package ) {
-
 		Log::debug( 'Forcing shipping cost, initial', [ 'rates' => $rates, 'package' => $package ] );
 
 		foreach ( $rates as $rate_id => $rate ) {
@@ -289,7 +299,7 @@ class Shipping {
 			$meta_data = $rate->get_meta_data();
 			if ( $meta_data ) {
 				foreach ( $meta_data as $meta_key => $meta_value ) {
-					if ( $meta_key === '_original_cost' ) {
+					if ( $meta_key === '_final_cost' ) {
 						$rate->set_cost( (float) $meta_value );
 						$rates[ $rate_id ] = $rate;
 					}

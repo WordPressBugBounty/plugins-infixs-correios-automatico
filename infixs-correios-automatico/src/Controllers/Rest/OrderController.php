@@ -38,7 +38,7 @@ class OrderController {
 		$search = $request->get_param( 'search' );
 		$status = $request->get_param( 'status' );
 
-		$orders = $this->orderService->getOrders( [ 
+		$orders = $this->orderService->getOrders( [
 			'page' => $page,
 			'per_page' => $per_page,
 			'search' => $search,
@@ -46,7 +46,7 @@ class OrderController {
 		] );
 
 		return rest_ensure_response(
-			array_merge( [ 
+			array_merge( [
 				"status" => "success",
 			],
 				$orders
@@ -63,7 +63,7 @@ class OrderController {
 			Config::update( 'preferences.order.status', $preferences['status'] );
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			"status" => "success",
 		] );
 	}
@@ -87,7 +87,7 @@ class OrderController {
 
 		$this->orderService->updateOrder( $order_id, $params );
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			'status' => 'success',
 			'order_id' => $order_id,
 		] );
@@ -119,7 +119,7 @@ class OrderController {
 			}
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			'status' => 'success',
 			'updated_orders' => $updated_orders,
 		] );
@@ -222,7 +222,7 @@ class OrderController {
 			return $response;
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			'success' => true,
 		] );
 	}
@@ -244,22 +244,24 @@ class OrderController {
 			return new \WP_Error( 'empty_order_id', 'Order ID is not empty.', [ 'status' => 400 ] );
 		}
 
+		$ceint_id = isset( $params['ceint_id'] ) && is_numeric( $params['ceint_id'] ) ? (int) $params['ceint_id'] : null;
+
 		$updated_orders = [];
 		$error_orders = [];
 
 		foreach ( $params['orders'] as $order_id ) {
-			$created = Container::unitService()->unitPacketByOrder( $order_id );
+			$created = Container::unitService()->unitPacketByOrder( $order_id, $ceint_id );
 			if ( ! is_wp_error( $created ) ) {
 				$updated_orders[] = $order_id;
 			} else {
-				$error_orders[] = [ 
+				$error_orders[] = [
 					'order_id' => $order_id,
 					'message' => $created->get_error_message(),
 				];
 			}
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			'status' => 'success',
 			'updated_orders' => $updated_orders,
 			'error_orders' => $error_orders,
@@ -311,7 +313,7 @@ class OrderController {
 		$order->save();
 
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			'status' => 'success',
 		] );
 	}

@@ -20,6 +20,7 @@ defined( 'ABSPATH' ) || exit;
  * @property string $status
  * @property string $service_code
  * @property string $cn38_code
+ * @property string $contract_number
  * @property string $created_at
  * @property string $updated_at
  * @property-read \Infixs\WordpressEloquent\Collection|\Infixs\CorreiosAutomatico\Models\Unit[] $units

@@ -19,9 +19,9 @@ class InfixsApi {
 	 * @return \WP_Error|array The response or WP_Error on failure.
 	 */
 	public function postDeactivationPlugin( $data ) {
-		return wp_safe_remote_post( $this->getApiUrl( 'plugin/deactivate' ), [ 
+		return wp_safe_remote_post( $this->getApiUrl( 'plugin/deactivate' ), [
 			"body" => wp_json_encode( $data ),
-			'headers' => [ 
+			'headers' => [
 				'Content-Type' => 'application/json',
 			]
 		] );
@@ -36,8 +36,8 @@ class InfixsApi {
 	}
 
 	public function fetchAddress( $postcode ) {
-		$response = wp_safe_remote_get( $this->getApiUrl( "postcode/{$postcode}" ), [ 
-			'headers' => [ 
+		$response = wp_safe_remote_get( $this->getApiUrl( "postcode/{$postcode}" ), [
+			'headers' => [
 				'Content-Type' => 'application/json',
 			]
 		] );
@@ -64,14 +64,14 @@ class InfixsApi {
 	 * @return array|\WP_Error
 	 */
 	public function getTrackingHistory( $tracking_code ) {
-		$query_params = [ 
+		$query_params = [
 			'format' => 'cws',
 		];
 
 		$url = add_query_arg( $query_params, $this->getApiUrl( "shipping/tracking/correios/{$tracking_code}" ) );
 
-		$response = wp_safe_remote_get( $url, [ 
-			'headers' => [ 
+		$response = wp_safe_remote_get( $url, [
+			'headers' => [
 				'Content-Type' => 'application/json',
 			]
 		] );
@@ -98,6 +98,12 @@ class InfixsApi {
 		);
 	}
 
+	public function fetchIcms() {
+		return $this->get(
+			'https://api.infixs.io/v1/tax/icms',
+		);
+	}
+
 	/**
 	 * Get currency rate
 	 * 
@@ -107,8 +113,8 @@ class InfixsApi {
 	 * @return array|\WP_Error
 	 */
 	public function getCurrencyRate( $from, $to ) {
-		$response = wp_safe_remote_get( $this->getApiUrl( "currency/rate/{$from}-{$to}" ), [ 
-			'headers' => [ 
+		$response = wp_safe_remote_get( $this->getApiUrl( "currency/rate/{$from}-{$to}" ), [
+			'headers' => [
 				'Content-Type' => 'application/json',
 			]
 		] );
@@ -128,12 +134,12 @@ class InfixsApi {
 	}
 
 	public function acceptTerms( $license_key, $token ) {
-		$response = wp_safe_remote_post( $this->getApiUrl( "plugin/accept-terms" ), [ 
-			"body" => wp_json_encode( [ 
+		$response = wp_safe_remote_post( $this->getApiUrl( "plugin/accept-terms" ), [
+			"body" => wp_json_encode( [
 				"license_key" => $license_key,
 				"token" => $token
 			] ),
-			'headers' => [ 
+			'headers' => [
 				'Content-Type' => 'application/json',
 			]
 		] );

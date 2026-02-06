@@ -73,7 +73,7 @@ class Order {
 		$line_items_shipping = $this->order->get_items( 'shipping' );
 		foreach ( $line_items_shipping as $item ) {
 			if ( ! $item instanceof \WC_Order_Item_Shipping || $item->get_method_id() !== 'infixs-correios-automatico' ) {
-				$this->shipping_items[] = [ 
+				$this->shipping_items[] = [
 					'instance_id' => $item->get_instance_id(),
 					'width' => 0,
 					'height' => 0,
@@ -87,7 +87,7 @@ class Order {
 				continue;
 			}
 
-			$this->shipping_items[] = [ 
+			$this->shipping_items[] = [
 				'instance_id' => $item->get_instance_id(),
 				'width' => $item->get_meta( '_width' ) ?: 0,
 				'height' => $item->get_meta( '_height' ) ?: 0,
@@ -247,7 +247,7 @@ class Order {
 	public function getBillingCustomerInfo() {
 		$document = Sanitizer::numeric_text( empty( $this->order->get_meta( '_billing_cnpj' ) ) ? $this->order->get_meta( '_billing_cpf' ) : $this->order->get_meta( '_billing_cnpj' ) );
 		$name = empty( $this->order->get_shipping_company() ) ? $this->order->get_billing_company() : $this->order->get_shipping_company();
-		return [ 
+		return [
 			'document' => $document,
 			'name' => $name
 		];
@@ -270,10 +270,17 @@ class Order {
 	public function getShippingCustomerInfo() {
 		$cpf = $this->order->get_meta( '_billing_cpf' );
 		$document = empty( $cpf ) ? '' : Sanitizer::numeric_text( $cpf );
-		$first_name = empty( $this->order->get_shipping_first_name() ) ? $this->order->get_billing_first_name() : $this->order->get_shipping_first_name();
-		$last_name = empty( $this->order->get_shipping_last_name() ) ? $this->order->get_billing_last_name() : $this->order->get_shipping_last_name();
+
+		if ( ! empty( $this->order->get_shipping_first_name() ) ) {
+			$first_name = $this->order->get_shipping_first_name();
+			$last_name = $this->order->get_shipping_last_name();
+		} else {
+			$first_name = $this->order->get_billing_first_name();
+			$last_name = $this->order->get_billing_last_name();
+		}
+
 		$name = trim( "$first_name $last_name" );
-		return [ 
+		return [
 			'document' => $document,
 			'name' => $name
 		];
@@ -296,13 +303,13 @@ class Order {
 
 			$item_id = $item->get_id();
 			if ( empty( $item_id ) ) {
-				$contents[] = [ 
+				$contents[] = [
 					'quantity' => $item->get_quantity(),
 					'data' => $item->get_product(),
 					'line_total' => $item->get_total(),
 				];
 			} else {
-				$contents[ $item_id ] = [ 
+				$contents[ $item_id ] = [
 					'quantity' => $item->get_quantity(),
 					'data' => $item->get_product(),
 					'line_total' => $item->get_total(),
@@ -341,14 +348,14 @@ class Order {
 	public function getPackageData() {
 		$address = $this->getAddress();
 
-		return [ 
+		return [
 			'contents' => $this->getContents(),
 			'contents_cost' => $this->order->get_subtotal(),
 			'applied_coupons' => false,
-			'user' => [ 
+			'user' => [
 				'ID' => get_current_user_id(),
 			],
-			'destination' => [ 
+			'destination' => [
 				'country' => $address->getCountry(),
 				'state' => $address->getState(),
 				'postcode' => $address->getPostCode(),
@@ -423,7 +430,7 @@ class Order {
 	 * }|null
 	 */
 	public function getFirstShippingItemData() {
-		return $this->shipping_items[0] ?? [ 
+		return $this->shipping_items[0] ?? [
 			'width' => 0,
 			'height' => 0,
 			'lenght' => 0,
@@ -445,8 +452,8 @@ class Order {
 		$customer['id'] = $this->order->get_customer_id();
 		$customer['address'] = $address;
 
-		$items = array_map( function ($item) {
-			return [ 
+		$items = array_map( function ( $item ) {
+			return [
 				'id' => $item->get_id(),
 				'name' => $item->get_name(),
 				'quantity' => intval( $item->get_quantity() ),
@@ -460,14 +467,14 @@ class Order {
 
 		$shipping_metadata = $this->getFirstShippingItemData();
 
-		$data = [ 
+		$data = [
 			'id' => $this->order->get_id(),
 			'order_url' => $this->order->get_edit_order_url(),
 			'status' => $this->order->get_status(),
 			'status_label' => wc_get_order_status_name( $this->order->get_status() ),
 			'total_amount' => NumberHelper::to100( $this->order->get_total() ),
 			'items' => $items,
-			'shipping' => [ 
+			'shipping' => [
 				'shipping_amount' => Sanitizer::money100( $this->order->get_shipping_total(), '.' ),
 				'original_cost' => $shipping_metadata['original_cost'] ? Sanitizer::money100( $shipping_metadata['original_cost'], '.' ) : null,
 				'shipping_method' => TextHelper::removeShippingTime( $this->order->get_shipping_method() ),
@@ -501,8 +508,8 @@ class Order {
 
 		$tracking_codes = $this->getTrackingCodes();
 		if ( ! empty( $tracking_codes ) ) {
-			$data['tracking_codes'] = array_map( function ($tracking_code) {
-				$tracking_code_data = [ 
+			$data['tracking_codes'] = array_map( function ( $tracking_code ) {
+				$tracking_code_data = [
 					'id' => $tracking_code['id'],
 					'code' => $tracking_code['code'],
 				];

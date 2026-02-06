@@ -1,28 +1,31 @@
 <?php
 /**
- * Tracking code HTML email notification.
+ * Delivered Email Plain
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
-?>
 
-<?php do_action( 'woocommerce_email_header', $email_heading, $email ); ?>
+echo '= ' . esc_html( $email_heading ) . " =\n\n";
 
-<?php echo wp_kses_post( wptexturize( wpautop( $tracking_message ) ) ); ?>
+echo esc_html( wptexturize( $message ) ) . "\n\n";
 
-<p><?php esc_html_e( 'Para sua informação, os detalhes do pedido estão abaixo.', 'infixs-correios-automatico' ); ?></p>
+echo esc_html__( 'Para sua informação, os detalhes do pedido estão abaixo.', 'infixs-correios-automatico' ) . "\n\n";
 
-<?php
+echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
+
 /**
  * Order details.
  *
  * @hooked WC_Emails::order_details() Shows the order details table.
  * @hooked WC_Structured_Data::generate_order_data() Generates structured data.
  * @hooked WC_Structured_Data::output_structured_data() Outputs structured data.
+ * @since 2.5.0
  */
 do_action( 'woocommerce_email_order_details', $order, $sent_to_admin, $plain_text, $email );
+
+echo "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
 
 /**
  * Order meta.
@@ -39,9 +42,6 @@ do_action( 'woocommerce_email_order_meta', $order, $sent_to_admin, $plain_text, 
  */
 do_action( 'woocommerce_email_customer_details', $order, $sent_to_admin, $plain_text, $email );
 
-/**
- * Email footer.
- *
- * @hooked WC_Emails::email_footer() Output the email footer.
- */
-do_action( 'woocommerce_email_footer', $email );
+echo "\n=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n\n";
+
+echo esc_html( apply_filters( 'woocommerce_email_footer_text', get_option( 'woocommerce_email_footer_text' ) ) );

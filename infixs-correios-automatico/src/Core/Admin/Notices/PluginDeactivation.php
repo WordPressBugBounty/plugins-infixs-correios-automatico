@@ -13,8 +13,8 @@ class PluginDeactivation extends Notice {
 		$this->message = sprintf( __( 'O plugin dos Correios Automático já oferece os mesmos recursos que o plugin "Calculadora de Frete otimizada no carrinho", desative-o para evitar conflitos.', 'infixs-correios-automatico' ) );
 		$this->type = 'info';
 		$this->dismissDuration = MONTH_IN_SECONDS;
-		$this->buttons = [ 
-			[ 
+		$this->buttons = [
+			[
 				'text' => __( 'Ir para Plugins', 'infixs-correios-automatico' ),
 				'url' => admin_url( 'plugins.php' ),
 			],

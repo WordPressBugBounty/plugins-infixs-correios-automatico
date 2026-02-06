@@ -1,6 +1,6 @@
 <?php
 /**
- * Tracking code HTML email notification.
+ * Delivered Email HTML
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -10,7 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 <?php do_action( 'woocommerce_email_header', $email_heading, $email ); ?>
 
-<?php echo wp_kses_post( wptexturize( wpautop( $tracking_message ) ) ); ?>
+<?php echo wp_kses_post( wptexturize( wpautop( $message ) ) ); ?>
 
 <p><?php esc_html_e( 'Para sua informação, os detalhes do pedido estão abaixo.', 'infixs-correios-automatico' ); ?></p>
 

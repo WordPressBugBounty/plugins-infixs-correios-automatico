@@ -127,6 +127,7 @@ class InvoiceUnitService {
 			'service_code' => $data->service_code,
 			'service_name' => DeliveryServiceCode::getShortDescription( $data->service_code ),
 			'cn38_code' => $data->cn38_code,
+			'shipment_date' => date_i18n( 'd/m/Y', strtotime( current_time( 'mysql' ) ) ),
 			'contract_number' => $data->contract_number,
 			'created_at' => $data->created_at,
 		];
@@ -152,7 +153,7 @@ class InvoiceUnitService {
 
 		$invoice_unit->request_id = isset( $result['requestId'] ) ? $result['requestId'] : null;
 		$invoice_unit->status = isset( $result['requestStatus'] ) ? strtolower( $result['requestStatus'] ) : 'open';
-
+		$invoice_unit->contract_number = Config::string( 'auth.contract_number' );
 
 		sleep( 5 );
 

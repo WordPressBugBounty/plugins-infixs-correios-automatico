@@ -82,7 +82,7 @@ class ShippingService {
 					continue;
 				}
 
-				$shipping_methods[] = [ 
+				$shipping_methods[] = [
 					"zone_id" => $zone['id'],
 					"instance_id" => $shipping_method->get_instance_id(),
 					"method_id" => $shipping_method->id,
@@ -111,7 +111,7 @@ class ShippingService {
 
 		$allowed_method_ids = [];
 
-		$return_data = [ 
+		$return_data = [
 			"total_imported" => 0,
 			"auth_imported" => false,
 		];
@@ -181,7 +181,7 @@ class ShippingService {
 			if ( ! is_wp_error( $postcard_response ) ) {
 				$allowed_services = array_column( $postcard_response['cartaoPostagem']['apis'], 'api' );
 
-				Config::update( 'auth', array_merge( $config, [ 
+				Config::update( 'auth', array_merge( $config, [
 					'active' => true,
 					'environment' => 'production',
 					'token' => $postcard_response['token'],
@@ -214,7 +214,7 @@ class ShippingService {
 		}
 
 		if ( is_array( $option_value ) && isset( $option_value['username'], $option_value['password'], $option_value['post_card'] ) ) {
-			return [ 
+			return [
 				'user_name' => $option_value['username'],
 				'access_code' => $option_value['password'],
 				'postcard' => $option_value['post_card'],
@@ -228,7 +228,7 @@ class ShippingService {
 		}
 
 		if ( is_array( $option_value ) && isset( $option_value['username'], $option_value['password'], $option_value['post_card'] ) ) {
-			return [ 
+			return [
 				'user_name' => $option_value['cws_username'],
 				'access_code' => $option_value['cws_access_code'],
 				'postcard' => $option_value['cws_posting_card'],
@@ -240,9 +240,9 @@ class ShippingService {
 	}
 
 	public function disable_shipping_method( $instance_id ) {
-		return WoocommerceShippingZoneMethod::update( [ 
+		return WoocommerceShippingZoneMethod::update( [
 			"is_enabled" => 0,
-		], [ 
+		], [
 			"instance_id" => $instance_id,
 		] );
 	}
@@ -299,7 +299,7 @@ class ShippingService {
 				$postcode = $source->get_option( 'origin_postcode', '' );
 				$cws_shipping_class = $source->get_option( 'shipping_class_id' );
 
-				$post_data = array_merge( $post_data, [ 
+				$post_data = array_merge( $post_data, [
 					$field_enabled => $source->is_enabled(),
 					$field_title => $source->get_title(),
 					$field_advanced_mode => 'yes',
@@ -327,7 +327,7 @@ class ShippingService {
 				if ( $source->get_option( 'service_type' ) != "conventional" )
 					throw new \Exception( esc_html__( 'Only conventional service type is supported.', 'infixs-correios-automatico' ) );
 
-				$converted = [ 
+				$converted = [
 					"correios-pac" => 'pac',
 					"correios-sedex" => 'sedex',
 					"correios-sedex10-pacote" => 'sedex10',
@@ -339,7 +339,7 @@ class ShippingService {
 				$postcode = $source->get_option( 'origin_postcode', '' );
 
 				$post_data = array_merge( $post_data,
-					[ 
+					[
 						$field_enabled => $source->is_enabled(),
 						$field_title => $source->get_title(),
 						$field_advanced_mode => null,
@@ -365,7 +365,7 @@ class ShippingService {
 				$postcode = $source->get_option( 'origin', '' );
 
 				$post_data = array_merge( $post_data,
-					[ 
+					[
 						$field_enabled => $source->is_enabled(),
 						$field_title => $source->get_title(),
 						$field_advanced_mode => 'yes',
@@ -392,13 +392,13 @@ class ShippingService {
 			case 'melhorenvio_correios_sedex':
 			case 'melhorenvio_correios_mini':
 
-				$converted = [ 
+				$converted = [
 					"melhorenvio_correios_pac" => 'pac',
 					"melhorenvio_correios_sedex" => 'sedex',
 				];
 
 				$post_data = array_merge( $post_data,
-					[ 
+					[
 						$field_enabled => $source->is_enabled(),
 						$field_title => $source->get_title(),
 						$field_additional_days => $source->get_option( 'additional_time' ),
@@ -492,11 +492,11 @@ class ShippingService {
 	}
 
 	public function get_compatible_methods( $flatten = false ) {
-		$methods = [ 
-			"virtuaria-correios" => [ 
+		$methods = [
+			"virtuaria-correios" => [
 				"virtuaria-correios-sedex"
 			],
-			"woocommerce-correios" => [ 
+			"woocommerce-correios" => [
 				"correios-cws",
 				"correios-pac",
 				"correios-sedex",
@@ -507,7 +507,7 @@ class ShippingService {
 				//"correios-sedex10-envelope",
 				//"correios-impresso-urgente",
 			],
-			"melhor-envio-cotacao" => [ 
+			"melhor-envio-cotacao" => [
 				"melhorenvio_correios_pac",
 				"melhorenvio_correios_sedex",
 				"melhorenvio_correios_mini"
@@ -527,7 +527,7 @@ class ShippingService {
 	public function hasMethodsToImport() {
 		$compatible_methods = $this->get_compatible_methods( true );
 
-		$shipping_methods = $this->list_shipping_methods( [ 
+		$shipping_methods = $this->list_shipping_methods( [
 			'is_enabled' => true,
 			'method_id' => $compatible_methods,
 		] );
@@ -558,16 +558,63 @@ class ShippingService {
 		return false;
 	}
 
+	protected function fetchBrasilApiAddress( $postcode ) {
+		$postcode = preg_replace( '/\D/', '', $postcode );
+
+		if ( empty( $postcode ) ) {
+			return false;
+		}
+
+		$url = "https://brasilapi.com.br/api/cep/v1/{$postcode}";
+		$response = wp_remote_get( $url, [
+			'timeout' => 5,
+			'headers' => [
+				'Accept' => 'application/json',
+			],
+		] );
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( empty( $body ) ) {
+			return false;
+		}
+
+		if ( isset( $body['errors'] ) ) {
+			return false;
+		}
+
+		return [
+			'postcode' => $body['cep'] ?? $postcode,
+			'address' => $body['street'] ?? '',
+			'neighborhood' => $body['neighborhood'] ?? '',
+			'city' => $body['city'] ?? '',
+			'state' => $body['state'] ?? '',
+		];
+	}
+
 	protected function fetchAddress( $postcode ) {
-		$address = $this->fetchViacepAddress( $postcode );
+
+		if ( Config::boolean( 'auth.active' ) ) {
+			$address = $this->correiosService->fetch_postcode( $postcode );
+
+			if ( $address && ! is_wp_error( $address ) ) {
+				return $address;
+			}
+		}
+
+		$address = $this->fetchBrasilApiAddress( $postcode );
 
 		if ( $address ) {
 			return $address;
 		}
 
-		$address = $this->correiosService->fetch_postcode( $postcode );
+		$address = $this->fetchViacepAddress( $postcode );
 
-		if ( $address && ! is_wp_error( $address ) ) {
+		if ( $address ) {
 			return $address;
 		}
 
@@ -615,7 +662,11 @@ class ShippingService {
 
 		$api_url = "https://viacep.com.br/ws/{$postcode}/json/";
 
-		$response = wp_remote_get( $api_url );
+		$response = wp_remote_get( $api_url,
+			[
+				"timeout" => 5,
+			]
+		);
 
 		if ( is_wp_error( $response ) ) {
 			return false;
@@ -656,7 +707,7 @@ class ShippingService {
 
 	public function getStateByPostcode( $postcode ) {
 
-		$postcode_range_map = [ 
+		$postcode_range_map = [
 			[ 'start' => '01000000', 'end' => '19999999', 'state' => 'SP' ],
 			[ 'start' => '20000000', 'end' => '28999999', 'state' => 'RJ' ],
 			[ 'start' => '29000000', 'end' => '29999999', 'state' => 'ES' ],
@@ -711,7 +762,7 @@ class ShippingService {
 	 * @return string|null
 	 */
 	public function getCeintByPostCode( $postcode ) {
-		$ceint_range_map = [ 
+		$ceint_range_map = [
 			[ 'start' => '01000000', 'end' => '11599999', 'destination' => CeintCode::CEINT_SAO_PAULO ],
 			[ 'start' => '60000000', 'end' => '63999999', 'destination' => CeintCode::CEINT_SAO_PAULO ],
 			[ 'start' => '11600000', 'end' => '19999999', 'destination' => CeintCode::CEINT_VALINHOS ],
@@ -774,8 +825,8 @@ class ShippingService {
 	 */
 	public function getAvailableZoneMethods( $address = [] ) {
 		$shipping_zone = \WC_Shipping_Zones::get_zone_matching_package(
-			[ 
-				'destination' => [ 
+			[
+				'destination' => [
 					'address' => $address['address'] ?? '',
 					'country' => $address['country'] ?? '',
 					'state' => $address['state'] ?? '',
@@ -806,7 +857,7 @@ class ShippingService {
 	public function getAvailableZoneCorreiosMethods( $address = [] ) {
 		$methods = $this->getAvailableZoneMethods( $address );
 
-		return array_filter( $methods, function ($method) {
+		return array_filter( $methods, function ( $method ) {
 			return $method instanceof CorreiosShippingMethod;
 		} );
 	}
@@ -834,19 +885,19 @@ class ShippingService {
 		if ( $has_active_contract ) {
 			return $this->correiosService->get_shipping_cost( $shipping_cost );
 		} else {
-			$request = [ 
+			$request = [
 				"origin_postal_code" => $shipping_cost->getOriginPostcode(),
 				"destination_postal_code" => $shipping_cost->getDestinationPostcode(),
 				"product_code" => $shipping_cost->getProductCode(),
 				"type" => $shipping_cost->getObjectType(),
 				'insurance' => $shipping_cost->getInsuranceDeclarationValue(),
-				"package" => [ 
+				"package" => [
 					"weight" => $shipping_cost->getWeight( 'g' ),
 					"length" => $shipping_cost->getLength(),
 					"width" => $shipping_cost->getWidth(),
 					"height" => $shipping_cost->getHeight(),
 				],
-				"services" => [ 
+				"services" => [
 					"own_hands" => $shipping_cost->getOwnHands(),
 					"receipt_notice" => $shipping_cost->getReceiptNotice(),
 				],

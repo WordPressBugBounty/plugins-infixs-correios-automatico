@@ -3,8 +3,8 @@ Contributors: infixs
 Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 6.8
-Stable tag: 1.6.80
+Tested up to: 6.9
+Stable tag: 1.7.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -138,6 +138,23 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.7.1 2026-02-05 =
+* Fix Bugs e Calculo mais rápido
+
+= 1.7.0 2026-01-15 =
+* Melhoria da compatibilidade com WhatsApp ( Pingo Notify )
+* Relatórios do WooCommerce agora compatíveis com os status do correios
+* Fix de bugs
+
+= 1.6.95 2025-12-01 =
+* Compatibilidade com novo Wordpress
+* Integração com WhatsApp via PingoNotify Plugin
+
+= 1.6.90 2025-10-27 =
+* Melhoria com a integração do melhor envio
+* Ajuste para compatibilidade do Energy+
+* Melhora na etiqueta internacional
 
 = 1.6.80 2025-09-28 =
 * Melhoria no calculo de frete

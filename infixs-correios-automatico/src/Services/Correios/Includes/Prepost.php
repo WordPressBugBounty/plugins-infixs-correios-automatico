@@ -297,11 +297,11 @@ class Prepost {
 				}
 			}
 
-			$this->content_items[] = [ 
+			$this->content_items[] = [
 				'ncm' => $product ? $product->get_meta( '_infixs_correios_automatico_ncm' ) : '',
-				'content' => $item->get_name(),
+				'content' => preg_replace( '/\s{2,}/', ' ', $item->get_name() ),
 				'quantity' => strval( $item->get_quantity() ),
-				'total' => strval( $product_price )
+				'total' => wc_format_decimal( $product_price, 2 )
 			];
 		}
 	}
@@ -325,7 +325,7 @@ class Prepost {
 	 * @since 1.0.0
 	 */
 	public function addAdditionalService( $service ) {
-		$this->addicional_service[] = [ 
+		$this->addicional_service[] = [
 			'code' => $service['code'],
 			'declaredValue' => $service['declaredValue']
 		];
@@ -337,21 +337,21 @@ class Prepost {
 		$content_items = [];
 
 		foreach ( $this->addicional_service as $service ) {
-			$addicional_service[] = [ 
+			$addicional_service[] = [
 				"codigoServicoAdicional" => $service['code'],
 				"valorDeclarado" => $service['declaredValue']
 			];
 		}
 
 		foreach ( $this->content_items as $content ) {
-			$content_items[] = [ 
+			$content_items[] = [
 				"conteudo" => $content['content'],
 				"quantidade" => $content['quantity'],
 				"valor" => $content['total']
 			];
 		}
 
-		$data = [ 
+		$data = [
 			"idCorreios" => $this->id,
 			"remetente" => $this->sender->getData(),
 			"destinatario" => $this->recipient->getData(),
@@ -372,7 +372,7 @@ class Prepost {
 			$data["comprimentoInformado"] = Sanitizer::integer_text( $this->getLength() );
 		}
 
-		if ( in_array( $this->service_code, [ 
+		if ( in_array( $this->service_code, [
 			DeliveryServiceCode::CARTA_COML_REG_B1_CHANC_ETIQ
 		] ) ) {
 			$data['dataPrevistaPostagem'] = date( 'Y-m-d', strtotime( '+1 day' ) );
@@ -406,7 +406,7 @@ class Prepost {
 	}
 
 	public function isPacket() {
-		return in_array( $this->getServiceCode(), [ 
+		return in_array( $this->getServiceCode(), [
 			DeliveryServiceCode::PACKET_EXPRESS,
 			DeliveryServiceCode::PACKET_STANDARD
 		] );

@@ -229,10 +229,11 @@ class UnitService {
 	 * @since 1.3.8
 	 * 
 	 * @param int $order_id Order ID.
+	 * @param int|null $ceint CEINT code (null for auto-detect).
 	 * 
 	 * @return \WP_Error|bool
 	 */
-	public function unitPacketByOrder( $order_id ) {
+	public function unitPacketByOrder( $order_id, $ceint_id = null ) {
 		$order = wc_get_order( $order_id );
 
 		if ( ! $order ) {
@@ -243,7 +244,7 @@ class UnitService {
 
 		$address = $caOrder->getAddress();
 
-		$ceint = Container::shippingService()->getCeintByPostCode( $address->getPostCode() );
+		$ceint = $ceint_id ? CeintCode::getCeintById( $ceint_id ) : Container::shippingService()->getCeintByPostCode( $address->getPostCode() );
 
 		if ( ! $ceint ) {
 			return new \WP_Error( 'invalid_post_code', 'Invalid Post Code.', [ 'status' => 400 ] );
@@ -270,17 +271,24 @@ class UnitService {
 
 		$codes = Container::trackingService()->getTrackings( $order_id, false, true );
 
+		$atachedCodes = 0;
+
 		foreach ( $codes->all() as $code ) {
 			if ( $code->unit_id == $unit->id ) {
 				continue;
 			}
 
-			if ( isset( $code->unit ) && $code->unit->status != 'open' ) {
+			if ( isset( $code->unit ) && $code->unit->status != 'pending' ) {
 				continue;
 			}
 
 			$code->unit_id = $unit->id;
 			$code->save();
+			$atachedCodes++;
+		}
+
+		if ( $atachedCodes === 0 ) {
+			return new \WP_Error( 'no_codes_attached', 'No tracking codes were attached to the unit.', [ 'status' => 400 ] );
 		}
 
 		return true;

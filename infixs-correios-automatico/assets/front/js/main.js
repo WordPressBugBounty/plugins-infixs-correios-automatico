@@ -308,7 +308,14 @@ jQuery( function ( $ ) {
 						.first()
 						.html( response );
 				},
-				error: ( error ) => {},
+				error: ( error ) => {
+					box.find( '#infixs-correios-automatico-calculate-results' )
+						.first()
+						.html(
+							error.responseJSON?.message ||
+								'Houve um problema ao calcular, verifique o CEP e tente novamente.'
+						);
+				},
 				complete: () => {
 					submitButton.prop( 'disabled', false );
 					postcodeInput.unsetLoading();

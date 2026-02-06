@@ -57,7 +57,7 @@ class Order {
 
 		$order = wc_get_order( $item->get_order_id() );
 
-		$correios_shipping_methods = Container::shippingService()->getAvailableZoneCorreiosMethods( [ 
+		$correios_shipping_methods = Container::shippingService()->getAvailableZoneCorreiosMethods( [
 			'country' => $order->get_shipping_country() ?: 'BR',
 			'state' => $order->get_shipping_state(),
 			'postcode' => $order->get_shipping_postcode(),
@@ -68,7 +68,7 @@ class Order {
 		$instances = [];
 
 		foreach ( $correios_shipping_methods as $method ) {
-			$instances[ $method->get_instance_id()] = [ 
+			$instances[ $method->get_instance_id()] = [
 				'title' => $method->get_title(),
 				'description' => DeliveryServiceCode::getDescription( $method->get_product_code(), true )
 			];
@@ -76,7 +76,7 @@ class Order {
 
 		$is_selected = $item->get_method_id() === 'infixs-correios-automatico';
 
-		Template::adminView( 'html-order-edit-shipping.php', [ 
+		Template::adminView( 'html-order-edit-shipping.php', [
 			'shipping_services' => $shipping_services,
 			'shipping_methods' => $correios_shipping_methods,
 			'item_id' => $item_id,
@@ -94,7 +94,7 @@ class Order {
 	 * @return array
 	 */
 	public function hidden_order_itemmeta( $hidden_order_itemmeta ) {
-		$hidden_order_itemmeta = array_merge( $hidden_order_itemmeta, [ 
+		$hidden_order_itemmeta = array_merge( $hidden_order_itemmeta, [
 			'_weight',
 			'_length',
 			'_width',
@@ -123,7 +123,7 @@ class Order {
 			return $display_key;
 		}
 
-		$display_keys = [ 
+		$display_keys = [
 			'_weight' => __( 'Peso', 'infixs-correios-automatico' ),
 			'_length' => __( 'Comprimento', 'infixs-correios-automatico' ),
 			'_width' => __( 'Largura', 'infixs-correios-automatico' ),
@@ -265,7 +265,7 @@ class Order {
 
 		if ( Config::boolean( 'general.active_preparing_to_ship' ) ) {
 			$preparing_to_ship_label = Config::string( 'general.status_preparing_to_ship', 'Preparando para envio' );
-			register_post_status( 'wc-preparing-to-ship', [ 
+			register_post_status( 'wc-preparing-to-ship', [
 				'label' => $preparing_to_ship_label,
 				'public' => true,
 				'exclude_from_search' => false,
@@ -278,7 +278,7 @@ class Order {
 
 		if ( Config::boolean( 'general.active_in_transit' ) ) {
 			$in_transit_label = Config::string( 'general.status_in_transit', 'Em transporte' );
-			register_post_status( 'wc-in-transit', [ 
+			register_post_status( 'wc-in-transit', [
 				'label' => $in_transit_label,
 				'public' => true,
 				'exclude_from_search' => false,
@@ -291,7 +291,7 @@ class Order {
 
 		if ( Config::boolean( 'general.active_waiting_pickup' ) ) {
 			$waiting_pickup_label = Config::string( 'general.status_waiting_pickup', 'Aguardando retirada' );
-			register_post_status( 'wc-waiting-pickup', [ 
+			register_post_status( 'wc-waiting-pickup', [
 				'label' => $waiting_pickup_label,
 				'public' => true,
 				'exclude_from_search' => false,
@@ -304,7 +304,7 @@ class Order {
 
 		if ( Config::boolean( 'general.active_returning' ) ) {
 			$returning_label = Config::string( 'general.status_returning', 'Em devolução' );
-			register_post_status( 'wc-returning', [ 
+			register_post_status( 'wc-returning', [
 				'label' => $returning_label,
 				'public' => true,
 				'exclude_from_search' => false,
@@ -317,7 +317,7 @@ class Order {
 
 		if ( Config::boolean( 'general.active_delivered' ) ) {
 			$delivered_label = Config::string( 'general.status_delivered', 'Entregue' );
-			register_post_status( 'wc-delivered', [ 
+			register_post_status( 'wc-delivered', [
 				'label' => $delivered_label,
 				'public' => true,
 				'exclude_from_search' => false,
@@ -390,7 +390,7 @@ class Order {
 		if ( 'delivered' === $new_status &&
 			Config::boolean( 'general.active_delivered' ) &&
 			Config::boolean( 'general.email_delivered' ) ) {
-			//$this->trackingService->sendDeliveredNotification( $order_id );
+			$this->trackingService->sendDeliveredNotification( $order_id );
 		}
 	}
 }

@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Admin\WooCommerce;
 
+use Infixs\CorreiosAutomatico\Core\Emails\DeliveredEmail;
 use Infixs\CorreiosAutomatico\Core\Emails\PreparingToShipEmail;
 use Infixs\CorreiosAutomatico\Core\Emails\ReturningEmail;
 use Infixs\CorreiosAutomatico\Core\Emails\TrackingCodeEmail;
@@ -43,6 +44,10 @@ class Email {
 
 		if ( ! isset( $emails['Correios_Automatico_Returning_Email'] ) ) {
 			$emails['Correios_Automatico_Returning_Email'] = new ReturningEmail();
+		}
+
+		if ( ! isset( $emails['Correios_Automatico_Delivered_Email'] ) ) {
+			$emails['Correios_Automatico_Delivered_Email'] = new DeliveredEmail();
 		}
 
 		return $emails;
