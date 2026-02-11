@@ -5,7 +5,7 @@ on:
   push:
     branches: ["master", "main"]
   schedule:
-    - cron: '39 3 * * *'
+    - cron: '7 3 * * *'
 
 jobs:
   semgrep:
