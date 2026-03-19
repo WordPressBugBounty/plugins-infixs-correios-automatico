@@ -45,7 +45,8 @@ jQuery(function ($) {
       const postcode = $element.val().replace(/\D/g, "");
 
       if (postcode.length === 8) {
-        $element.closest("form").trigger("submit");
+        $('button[name="calc_shipping"]').click();
+        //$element.closest("form").trigger("submit");
       }
     },
   };

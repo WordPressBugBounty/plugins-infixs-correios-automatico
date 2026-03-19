@@ -243,6 +243,13 @@ class Admin {
 
 		if ( class_exists( 'Infixs\PingoNotify\Services\NotificationService' ) ) {
 			$params['activePlugins'][] = 'infixs-pingo-notify';
+
+			if ( function_exists( 'pingo_notify_get_connections' ) ) {
+				$connections = pingo_notify_get_connections();
+				if ( ! is_wp_error( $connections ) ) {
+					$params['pingoConnections'] = method_exists( $connections, 'toArray' ) ? $connections->toArray() : (array) $connections;
+				}
+			}
 		}
 
 		$scriptData = array_merge( $params, [

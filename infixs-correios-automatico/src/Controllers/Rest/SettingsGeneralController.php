@@ -260,7 +260,7 @@ class SettingsGeneralController {
 
 		$response_data = $this->prepare_data();
 
-		$response = [ 
+		$response = [
 			'status' => 'success',
 			'data' => $response_data,
 		];
@@ -298,13 +298,75 @@ class SettingsGeneralController {
 
 		Container::infixsApi()->acceptTerms( $data['license_key'], $data['token'] );
 
-		Config::update( 'general', [ 
+		Config::update( 'general', [
 			"terms_and_conditions_of_use_accepted" => rest_sanitize_boolean( $data['accepted'] )
 		] );
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			'status' => 'success',
 		] );
+	}
+
+	/**
+	 * Reset cron
+	 * 
+	 * @return \WP_REST_Response
+	 */
+	public function reset_cron() {
+		Log::debug( "Cron resetado via configurações - Inicio." );
+		$this->log_cron_schedule();
+
+
+		if ( function_exists( '_get_cron_array' ) ) {
+			$crons = _get_cron_array();
+			if ( ! empty( $crons ) ) {
+				foreach ( $crons as $timestamp => $cronhooks ) {
+					if ( isset( $cronhooks['infixs_correios_automatico_tracking_schedule'] ) ) {
+						foreach ( $cronhooks['infixs_correios_automatico_tracking_schedule'] as $event ) {
+							$args = isset( $event['args'] ) ? $event['args'] : [];
+							Log::debug( "Forçando remoção de infixs_correios_automatico_tracking_schedule | Timestamp: {$timestamp} | Args: " . json_encode( $args ) );
+							wp_unschedule_event( $timestamp, 'infixs_correios_automatico_tracking_schedule', $args );
+						}
+					}
+				}
+			}
+		}
+
+		$result = wp_clear_scheduled_hook( 'infixs_correios_automatico_tracking_schedule' );
+
+		if ( is_wp_error( $result ) ) {
+			Log::debug( 'Erro ao resetar cron: ' . $result->get_error_message() );
+		}
+
+
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'infixs_correios_automatico_tracking_schedule' );
+			as_unschedule_all_actions( 'infixs_correios_automatico_update_status_schedule' );
+		}
+
+
+
+		Log::debug( "Cron resetado via configurações - Fim." );
+		$this->log_cron_schedule();
+
+		return rest_ensure_response( [
+			'success' => true,
+		] );
+	}
+
+	private function log_cron_schedule() {
+		if ( Config::boolean( 'debug.active' ) && Config::boolean( 'debug.debug_log' ) && function_exists( '_get_cron_array' ) ) {
+			$crons = _get_cron_array();
+			if ( ! empty( $crons ) ) {
+				foreach ( $crons as $timestamp => $cronhooks ) {
+					foreach ( $cronhooks as $hook => $keys ) {
+						if ( strpos( $hook, 'infixs_correios_automatico' ) !== false ) {
+							Log::debug( "Tarefa Cron: {$hook} - Execução: " . date( 'd/m/Y H:i:s', $timestamp ) );
+						}
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -317,7 +379,7 @@ class SettingsGeneralController {
 	 * @return array
 	 */
 	protected function prepare_data() {
-		$sanitized_settings = [ 
+		$sanitized_settings = [
 			'autofill_address' => Config::boolean( 'general.autofill_address' ),
 			'calculate_shipping_product_page' => Config::boolean( 'general.calculate_shipping_product_page' ),
 			'consider_quantity' => Config::boolean( 'general.consider_quantity' ),
@@ -365,7 +427,7 @@ class SettingsGeneralController {
 			'auto_change_order_to_completed' => Config::boolean( 'general.auto_change_order_to_completed' ),
 			'show_full_address_calculate_product' => Config::boolean( 'general.show_full_address_calculate_product' ),
 			'tracking_page' => Config::integer( 'general.tracking_page' ),
-			'pages' => array_reduce( get_pages(), function ($result, $page) {
+			'pages' => array_reduce( get_pages(), function ( $result, $page ) {
 				$result[ $page->ID ] = $page->post_title;
 				return $result;
 			}, [] ),

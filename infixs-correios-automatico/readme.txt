@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 6.9
-Stable tag: 1.7.1
+Stable tag: 1.7.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -25,7 +25,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 
 = 🌟 Recursos =
 
-- **Configuração Rápida e Inteligente** - Importamos as configurações de plugins antigos rapidamente para você não precisar criar as configurações manualmente. Caso opte por adicionar as configurações manualmente, o plugin detecta automaticamente as configuraçõe ideais baseado se existe ou não um contrato com os correios.
+- **Configuração Rápida e Inteligente** - Importamos as configurações de plugins antigos como Claudio Sanches e Virtuaria Correios rapidamente para você não precisar criar as configurações manualmente. Caso opte por adicionar as configurações manualmente, o plugin detecta automaticamente as configuraçõe ideais baseado se existe ou não um contrato com os correios.
 - **Calculo de frete na Página do Produto** - Adicione o calculo de frete na página do produto, para que seu cliente saiba rapidamente o custo de envio.
 - **Preenchimento Automático de Endereço** - No checkout, quando seu cliente preencher o CEP, os campos de endereço, bairro, cidade e estado são preenchidos automaticamente.
 - **Calculo de frete simplificado no Carrinho** - Calculo de frete rápido e simplificado no carrinho, sem campos desnecessários substituindo plugins que fazem o mesmo em um só.
@@ -34,6 +34,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Frete Grátis e Descontos** - Adicione regras para dar o frete grátis ou descontos para seu cliente a partir do total do carrinho.
 - **Devolução de Produto** - Habilite o botão de devolução de produto no seu site para seu cliente de forma fácil e rápida.
 - **E-mails de rastreio** - Gerencie, customize e automatize emails de rastreio para o seu cliente.
+- **Avisos via WhatsApp** - Integre com o plugin Pingo Notify para envio de avisos para seus clientes e administradores via WhatsApp
 - **Dias Adicionais** - Insira dias adicionais (prazo de entrega) em cada Produto ou então no método de entrega, ele será somado ao prazo real dos correios.
 - **Modo Offline** - Caso os correios fique fora do ar, nossos servidores ficam responsáveis por calcular o custo de envio aproximado, envitando a perda de vendas.
 - **Compatibilidade com Multisites** - Plugin totalmente compatível com Wordpress Multisites mesmo na versão free.
@@ -117,7 +118,7 @@ Não! Este plugin reúne todas as funcionalidades essenciais de frete em um só 
 
 = 4 - Como é feita a configuração do plugin? =
 
-A configuração é rápida e inteligente. O plugin pode importar automaticamente configurações de outros plugins antigos ou você poderá adicionar os métodos de entrega manualmente em "WooCommerce" -> "Configurações" -> "Entrega" -> "Adicionar Método de entrega"
+A configuração é rápida e inteligente. O plugin pode importar automaticamente configurações de outros plugins antigos como Virtuaria e Claudio Sanches ou você poderá adicionar os métodos de entrega manualmente em "WooCommerce" -> "Configurações" -> "Entrega" -> "Adicionar Método de entrega"
 
 = 5 - É compatível com o wordpress Multisites? =
 
@@ -138,6 +139,14 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.7.3 2026-03-19 =
+* Fix Bugs
+* Melhoria na etiqueta
+* Melhoria no calculo
+
+= 1.7.1 2026-03-02 =
+* Fix Bugs
 
 = 1.7.1 2026-02-05 =
 * Fix Bugs e Calculo mais rápido
@@ -248,6 +257,7 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 * Novos recursos Free
 * Melhorias e correções
 * Integração com Webhook dos Correios
+* Importação de plugins antigos como Correios Virtuaria e Claudio Sanches
 
 = 1.3.0 =
 * Correções de Bugs

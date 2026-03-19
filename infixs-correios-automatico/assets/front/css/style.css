@@ -167,7 +167,9 @@
 
 .infxs-correios-automatico-cart-shipping-calculator-visible
 	.woocommerce-shipping-calculator
-	.shipping-calculator-form {
+	.shipping-calculator-form,
+.woocommerce-cart.infxs-correios-automatico-cart-shipping-calculator-visible .shipping-calculator-form
+	{
 	display: block !important;
 }
 

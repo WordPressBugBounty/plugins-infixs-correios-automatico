@@ -35,18 +35,18 @@ class Front {
 		wp_enqueue_script(
 			'infixs-correios-automatico-front',
 			\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/front/js/main.js',
-			[ 'jquery', 'jquery-blockui', 'wp-util' ],
+			[ 'jquery', 'wp-util' ],
 			filemtime( \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'assets/front/js/main.js' ),
 			true
 		);
 
-		$script_data = [ 
+		$script_data = [
 			'nonce' => wp_create_nonce( 'infixs_correios_automatico_nonce' ),
 		];
 
 		if ( function_exists( 'is_product' ) && is_product() ) {
 			$script_data['productId'] = $post->ID;
-			$script_data['options'] = [ 
+			$script_data['options'] = [
 				'autoCalculateProductShippingPostcode' => Config::boolean( 'general.auto_calculate_product_shipping_postcode' ),
 			];
 		}
@@ -71,8 +71,8 @@ class Front {
 			wp_localize_script(
 				'infixs-correios-automatico-front-cart',
 				'infxsCorreiosAutomaticoCart',
-				[ 
-					'options' => [ 
+				[
+					'options' => [
 						'shippingCalculatorAlwaysVisible' => Config::boolean( 'general.cart_shipping_calculator_always_visible' ),
 						'autoCalculateCartShippingPostcode' => Config::boolean( 'general.auto_calculate_cart_shipping_postcode' ),
 					]

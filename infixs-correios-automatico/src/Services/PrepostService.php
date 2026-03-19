@@ -142,22 +142,38 @@ class PrepostService {
 		}
 
 		if ( $shippingProductCode === DeliveryServiceCode::IMPRESSO_MODICO ) {
-			$prepost->addAdditionalService( [ 
+			$prepost->addAdditionalService( [
 				'code' => '004',
 				'declaredValue' => '0'
 			] );
 		}
 
 		if ( $shippingProductCode === DeliveryServiceCode::CARTA_COML_REG_B1_CHANC_ETIQ ) {
-			$prepost->addAdditionalService( [ 
+			$prepost->addAdditionalService( [
 				'code' => '025',
 				'declaredValue' => '0'
 			] );
 		}
 
 		if ( $shipping_method->is_receipt_notice() ) {
-			$prepost->addAdditionalService( [ 
+			$prepost->addAdditionalService( [
 				'code' => '001',
+				'declaredValue' => '0'
+			] );
+		}
+
+		// Check for dangerous products
+		$has_dangerous_product = false;
+		foreach ( $order->get_items() as $item ) {
+			if ( 'yes' === get_post_meta( $item->get_product_id(), '_infixs_correios_automatico_dangerous_product', true ) ) {
+				$has_dangerous_product = true;
+				break;
+			}
+		}
+
+		if ( $has_dangerous_product ) {
+			$prepost->addAdditionalService( [
+				'code' => '095',
 				'declaredValue' => '0'
 			] );
 		}
@@ -169,7 +185,7 @@ class PrepostService {
 		if ( isset( $shippingItem['insurance_cost'] ) && $shippingItem['insurance_cost'] > 0 ) {
 			$insurance_code = AddicionalServiceCode::getInsuranceCode( $shippingProductCode );
 			if ( $insurance_code ) {
-				$prepost->addAdditionalService( [ 
+				$prepost->addAdditionalService( [
 					'code' => $insurance_code,
 					'declaredValue' => $prepost->getItemsTotal()
 				] );
@@ -197,7 +213,7 @@ class PrepostService {
 		$created_prepost = $this->processPrespost( $prepost );
 
 		if ( is_wp_error( $created_prepost ) ) {
-			Log::notice( "Erro ao criar a pré-postagem.", [ 
+			Log::notice( "Erro ao criar a pré-postagem.", [
 				'message' => $created_prepost->get_error_message(),
 			] );
 			return $created_prepost;
@@ -218,7 +234,7 @@ class PrepostService {
 
 		do_action( 'infixs_correios_automatico_prepost_created', $order_id, $created_prepost );
 
-		Log::debug( 'Pré-postagem criada com sucesso.', [ 
+		Log::debug( 'Pré-postagem criada com sucesso.', [
 			'prepost_id' => $created_prepost->id,
 			'order_id' => $order_id,
 		] );
@@ -259,7 +275,7 @@ class PrepostService {
 
 		$object_code = $response['packageResponseList'][0]['trackingNumber'];
 
-		$created_prepost = $this->prepostRepository->create( [ 
+		$created_prepost = $this->prepostRepository->create( [
 			'external_id' => 0,
 			'order_id' => $prepost->getOrderId(),
 			'object_code' => $object_code,
@@ -303,7 +319,7 @@ class PrepostService {
 
 		$prazoPostagem = ( new \DateTime( $response['prazoPostagem'] ) )->format( 'Y-m-d H:i:s' );
 
-		$data = [ 
+		$data = [
 			'external_id' => $response['id'],
 			'order_id' => $prepost->getOrderId(),
 			'object_code' => $response['codigoObjeto'],
@@ -374,7 +390,7 @@ class PrepostService {
 			$items[] = $this->prepareData( $prepost );
 		}
 
-		return [ 
+		return [
 			'page' => $page,
 			'per_page' => $per_page,
 			'total_results' => count( $items ),
@@ -391,7 +407,7 @@ class PrepostService {
 	 * @param \Infixs\CorreiosAutomatico\Models\Prepost $prepost
 	 */
 	public function prepareData( $prepost ) {
-		return [ 
+		return [
 			"id" => (int) $prepost->id,
 			"order_id" => (int) $prepost->order_id,
 			"expire_at" => $prepost->expire_at,
@@ -407,18 +423,19 @@ class PrepostService {
 	/**
 	 * Cancel Prepost
 	 * 
-	 * PRO Feature: https://infixs.io/product/correios-automatico-rastreio-etiqueta-e-frete-versao-pro/
+	 * PRO Feature: https://infixs.com/product/correios-automatico-rastreio-etiqueta-e-frete-versao-pro/
 	 * 
 	 * @param int $prepost_id
 	 * 
 	 * @return array|\WP_Error
 	 */
 	public function cancelPrepost( $prepost_id ) {
-		$reponse = apply_filters( 'infixs_correios_automatico_service_cancel_prepost',
+		$reponse = apply_filters(
+			'infixs_correios_automatico_service_cancel_prepost',
 			new \WP_Error(
 				'cancel_prepost_pro_feature',
 				'Essa funcionalidade é uma feature da versão PRO, considerer adquirir a versão PRO para utilizar essa funcionalidade.',
-				[ 
+				[
 					'status' => 400,
 					'buy_pro_url' => Plugin::PRO_URL
 				]

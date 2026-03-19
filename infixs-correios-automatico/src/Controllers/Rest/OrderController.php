@@ -317,4 +317,65 @@ class OrderController {
 			'status' => 'success',
 		] );
 	}
+
+	/**
+	 * Send tracking whatsapp
+	 * 
+	 * @since 1.6.0
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function send_tracking_whatsapp( $request ) {
+		$order_id = $request->get_param( 'id' );
+		$params = $request->get_json_params();
+		$connection_id = $params['connection'] ?? null;
+
+		if ( ! $order_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_missing_order_id', __( 'Order ID is required.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		if ( ! $connection_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_missing_connection_id', __( 'Connection ID is required.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$order = \Infixs\CorreiosAutomatico\Entities\Order::fromId( $order_id );
+
+		if ( ! $order ) {
+			return new \WP_Error( 'infixs_correios_automatico_order_not_found', __( 'Order not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
+		$customer_name = $order->getCustomerFullName();
+		$phone = $order->getAlwaysPhone();
+
+		if ( empty( $phone ) ) {
+			return new \WP_Error( 'infixs_correios_automatico_missing_phone', __( 'Customer phone not found.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$tracking_code = $order->getLastTrackingCode();
+
+		$message_text = '';
+		if ( $tracking_code ) {
+			$message_text = "Olá {$customer_name}, segue o código de rastreio do seu pedido #{$order_id}: {$tracking_code}";
+		} else {
+			$message_text = "Olá {$customer_name}, sobre o pedido #{$order_id}.";
+		}
+
+		$message = [ 'text' => $message_text ];
+		$result = false;
+
+		if ( function_exists( 'pingo_notify_send_message' ) ) {
+			if ( function_exists( 'pingo_notify_normalize_phone' ) ) {
+				$phone = pingo_notify_normalize_phone( $phone );
+			}
+			$result = pingo_notify_send_message( $connection_id, $phone, $message );
+		}
+
+		if ( $result ) {
+			return rest_ensure_response( [ 'success' => true ] );
+		} else {
+			return new \WP_Error( 'infixs_correios_automatico_dispatch_failed', __( 'Failed to dispatch message, update a Pingo Notify plugin.', 'infixs-correios-automatico' ), [ 'status' => 500 ] );
+		}
+	}
 }

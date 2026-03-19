@@ -78,13 +78,19 @@ class LabelService {
 		$products_total_amount = 0;
 		//TODO: Deprecated
 		$products_total_weight = 0;
-
+		
+		$has_dangerous_product = false;
 
 		foreach ( $order->getItems() as $item ) {
 			$product = $item->get_product();
 			if ( ! $product || ! $product->needs_shipping() ) {
 				continue;
 			}
+
+			if ( 'yes' === get_post_meta( $item->get_product_id(), '_infixs_correios_automatico_dangerous_product', true ) ) {
+				$has_dangerous_product = true;
+			}
+
 			$quantity = $item->get_quantity();
 			$weight = wc_get_weight( (float) $product->get_weight(), 'kg' );
 			$amount = Sanitizer::money100( $item->get_total(), '.' );
@@ -143,7 +149,8 @@ class LabelService {
 			'declaration_total_amount' => $declaration_total_amount,
 			'invoice_number' => $order->getOrder()->get_meta( '_infixs_correios_automatico_invoice_number', true ) ?: null,
 			'items' => $items,
-			'ceint' => $this->shippingService->getCeintByPostCode( $address->getPostCode() )
+			'ceint' => $this->shippingService->getCeintByPostCode( $address->getPostCode() ),
+			'has_dangerous_product' => $has_dangerous_product,
 		];
 	}
 

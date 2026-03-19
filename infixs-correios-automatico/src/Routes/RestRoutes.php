@@ -78,6 +78,14 @@ class RestRoutes {
 			}
 		] );
 
+		register_rest_route( $this->namespace, '/settings/general/reset-cron', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $general_controller, 'reset_cron' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
 		$sender_controller = new SettingsSenderController();
 
 		register_rest_route( $this->namespace, '/settings/sender', [
@@ -504,6 +512,14 @@ class RestRoutes {
 		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/preposts/(?P<prepost_id>\d+)', [
 			'methods' => \WP_REST_Server::DELETABLE,
 			'callback' => [ $order_controller, 'delete_prepost' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/send-tracking-whatsapp', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $order_controller, 'send_tracking_whatsapp' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}
