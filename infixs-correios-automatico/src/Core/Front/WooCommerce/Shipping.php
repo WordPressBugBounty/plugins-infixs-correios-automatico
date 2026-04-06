@@ -71,40 +71,7 @@ class Shipping {
 	 * @since 1.0.0
 	 */
 	public function shipping_method_label( $label, $method ) {
-		if ( ! $method instanceof \WC_Shipping_Rate ) {
-			return $label;
-		}
-
-		$meta_data = $method->get_meta_data();
-		$show_original_shipping_discount_price = isset( $meta_data['_show_original_shipping_discount_price'] )
-			? Sanitizer::boolean( $meta_data['_show_original_shipping_discount_price'] )
-			: false;
-
-		if ( ! $show_original_shipping_discount_price ) {
-			return $label;
-		}
-
-		$current_cost = (float) $method->cost;
-		$original_cost = isset( $meta_data['_original_cost'] ) ? (float) $meta_data['_original_cost'] : null;
-
-		if ( null === $original_cost || $original_cost <= $current_cost ) {
-			return $label;
-		}
-
-		if ( false !== strpos( $label, 'infixs-correios-automatico-original-cost' ) ) {
-			return $label;
-		}
-
-		$discount_html = sprintf(
-			'<del class="infixs-correios-automatico-original-cost">%s</del> ',
-			esc_html( Formatter::format_currency( $original_cost ) )
-		);
-
-		if ( preg_match( '/(<span class="woocommerce-Price-amount amount">.*?<\/span>)/', $label, $matches ) ) {
-			return str_replace( $matches[1], $discount_html . $matches[1], $label );
-		}
-
-		return $discount_html . $label;
+		return $label;
 	}
 
 	/**

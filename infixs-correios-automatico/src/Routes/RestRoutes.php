@@ -357,22 +357,6 @@ class RestRoutes {
 			}
 		] );
 
-		register_rest_route( $this->namespace, '/preposts/(?P<id>\d+)/sync', [
-			'methods' => \WP_REST_Server::CREATABLE,
-			'callback' => [ $prepost_controller, 'sync' ],
-			'permission_callback' => function () {
-				return current_user_can( 'manage_woocommerce' );
-			}
-		] );
-
-		register_rest_route( $this->namespace, '/preposts/(?P<id>\d+)/print-dce', [
-			'methods' => \WP_REST_Server::CREATABLE,
-			'callback' => [ $prepost_controller, 'printDce' ],
-			'permission_callback' => function () {
-				return current_user_can( 'manage_woocommerce' );
-			}
-		] );
-
 		$unit_controller = new UnitController( Container::unitService(), Container::trackingService() );
 
 		register_rest_route( $this->namespace, '/units', [

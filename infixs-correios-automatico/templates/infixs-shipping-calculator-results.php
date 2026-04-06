@@ -35,10 +35,6 @@ defined( 'ABSPATH' ) || exit;
 			foreach ( $rates as $rate ) :
 				$meta_data = $rate->get_meta_data();
 				$delivery_time = isset( $meta_data['delivery_time'] ) ? $meta_data['delivery_time'] : ( isset( $meta_data['_delivery_time'] ) ? $meta_data['_delivery_time'] : false );
-				$rate_cost = (float) $rate->cost;
-				$original_cost = isset( $meta_data['_original_cost'] ) ? (float) $meta_data['_original_cost'] : null;
-				$show_original_shipping_discount_price = ! empty( $meta_data['_show_original_shipping_discount_price'] );
-				$has_discount = $show_original_shipping_discount_price && null !== $original_cost && $original_cost > $rate_cost;
 				?>
 				<div>
 					<div class="infixs-correios-automatico-shipping-results-method">
@@ -60,10 +56,7 @@ defined( 'ABSPATH' ) || exit;
 					<?php endif; ?>
 				</div>
 				<div class="infixs-correios-automatico-shipping-results-cost">
-					<?php if ( $has_discount ) : ?>
-						<del><?php echo esc_html( Formatter::format_currency( $original_cost ) ); ?></del>
-					<?php endif; ?>
-					<?php echo esc_html( $rate_cost > 0 ? Formatter::format_currency( $rate_cost ) : __( 'Grátis', 'infixs-correios-automatico' ) ); ?>
+					<?php echo esc_html( $rate->cost > 0 ? Formatter::format_currency( $rate->cost ) : __( 'Grátis', 'infixs-correios-automatico' ) ); ?>
 				</div>
 
 			<?php endforeach; ?>

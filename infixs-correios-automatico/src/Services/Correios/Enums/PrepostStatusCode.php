@@ -12,8 +12,6 @@ class PrepostStatusCode {
 	public const CANCELADO = 5;
 	public const ESTORNADO = 6;
 
-	public const PENDENTE = 7;
-
 	/**
 	 * Get status
 	 * 
@@ -22,14 +20,13 @@ class PrepostStatusCode {
 	 * @return string|null
 	 */
 	public static function getStatus( $code ) {
-		$statuses = [
+		$statuses = [ 
 			self::PREATENDIDO => 'Preatendido',
 			self::PREPOSTADO => 'Pré-postado',
 			self::POSTADO => 'Postado',
 			self::EXPRIRADO => 'Expirado',
 			self::CANCELADO => 'Cancelado',
 			self::ESTORNADO => 'Estornado',
-			self::PENDENTE => 'Pendente',
 		];
 
 		return isset( $statuses[ $code ] ) ? $statuses[ $code ] : null;

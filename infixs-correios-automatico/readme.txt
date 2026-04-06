@@ -3,8 +3,8 @@ Contributors: infixs
 Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 7.0
-Stable tag: 1.7.4
+Tested up to: 6.9
+Stable tag: 1.7.3
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -49,9 +49,9 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Impressão e Customização de etiquetas (Etiqueta Builder)** - Customize suas etiquetas com varios modelos, remssa conforme, padrão, internacional e nacional para impressão em lote ou individual.
 - **Frete Internacional Automatizado** - Exporte seu produto com Exporta Fácil, calculo de frete internacional, remessa conforme, etiqueta unitizadora, CN35, CN36 e muito mais.
 - **Pré-Postagem Automática** - Se você tiver um contrato com os correios, a pré-postagem é feita automática.
-- **Declaração de Conteúdo Eletronica (DCe ou DACE)** - Emissao de declaração de conteúdo eletrônica em conformidade com o sefaz e correios sem necessidade de nota fiscal.
 - **Alteração de Status do Pedido Automático** - Status do pedido é alterado para concluído automaticamente assim que o cliente receber o pedido, também pode ser configurado para mudar automáticamente para "Em transporte".
 - **Barra de Frete Grátis** - Adiciona uma barra com porcentagem mostrando o quanto falta para o cliente ter frete grátis na loja, a partir das suas configurações de desconto nos Correios Automático.
+- **Declaração de conteúdo** - A declaração pode ser gerada com facilidade com os itens inclusos no pedido.
 - **Devolução Automática de Produto** - Seu cliente solicita a devolução e o plugin faz todo o resto para você.
 - **Rastreamento Automático** - Não se preocupe em adicionar o código de rastreamento, o plugin adiciona automáticamente pra você.
 - **Integração com Dokan** - Integre com o plugin Dokan para marketplace, para que os vendedores tenham autonomia para imprimir etiquetas, e os calculos de fretes sejam baseados na loja do vendedor. 
@@ -139,12 +139,6 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
-
-= 1.7.4 2026-04-05 =
-* Declaraçao de Conteúdo Eletronica (DCe)
-* Impressão da DACE
-* Impressao de DCe em PDF
-* Prepostagem Automática de DCe
 
 = 1.7.3 2026-03-19 =
 * Fix Bugs

@@ -20,16 +20,10 @@ defined( 'ABSPATH' ) || exit;
  * @property string $payment_type
  * @property string $status
  * @property string $status_label
- * @property string $invoice_number
- * @property string $invoice_key
- * @property string $dce_number
- * @property string $dce_series
- * @property string $dce_authorization_protocol
  * @property string $expire_at
  * @property string $updated_at
  * @property string $created_at
  * @property string $cancelled_at
- * @property bool $dce
  * 
  */
 class Prepost extends Model {
