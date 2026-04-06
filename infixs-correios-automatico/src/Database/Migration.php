@@ -81,10 +81,14 @@ class Migration {
 			"status_label" => "varchar(255) NOT NULL",
 			"invoice_number" => "varchar(255) DEFAULT NULL",
 			"invoice_key" => "varchar(255) DEFAULT NULL",
+			'dce_number' => 'varchar(50) DEFAULT NULL', //@since 1.7.5
+			'dce_series' => 'varchar(20) DEFAULT NULL', //@since 1.7.5
+			'dce_authorization_protocol' => 'varchar(50) DEFAULT NULL', //@since 1.7.5
 			"expire_at" => "datetime DEFAULT NULL",
 			'updated_at' => 'datetime NOT NULL',
 			'created_at' => 'datetime NOT NULL',
 			'cancelled_at' => 'datetime DEFAULT NULL', //@since 1.1.3
+			'dce' => "tinyint(1) unsigned DEFAULT 0", //@since 1.7.4
 		] );
 
 		/**

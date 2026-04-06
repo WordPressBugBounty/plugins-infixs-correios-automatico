@@ -202,6 +202,15 @@ class Prepost {
 	 */
 	private $invoice_key = '';
 
+	/**
+	 * Emit DCE flag.
+	 *
+	 * Optional. When enabled, must be "S".
+	 *
+	 * @var string|null
+	 */
+	private $emit_dce = null;
+
 	private $order_id;
 
 
@@ -378,6 +387,10 @@ class Prepost {
 			$data['dataPrevistaPostagem'] = date( 'Y-m-d', strtotime( '+1 day' ) );
 		}
 
+		if ( 'S' === $this->emit_dce ) {
+			$data['emiteDCe'] = 'S';
+		}
+
 
 		return $data;
 	}
@@ -418,6 +431,10 @@ class Prepost {
 
 	public function setInvoiceKey( $invoice_key ) {
 		$this->invoice_key = $invoice_key;
+	}
+
+	public function setEmitDce( $emit_dce ) {
+		$this->emit_dce = $emit_dce;
 	}
 
 	public function getOrderId() {

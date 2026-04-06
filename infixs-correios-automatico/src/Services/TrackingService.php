@@ -678,6 +678,8 @@ class TrackingService {
 			'code' => $tracking->code,
 			'category' => $tracking->category,
 			'expected_date' => $tracking->expected_date,
+			'status' => null,
+			'status_code' => null,
 			'events' => [],
 			'last_sync' => $tracking->sync_at,
 		];
@@ -687,6 +689,12 @@ class TrackingService {
 		}
 
 		$events_by_date = $tracking->events->sortByDesc( 'event_date' );
+
+		$last_event = $events_by_date->first();
+		if ( $last_event ) {
+			$history['status'] = $last_event->description;
+			$history['status_code'] = $last_event->code;
+		}
 
 		foreach ( $events_by_date as $event ) {
 			$history['events'][] = [
