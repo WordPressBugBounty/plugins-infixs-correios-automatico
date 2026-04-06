@@ -300,4 +300,31 @@ class CorreiosService {
 	public function get_invoice_unit_by_request( $request_id ) {
 		return $this->correiosApi->getInvoiceUnitByRequest( $request_id );
 	}
+
+	/**
+	 * Get Prepost by Object Code
+	 * 
+	 * @param string $object_code
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function get_prepost( $object_code ) {
+		return $this->correiosApi->getPrepostagens( [
+			'codigoObjeto' => $object_code
+		] );
+	}
+	/**
+	 * Print DCe (Documento de Coleta Eletrônico) for a prepost.
+	 * 
+	 * @param string $object_code
+	 * @param string $dace_type 'R' = Resumida, 'C' = Completa, 'T' = Texto (default: 'C')
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function printDce( $object_code, $dace_type = 'C' ) {
+		return $this->correiosApi->printDce( [
+			'codigosObjetos' => [ $object_code ],
+			'tipoDace' => $dace_type
+		] );
+	}
 }

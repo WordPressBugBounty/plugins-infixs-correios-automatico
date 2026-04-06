@@ -155,9 +155,24 @@ class PrepostService {
 			] );
 		}
 
-		if ( $shipping_method->is_receipt_notice() ) {
+		$use_receipt_notice = isset( $data['receiptNotice'] )
+			? filter_var( $data['receiptNotice'], FILTER_VALIDATE_BOOLEAN )
+			: $shipping_method->is_receipt_notice();
+
+		if ( $use_receipt_notice ) {
 			$prepost->addAdditionalService( [
 				'code' => '001',
+				'declaredValue' => '0'
+			] );
+		}
+
+		$use_own_hands = isset( $data['ownHands'] )
+			? filter_var( $data['ownHands'], FILTER_VALIDATE_BOOLEAN )
+			: false;
+
+		if ( $use_own_hands ) {
+			$prepost->addAdditionalService( [
+				'code' => '002',
 				'declaredValue' => '0'
 			] );
 		}
@@ -171,7 +186,11 @@ class PrepostService {
 			}
 		}
 
-		if ( $has_dangerous_product ) {
+		$use_dangerous_product = isset( $data['dangerousProduct'] )
+			? filter_var( $data['dangerousProduct'], FILTER_VALIDATE_BOOLEAN )
+			: $has_dangerous_product;
+
+		if ( $use_dangerous_product ) {
 			$prepost->addAdditionalService( [
 				'code' => '095',
 				'declaredValue' => '0'
@@ -203,6 +222,12 @@ class PrepostService {
 
 		if ( isset( $data['invoice_key'] ) ) {
 			$prepost->setInvoiceKey( $data['invoice_key'] );
+		}
+
+		if ( isset( $data['emiteDCe'] ) && in_array( $data['emiteDCe'], [ 'S', 'N' ], true ) ) {
+			$prepost->setEmitDce( $data['emiteDCe'] );
+		} elseif ( Config::boolean( 'general.emit_dce_auto_prepost' ) ) {
+			$prepost->setEmitDce( 'S' );
 		}
 
 		if ( $prepost->isPacket() ) {
@@ -338,6 +363,7 @@ class PrepostService {
 			'expire_at' => $prazoPostagem,
 			'updated_at' => current_time( 'mysql' ),
 			'created_at' => current_time( 'mysql' ),
+			'dce' => isset( $response['emiteDCe'] ) && $response['emiteDCe'] === 'S' ? 1 : 0,
 		];
 
 		$created_prepost = $this->prepostRepository->create( $data );
@@ -417,7 +443,122 @@ class PrepostService {
 			"status" => PrepostStatusCode::getStatus( $prepost->status ),
 			"status_code" => (int) $prepost->status,
 			"payment_type" => PaymentTypeCode::getDescription( $prepost->payment_type ),
+			"dce" => (bool) $prepost->dce,
 		];
+	}
+
+	/**
+	 * Sync Prepost
+	 * 
+	 * Synchronizes the prepost status from Correios API and updates invoice key if present.
+	 * 
+	 * @since 1.5.0
+	 * 
+	 * @param int $prepost_id
+	 * 
+	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
+	 */
+	public function sync( $prepost_id ) {
+		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
+		$prepost = $this->prepostRepository->findById( $prepost_id );
+
+		if ( ! $prepost ) {
+			Log::notice( "Pré-postagem inválida ao sincronizar." );
+			return new \WP_Error( 'invalid_prepost_id', 'Pré-postagem inválida.', [ 'status' => 400 ] );
+		}
+
+		$response = $this->correiosService->get_prepost( $prepost->object_code );
+
+		if ( is_wp_error( $response ) ) {
+			Log::notice( "Erro ao sincronizar pré-postagem.", [ 'error' => $response->get_error_message() ] );
+			return $response;
+		}
+
+		if ( ! isset( $response['itens'] ) || empty( $response['itens'] ) ) {
+			Log::notice( "Nenhuma pré-postagem encontrada nos Correios para o código: " . $prepost->object_code );
+			return new \WP_Error( 'prepost_not_found', 'Pré-postagem não encontrada nos Correios.', [ 'status' => 404 ] );
+		}
+
+		$prepost_data = $response['itens'][0];
+
+		// Prepare update data
+		$update_data = [
+			'status' => isset( $prepost_data['statusAtual'] ) ? $prepost_data['statusAtual'] : $prepost->status,
+			'status_label' => isset( $prepost_data['descStatusAtual'] ) ? $prepost_data['descStatusAtual'] : $prepost->status_label,
+		];
+
+		if ( isset( $prepost_data['statusAtual'] ) && (int) $prepost_data['statusAtual'] === 2 ) {
+			$dce_response = $this->correiosService->printDce( $prepost->object_code, 'T' );
+
+			if ( ! is_wp_error( $dce_response ) && ! empty( $dce_response['dados'] ) ) {
+				$dce_text_data = $this->extractDceTextData( $dce_response['dados'] );
+
+				if ( ! empty( $dce_text_data['dce_number'] ) ) {
+					$update_data['dce_number'] = $dce_text_data['dce_number'];
+				}
+
+				if ( ! empty( $dce_text_data['dce_series'] ) ) {
+					$update_data['dce_series'] = $dce_text_data['dce_series'];
+				}
+
+				if ( ! empty( $dce_text_data['dce_authorization_protocol'] ) ) {
+					$update_data['dce_authorization_protocol'] = $dce_text_data['dce_authorization_protocol'];
+				}
+			}
+		}
+
+		// Update invoice key (chaveNFe) if present in response
+		if ( isset( $prepost_data['chaveNFe'] ) && ! empty( $prepost_data['chaveNFe'] ) ) {
+			$update_data['invoice_key'] = $prepost_data['chaveNFe'];
+		}
+
+		// Update the prepost
+		$updated = $this->prepostRepository->update( $prepost_id, $update_data );
+
+		if ( ! $updated ) {
+			Log::notice( "Erro ao atualizar pré-postagem." );
+			return new \WP_Error( 'update_prepost_error', 'Erro ao atualizar pré-postagem.', [ 'status' => 400 ] );
+		}
+
+		// Refresh the prepost data
+		$updated_prepost = $this->prepostRepository->findById( $prepost_id );
+
+		Log::debug( 'Pré-postagem sincronizada com sucesso.', [
+			'prepost_id' => $prepost_id,
+			'object_code' => $prepost->object_code,
+		] );
+
+		return $updated_prepost;
+	}
+
+	/**
+	 * Extract DCe number and series from the text response.
+	 *
+	 * @param string $dce_text
+	 *
+	 * @return array{dce_number: string|null, dce_series: string|null, dce_authorization_protocol: string|null}
+	 */
+	protected function extractDceTextData( $dce_text ) {
+		$result = [
+			'dce_number' => null,
+			'dce_series' => null,
+			'dce_authorization_protocol' => null,
+		];
+
+		if ( ! is_string( $dce_text ) || '' === trim( $dce_text ) ) {
+			return $result;
+		}
+
+		if ( preg_match( '/Num:\s*([^\s]+)\s+S[ée]rie:\s*([^\s]+)/u', $dce_text, $matches ) ) {
+			$result['dce_number'] = $matches[1];
+			$result['dce_series'] = $matches[2];
+		}
+
+		if ( preg_match( '/Protocolo de Autoriza[cç][aã]o:\s*([^\s]+)/u', $dce_text, $matches ) ) {
+			$result['dce_authorization_protocol'] = $matches[1];
+		}
+
+		return $result;
 	}
 
 	/**
@@ -469,5 +610,36 @@ class PrepostService {
 			Container::trackingService()->deleteTrackingByCode( $prepost->object_code );
 			return true;
 		}
+	}
+
+	/**
+	 * Print DCe (Documento de Coleta Eletrônico) for a prepost.
+	 * 
+	 * @since 1.6.0
+	 * 
+	 * @param int $prepost_id
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function printDce( $prepost_id ) {
+		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
+		$prepost = $this->prepostRepository->findById( $prepost_id );
+
+		if ( ! $prepost ) {
+			return new \WP_Error( 'invalid_prepost_id', 'Pré-postagem inválida.', [ 'status' => 400 ] );
+		}
+
+		if ( ! $prepost->dce ) {
+			return new \WP_Error( 'prepost_without_dce', 'Esta pré-postagem não possui DCe.', [ 'status' => 400 ] );
+		}
+
+		// Call Correios API to get DCe PDF
+		$response = $this->correiosService->printDce( $prepost->object_code );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		return $response;
 	}
 }

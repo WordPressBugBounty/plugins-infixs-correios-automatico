@@ -369,4 +369,37 @@ class CorreiosApi {
 			[ 'requestId' => $request_id ]
 		);
 	}
+
+	/**
+	 * Get Prepostagens
+	 * 
+	 * Retrieves prepostagens from Correios API with optional filters.
+	 * Supports filters like: codigoObjeto, statusAtual, etc.
+	 * 
+	 * @param array $params Filter parameters
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function getPrepostagens( $params = [] ) {
+		return $this->authenticated_get(
+			"prepostagem/v2/prepostagens",
+			$params
+		);
+	}
+
+	/**
+	 * Print DCe (Documento de Coleta Eletrônico)
+	 * 
+	 * @param array $data Data containing:
+	 *                     - codigosObjetos: array of object codes
+	 *                     - tipoDace: 'R' (Resumida), 'C' (Completa), 'T' (Texto)
+	 * 
+	 * @return array|\WP_Error
+	 */
+	public function printDce( $data ) {
+		return $this->authenticated_post(
+			"prepostagem/v1/prepostagens/dce/dace/impressao",
+			$data
+		);
+	}
 }

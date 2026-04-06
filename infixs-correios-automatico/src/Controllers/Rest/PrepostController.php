@@ -74,6 +74,23 @@ class PrepostController {
 			$data['invoice_number'] = $params['invoice_number'];
 		}
 
+		if ( array_key_exists( 'withDce', $params ) ) {
+			$with_dce = filter_var( $params['withDce'], FILTER_VALIDATE_BOOLEAN );
+			$data['emiteDCe'] = $with_dce ? 'S' : 'N';
+		}
+
+		if ( isset( $params['dangerousProduct'] ) ) {
+			$data['dangerousProduct'] = filter_var( $params['dangerousProduct'], FILTER_VALIDATE_BOOLEAN );
+		}
+
+		if ( isset( $params['receiptNotice'] ) ) {
+			$data['receiptNotice'] = filter_var( $params['receiptNotice'], FILTER_VALIDATE_BOOLEAN );
+		}
+
+		if ( isset( $params['ownHands'] ) ) {
+			$data['ownHands'] = filter_var( $params['ownHands'], FILTER_VALIDATE_BOOLEAN );
+		}
+
 		$prepost = $this->prepostService->createPrepost( $params['order_id'], $data );
 
 		if ( is_wp_error( $prepost ) ) {
@@ -133,5 +150,61 @@ class PrepostController {
 		}
 
 		return new \WP_REST_Response( [ 'success' => true ], 200 );
+	}
+
+	/**
+	 * Sync prepost status by ID.
+	 * 
+	 * @since 1.5.0
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function sync( $request ) {
+		$prepost_id = $request['id'];
+
+		if ( ! $prepost_id ) {
+			return new \WP_Error( 'invalid_prepost_id', __( 'Invalid prepost ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$response = $this->prepostService->sync( $prepost_id );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		return rest_ensure_response( $this->prepostService->prepareData( $response ) );
+	}
+
+	/**
+	 * Print DCe (Documento de Coleta Eletrônico) for a prepost.
+	 * 
+	 * @since 1.6.0
+	 * 
+	 * @param \WP_REST_Request $request
+	 * 
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function printDce( $request ) {
+		$prepost_id = $request['id'];
+
+		if ( ! $prepost_id ) {
+			return new \WP_Error( 'invalid_prepost_id', __( 'Invalid prepost ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		try {
+			$this->prepostService->sync( $prepost_id );
+		} catch (\Exception $e) {
+			// Log the error but continue to attempt to print the DCE, as the sync failure might not prevent it from being printed.
+		}
+
+		$response = $this->prepostService->printDce( $prepost_id );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		return rest_ensure_response( $response );
 	}
 }

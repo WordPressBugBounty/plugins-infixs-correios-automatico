@@ -31,6 +31,10 @@ class Repository {
 		return $this->modelClass::where( 'id', $id )->limit( 1 )->delete();
 	}
 
+	public function update( $id, $data ) {
+		return $this->modelClass::where( 'id', $id )->limit( 1 )->update( $data );
+	}
+
 	/**
 	 * Find a model by its primary key.
 	 *

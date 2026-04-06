@@ -5,6 +5,7 @@ namespace Infixs\CorreiosAutomatico\Services;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Entities\Order;
+use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingRange;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
 use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
@@ -78,7 +79,7 @@ class LabelService {
 		$products_total_amount = 0;
 		//TODO: Deprecated
 		$products_total_weight = 0;
-		
+
 		$has_dangerous_product = false;
 
 		foreach ( $order->getItems() as $item ) {
@@ -119,6 +120,30 @@ class LabelService {
 
 		$product_code = $order->getShippingProductCode() ?? ( $shipping_method ? $shipping_method->get_product_code() : '00000' );
 
+		$preposts = [];
+
+		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
+		foreach ( Prepost::where( 'order_id', $order->get_id() )->orderBy( 'created_at', 'desc' )->get() as $prepost ) {
+			$prepost_data = $prepost->toArray();
+
+			$preposts[] = [
+				'id' => (int) $prepost->id,
+				'order_id' => (int) $prepost->order_id,
+				'object_code' => $prepost->object_code,
+				'service_code' => $prepost->service_code,
+				'status_code' => (int) $prepost->status,
+				'status_label' => $prepost->status_label,
+				'invoice_number' => $prepost_data['invoice_number'] ?? null,
+				'invoice_key' => $prepost_data['invoice_key'] ?? null,
+				'dce_number' => $prepost_data['dce_number'] ?? null,
+				'dce_series' => $prepost_data['dce_series'] ?? null,
+				'dce_authorization_protocol' => $prepost_data['dce_authorization_protocol'] ?? null,
+				'created_at' => $prepost->created_at,
+				'expire_at' => $prepost->expire_at,
+				'dce' => (bool) $prepost->dce,
+			];
+		}
+
 		return [
 			'name' => $order->getCustomerFullName(),
 			'document' => $order->getCustomerDocument(),
@@ -147,7 +172,7 @@ class LabelService {
 			'shipping_insurance' => NumberHelper::numericToCents( $shipping_metadata['insurance_cost'] ?? 0 ),
 			'products_total_amount' => $products_total_amount,
 			'declaration_total_amount' => $declaration_total_amount,
-			'invoice_number' => $order->getOrder()->get_meta( '_infixs_correios_automatico_invoice_number', true ) ?: null,
+			'preposts' => $preposts,
 			'items' => $items,
 			'ceint' => $this->shippingService->getCeintByPostCode( $address->getPostCode() ),
 			'has_dangerous_product' => $has_dangerous_product,

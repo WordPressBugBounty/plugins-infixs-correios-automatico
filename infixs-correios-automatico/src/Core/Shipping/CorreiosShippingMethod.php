@@ -267,6 +267,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	protected $hidden_others_when_match = false;
 
 	/**
+	 * Show original discounted shipping price
+	 *
+	 * @var bool
+	 */
+	protected $show_original_shipping_discount_price = false;
+
+	/**
 	 * When exceed maximum insurance
 	 *
 	 * @var string "ignore_insurance"|"hide_method"
@@ -327,6 +334,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->when_less_minimum = $this->get_option( 'when_less_minimum' );
 		$this->advanced_rules = $this->get_option( 'advanced_rules' ) ?? [];
 		$this->hidden_others_when_match = Sanitizer::boolean( $this->get_option( 'hidden_others_when_match' ) );
+		$this->show_original_shipping_discount_price = Sanitizer::boolean( $this->get_option( 'show_original_shipping_discount_price' ) );
 		$this->when_exceed_maximum_insurance = $this->get_option( 'when_exceed_maximum_insurance' );
 	}
 
@@ -633,6 +641,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'no',
 			],
+			'show_original_shipping_discount_price' => [
+				'title' => __( 'Exibir valor original riscado', 'infixs-correios-automatico' ),
+				'type' => 'checkbox',
+				'description' => __( 'Mostra o valor original do frete riscado antes do valor cobrado quando houver desconto.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'default' => 'no',
+			],
 			'hide_exceed' => [
 				'title' => __( 'Hide When Exceed', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
@@ -689,10 +704,16 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$value = json_decode( stripslashes( $value ), true );
 		}
 
+		if ( ! is_array( $value ) ) {
+			return [];
+		}
+
 		foreach ( $value as $key => $rule ) {
 			$value[ $key ]['min_amount'] = Sanitizer::numeric( $rule['min_amount'] );
 			$value[ $key ]['max_amount'] = Sanitizer::numeric( $rule['max_amount'] );
 			$value[ $key ]['value_amount'] = Sanitizer::numeric( $rule['value_amount'] ?? 0 );
+			$value[ $key ]['method_title_enabled'] = Sanitizer::boolean( $rule['method_title_enabled'] ?? false );
+			$value[ $key ]['method_title'] = sanitize_text_field( $rule['method_title'] ?? '' );
 		}
 
 		return $value;
@@ -834,6 +855,8 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					$map[ $key ]['value'][ $rule_key ]['max_amount'] = NumberHelper::from100( $rule['max_amount'] ?? 0 );
 					$map[ $key ]['value'][ $rule_key ]['max_amount_enabled'] = $rule['max_amount_enabled'] ?? false;
 					$map[ $key ]['value'][ $rule_key ]['value_amount'] = isset( $rule['value_amount'] ) ? (int) $rule['value_amount'] / 100 : 0;
+					$map[ $key ]['value'][ $rule_key ]['method_title_enabled'] = Sanitizer::boolean( $rule['method_title_enabled'] ?? false );
+					$map[ $key ]['value'][ $rule_key ]['method_title'] = sanitize_text_field( $rule['method_title'] ?? '' );
 					if ( ! isset( $map[ $key ]['value'][ $rule_key ]['compare'] ) )
 						$map[ $key ]['value'][ $rule_key ]['compare'] = 'total';
 				}
@@ -1102,6 +1125,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		$transient_key = 'shipping_cost_' . Helper::generateHashFromArray( [
 			'data' => $shipping_cost->getData(),
+			'country' => $destination_country,
 			'product' => $shipping_cost->getProductCode()
 		] );
 
@@ -1143,6 +1167,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		$meta_data = [
 			"_original_cost" => $original_cost,
+			"_show_original_shipping_discount_price" => $this->show_original_shipping_discount_price,
 			"_weight" => $shipping_cost->getWeight(),
 			"_length" => $shipping_cost->getLength(),
 			"_width" => $shipping_cost->getWidth(),
@@ -1153,6 +1178,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		if ( is_array( $this->discount_rules ) ) {
 
 			$enabled_rules = $this->get_enabled_discount_rules();
+			$matched_rule_method_title = null;
 
 			usort( $enabled_rules, function ( $a, $b ) {
 				return $b['min_amount'] <=> $a['min_amount'];
@@ -1200,6 +1226,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					$cost = 0;
 				}
 
+				if ( Sanitizer::boolean( $rule['method_title_enabled'] ?? false ) ) {
+					$method_title = sanitize_text_field( $rule['method_title'] ?? '' );
+					if ( ! empty( $method_title ) ) {
+						$matched_rule_method_title = $method_title;
+					}
+				}
+
 				break;
 			}
 
@@ -1210,6 +1243,10 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 			if ( $this->hidden_others_when_match && $matched ) {
 				$meta_data['_hide_others_rates'] = true;
+			}
+
+			if ( isset( $matched_rule_method_title ) && ! empty( $matched_rule_method_title ) ) {
+				$meta_data['_matched_rule_method_title'] = $matched_rule_method_title;
 			}
 		}
 
@@ -1257,9 +1294,12 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		$meta_data['_final_cost'] = $cost;
 
+		$default_rate_title = $cost > 0 ? $this->title : $this->discount_free_title;
+		$rate_title = $meta_data['_matched_rule_method_title'] ?? $default_rate_title;
+
 		$rate = [
 			'id' => "{$this->id}_{$this->instance_id}",
-			'label' => ( $cost > 0 ? $this->title : $this->discount_free_title ) . ( empty( $delivery_time_text ) ? '' : " ({$delivery_time_text})" ),
+			'label' => $rate_title . ( empty( $delivery_time_text ) ? '' : " ({$delivery_time_text})" ),
 			'cost' => $cost,
 			'package' => $package,
 			'meta_data' => $meta_data,
@@ -1349,5 +1389,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 	public function is_receipt_notice() {
 		return $this->receipt_notice;
+	}
+
+	public function is_own_hands() {
+		return $this->own_hands;
 	}
 }
