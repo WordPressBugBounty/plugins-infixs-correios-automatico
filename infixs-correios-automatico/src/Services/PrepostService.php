@@ -52,6 +52,7 @@ class PrepostService {
 	public function __construct( PrepostRepository $prepostRepository, CorreiosService $correiosService ) {
 		$this->prepostRepository = $prepostRepository;
 		$this->correiosService = $correiosService;
+		add_action( 'infixs_correios_automatico_prepost_sync_schedule', [ $this, 'sync_schedule' ], 10 );
 	}
 
 	/**
@@ -257,6 +258,12 @@ class PrepostService {
 
 		$order->save();
 
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			as_schedule_single_action( time() + 60, 'infixs_correios_automatico_prepost_sync_schedule', [ $created_prepost->id ] );
+		} else {
+			wp_schedule_single_event( time() + 60, 'infixs_correios_automatico_prepost_sync_schedule', [ $created_prepost->id ] );
+		}
+
 		do_action( 'infixs_correios_automatico_prepost_created', $order_id, $created_prepost );
 
 		Log::debug( 'Pré-postagem criada com sucesso.', [
@@ -372,6 +379,8 @@ class PrepostService {
 			Log::notice( "Erro ao salvar a pré-postagem no banco de dados." );
 			return new \WP_Error( 'prepost_save_error', 'Erro ao salvar a pré-postagem no banco de dados.', [ 'status' => 400 ] );
 		}
+
+		
 
 		return $created_prepost;
 	}
@@ -529,6 +538,26 @@ class PrepostService {
 		] );
 
 		return $updated_prepost;
+	}
+
+	/**
+	 * Run prepost sync from schedule.
+	 *
+	 * @since 1.6.57
+	 *
+	 * @param int $prepost_id
+	 *
+	 * @return void
+	 */
+	public function sync_schedule( $prepost_id ) {
+		$response = $this->sync( $prepost_id );
+
+		if ( is_wp_error( $response ) ) {
+			Log::notice( 'Erro ao sincronizar pré-postagem via agendamento.', [
+				'prepost_id' => $prepost_id,
+				'error' => $response->get_error_message(),
+			] );
+		}
 	}
 
 	/**
