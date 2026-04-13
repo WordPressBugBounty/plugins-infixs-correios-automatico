@@ -354,7 +354,7 @@ class Prepost {
 
 		foreach ( $this->content_items as $content ) {
 			$content_items[] = [
-				"conteudo" => $this->cleanName( $content['content'] ),
+				"conteudo" => Sanitizer::clean_name( $content['content'] ),
 				"quantidade" => $content['quantity'],
 				"valor" => $content['total']
 			];
@@ -393,11 +393,6 @@ class Prepost {
 
 
 		return $data;
-	}
-
-	public function cleanName( $str ) {
-		$str = str_replace( [ '–', '×' ], [ '-', 'x' ], $str );
-		return preg_replace( '/[^\p{L}\p{N}\s\-\+]/u', '', $str );
 	}
 
 	/**

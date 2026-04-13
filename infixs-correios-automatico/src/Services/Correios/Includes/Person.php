@@ -178,8 +178,8 @@ class Person {
 			$data['obs'] = $this->notes;
 		}
 
-		return array_merge( $data, [ 
-			"nome" => $this->name,
+		return array_merge( $data, [
+			"nome" => Sanitizer::clean_name( $this->name ),
 			"endereco" => $this->address->getData(),
 		] );
 	}

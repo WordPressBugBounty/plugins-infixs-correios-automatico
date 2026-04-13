@@ -93,6 +93,23 @@ class PrepostService {
 
 		$ca_address = $ca_order->getAddress();
 
+		$recipient_postal_code = trim( (string) $ca_address->getPostCode() );
+		$recipient_postal_code_numeric = Sanitizer::numeric_text( $recipient_postal_code );
+		$recipient_neighborhood = trim( (string) $ca_address->getNeighborhood() );
+
+		if ( preg_match( '/000$/', $recipient_postal_code_numeric ) && empty( $recipient_neighborhood ) ) {
+			Log::notice( 'Bairro do destinatário é obrigatório para CEP finalizado em 000.', [
+				'order_id' => $order_id,
+				'postal_code' => $recipient_postal_code,
+			] );
+
+			return new \WP_Error(
+				'invalid_recipient_neighborhood',
+				'O campo Bairro do destinatário é obrigatório quando o CEP termina com 000.',
+				[ 'status' => 400 ]
+			);
+		}
+
 		$recipient = new Person(
 			$ca_order->getCustomerFullName(),
 			new Address(
@@ -227,7 +244,7 @@ class PrepostService {
 
 		if ( isset( $data['emiteDCe'] ) && in_array( $data['emiteDCe'], [ 'S', 'N' ], true ) ) {
 			$prepost->setEmitDce( $data['emiteDCe'] );
-		} elseif ( Config::boolean( 'general.emit_dce_auto_prepost' ) ) {
+		} else {
 			$prepost->setEmitDce( 'S' );
 		}
 
@@ -380,7 +397,7 @@ class PrepostService {
 			return new \WP_Error( 'prepost_save_error', 'Erro ao salvar a pré-postagem no banco de dados.', [ 'status' => 400 ] );
 		}
 
-		
+
 
 		return $created_prepost;
 	}

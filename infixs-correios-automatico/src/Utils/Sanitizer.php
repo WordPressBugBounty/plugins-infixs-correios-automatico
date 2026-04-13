@@ -102,7 +102,7 @@ class Sanitizer {
 		if ( ! is_array( $value ) ) {
 			return [ sanitize_text_field( $value ) ];
 		}
-		return array_map( function ($item) {
+		return array_map( function ( $item ) {
 			return sanitize_text_field( $item );
 		}, $value );
 	}
@@ -199,5 +199,45 @@ class Sanitizer {
 		} else {
 			return array_filter( array_map( $filter, explode( ',', $value ) ) );
 		}
+	}
+
+	/**
+	 * Sanitize names/text for Correios payload.
+	 *
+	 * Keeps letters/numbers, common latin accents, spaces, comma, dot and hyphen.
+	 * Converts &, long dashes and multiplication sign to safe equivalents.
+	 *
+	 * @param string $value
+	 *
+	 * @return string
+	 */
+	public static function clean_name( $value ) {
+		$value = str_replace( [ '–', '—', '−', '×', '&' ], [ '-', '-', '-', 'x', ' e ' ], $value );
+
+		$value = preg_replace_callback(
+			'/(.)/u',
+			function ( $matches ) {
+				$char = $matches[1];
+
+				if ( preg_match( '/^[A-Za-z0-9À-ÖØ-öø-ÿ\s,\.\-]$/u', $char ) ) {
+					return $char;
+				}
+
+				if ( class_exists( '\\Normalizer' ) ) {
+					$normalized = \Normalizer::normalize( $char, \Normalizer::FORM_D );
+					if ( false !== $normalized && null !== $normalized ) {
+						$base_char = preg_replace( '/\p{Mn}+/u', '', $normalized );
+						if ( preg_match( '/^[A-Za-z0-9]$/u', $base_char ) ) {
+							return $base_char;
+						}
+					}
+				}
+
+				return '';
+			},
+			$value
+		);
+
+		return trim( preg_replace( '/\s{2,}/', ' ', $value ) );
 	}
 }
