@@ -48,6 +48,12 @@ jQuery( function ( $ ) {
 
 			$( document.body ).on(
 				'click',
+				'#infixs-correios-automatico-print-dce',
+				this.printDce.bind( this )
+			);
+
+			$( document.body ).on(
+				'click',
 				'#infixs-correios-automatico-create-prepost-invoice',
 				this.choosePrepostInvoice.bind( this )
 			);
@@ -531,8 +537,21 @@ jQuery( function ( $ ) {
 						headers: {
 							'X-WP-Nonce': nonce,
 						},
-						success: function () {
-							window.location.reload();
+						success: function ( response ) {
+							const prepostId = response?.id;
+
+							if ( ! prepostId ) {
+								window.location.reload();
+								return;
+							}
+
+							InfixsCorreiosAutomaticoOrders.unblock(
+								'#infixs-correios-automatico-prepost'
+							);
+
+							InfixsCorreiosAutomaticoOrders.syncPrepostWithSefaz(
+								prepostId
+							);
 						},
 						error: function ( response ) {
 							InfixsCorreiosAutomaticoOrders.unblock(
@@ -543,6 +562,133 @@ jQuery( function ( $ ) {
 					} );
 				}
 			);
+		},
+
+		syncPrepostWithSefaz( prepostId ) {
+			const restUrl = infixsCorreiosAutomaticoOrdersParams.restUrl;
+			const nonce = infixsCorreiosAutomaticoOrdersParams.nonce;
+			const maxAttempts = 4;
+			const intervalMs = 5000;
+			const pendingStatusCode = 7;
+			const canceledStatusCode = 5;
+
+			if ( ! prepostId || ! nonce ) {
+				window.location.reload();
+				return;
+			}
+
+			const loading = this.showSefazSyncLoading(
+				'Aguardando SEFAZ processar a DCe...',
+				'Isso pode levar alguns segundos.'
+			);
+
+			let attempt = 0;
+
+			const poll = () => {
+				if ( attempt >= maxAttempts ) {
+					this.closeSefazSyncLoading( loading );
+					window.location.reload();
+					return;
+				}
+
+				attempt += 1;
+
+				this.updateSefazSyncLoading(
+					loading,
+					attempt === 1
+						? 'Verificando status no SEFAZ...'
+						: 'Verificando novamente...',
+					`Tentativa ${ attempt } de ${ maxAttempts }`
+				);
+
+				$.ajax( {
+					url: `${ restUrl }/preposts/${ prepostId }/sync`,
+					type: 'POST',
+					contentType: 'application/json',
+					headers: {
+						'X-WP-Nonce': nonce,
+					},
+					success: ( response ) => {
+						if ( response?.status_code === canceledStatusCode ) {
+							this.closeSefazSyncLoading( loading );
+							alert(
+								'Por algum motivo o SEFAZ não aceitou a DCe. Verifique os dados e tente novamente mais tarde.'
+							);
+							window.location.reload();
+							return;
+						}
+
+						if ( response?.status_code !== pendingStatusCode ) {
+							this.closeSefazSyncLoading( loading );
+							window.location.reload();
+							return;
+						}
+
+						setTimeout( poll, intervalMs );
+					},
+					error: () => {
+						setTimeout( poll, intervalMs );
+					},
+				} );
+			};
+
+			setTimeout( poll, intervalMs );
+		},
+
+		showSefazSyncLoading( title, subtitle = '' ) {
+			const overlay = $( '<div>' )
+				.addClass( 'infixs-correios-automatico-alert-overlay infixs-correios-automatico-sefaz-loading' )
+				.css( {
+					display: 'flex',
+					'align-items': 'center',
+					'justify-content': 'center',
+				} );
+
+			const wrapper = $( '<div>' )
+				.addClass( 'infixs-correios-automatico-alert-wrapper' )
+				.css( {
+					'max-width': '360px',
+					'text-align': 'center',
+					padding: '18px',
+				} );
+
+			const spinner = $( '<div>' )
+				.addClass( 'spinner is-active' )
+				.css( {
+					float: 'none',
+					margin: '0 auto 10px',
+				} );
+
+			const titleElement = $( '<p>' )
+				.addClass( 'infixs-correios-automatico-sefaz-title' )
+				.css( { margin: '0 0 6px', 'font-weight': '600' } )
+				.text( title );
+
+			const subtitleElement = $( '<p>' )
+				.addClass( 'infixs-correios-automatico-sefaz-subtitle' )
+				.css( { margin: 0, color: '#646970' } )
+				.text( subtitle );
+
+			wrapper.append( spinner, titleElement, subtitleElement );
+			overlay.append( wrapper );
+			$( '#infixs-correios-automatico-prepost' ).append( overlay );
+
+			return {
+				overlay,
+				titleElement,
+				subtitleElement,
+			};
+		},
+
+		updateSefazSyncLoading( loading, title, subtitle = '' ) {
+			if ( ! loading ) return;
+
+			if ( loading.titleElement ) loading.titleElement.text( title );
+			if ( loading.subtitleElement ) loading.subtitleElement.text( subtitle );
+		},
+
+		closeSefazSyncLoading( loading ) {
+			if ( loading?.overlay ) loading.overlay.remove();
 		},
 
 		/**
@@ -599,6 +745,58 @@ jQuery( function ( $ ) {
 				`${ infixsCorreiosAutomaticoOrdersParams.adminUrl }&path=/print&orders=${ orderId }`,
 				'_blank'
 			);
+		},
+
+		printDce( event ) {
+			event.preventDefault();
+
+			const restUrl = infixsCorreiosAutomaticoOrdersParams.restUrl;
+			const nonce = infixsCorreiosAutomaticoOrdersParams.nonce;
+			const prepostId = $( '#infixs_correios_automatico_prepost_id' ).val();
+
+			if ( ! prepostId ) {
+				alert( 'Nenhuma pré-postagem disponível para imprimir DCe neste pedido.' );
+				return;
+			}
+
+			if ( ! nonce ) return;
+
+			$.ajax( {
+				url: `${ restUrl }/preposts/${ prepostId }/print-dce`,
+				type: 'POST',
+				contentType: 'application/json',
+				headers: {
+					'X-WP-Nonce': nonce,
+				},
+				success: function ( response ) {
+					if ( ! response || ! response.dados ) {
+						alert( 'Não foi possível gerar o PDF da DCe.' );
+						return;
+					}
+
+					const byteCharacters = atob( response.dados );
+					const byteNumbers = new Array( byteCharacters.length );
+
+					for ( let i = 0; i < byteCharacters.length; i++ ) {
+						byteNumbers[ i ] = byteCharacters.charCodeAt( i );
+					}
+
+					const blob = new Blob( [ new Uint8Array( byteNumbers ) ], {
+						type: 'application/pdf',
+					} );
+
+					const url = window.URL.createObjectURL( blob );
+					const printWindow = window.open( url );
+
+					if ( printWindow ) printWindow.print();
+				},
+				error: function ( response ) {
+					alert(
+						response?.responseJSON?.message ||
+							'Ocorreu um erro ao imprimir a DCe.'
+					);
+				},
+			} );
 		},
 
 		/** Update Tracking Column */

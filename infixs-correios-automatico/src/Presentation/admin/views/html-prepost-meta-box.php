@@ -22,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
 		<div class="infixs-correios-automatico-prepost-box"
 			style="display: flex; width: 100%; gap: 10px; margin-top: 10px; position: relative;">
 			<button id="infixs-correios-automatico-create-prepost-declaration"
-				style="white-space: normal; line-height: 1; padding: 5px 5px 12px 5px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;"
+				style="white-space: normal; flex-basis: 50%; line-height: 1; padding: 5px 5px 12px 5px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;"
 				class="button">
 				<svg xmlns="http://www.w3.org/2000/svg" width="4em" height="4em" viewBox="0 0 48 48">
 					<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -31,11 +31,11 @@ defined( 'ABSPATH' ) || exit;
 						d="m38.06 10.646l-.582-2.176a1.84 1.84 0 0 0-2.256-1.302l-12.98 3.478M41.038 33.26l1.096-.294a1.84 1.84 0 0 0 1.303-2.256l-2.4-8.953M9.94 37.354l.582 2.176a1.84 1.84 0 0 0 2.256 1.302l12.98-3.478M6.962 14.74l-1.096.294a1.84 1.84 0 0 0-1.303 2.256l2.414 9.008m5.971-10.126h22.103m-22.103 5.219h22.103m-22.103 5.218h22.103m-22.103 5.219H24" />
 				</svg>
 				<div>
-					Criar Pré-Postagem c/ Declaração
+					Criar Pré-Postagem c/ Declaração Eletrônica (DCe)
 				</div>
 			</button>
 			<button id="infixs-correios-automatico-create-prepost-invoice"
-				style="white-space: normal; line-height: 1; padding: 5px 5px 12px 5px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;"
+				style="white-space: normal; flex-basis: 50%; line-height: 1; padding: 5px 5px 12px 5px; display: flex; flex-direction: column; gap: 3px; align-items: center; justify-content: center;"
 				class="button">
 				<svg xmlns="http://www.w3.org/2000/svg" width="4em" height="4em" viewBox="0 0 48 48">
 					<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"

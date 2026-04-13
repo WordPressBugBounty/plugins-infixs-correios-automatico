@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.0
-Stable tag: 1.7.7
+Stable tag: 1.7.8
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -28,6 +28,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Configuração Rápida e Inteligente** - Importamos as configurações de plugins antigos como Claudio Sanches e Virtuaria Correios rapidamente para você não precisar criar as configurações manualmente. Caso opte por adicionar as configurações manualmente, o plugin detecta automaticamente as configuraçõe ideais baseado se existe ou não um contrato com os correios.
 - **Calculo de frete na Página do Produto** - Adicione o calculo de frete na página do produto, para que seu cliente saiba rapidamente o custo de envio.
 - **Preenchimento Automático de Endereço** - No checkout, quando seu cliente preencher o CEP, os campos de endereço, bairro, cidade e estado são preenchidos automaticamente.
+- **Declaração de Conteúdo Eletronica (DCe ou DACE)** - Emissao de declaração de conteúdo eletrônica em conformidade com o sefaz e correios sem necessidade de nota fiscal.
 - **Calculo de frete simplificado no Carrinho** - Calculo de frete rápido e simplificado no carrinho, sem campos desnecessários substituindo plugins que fazem o mesmo em um só.
 - **Novos Status de Pedido** - Opcionalmente você pode adicionar novos Status ao pedido, como "Preparando envio", "Em transporte", "Aguardando Retirada", "Entregue", "Em Devolução".
 - **Código de rastreamento em Lote** - Atualize o código de rastreamento de vários pedidos ao memso tempo.
@@ -49,7 +50,6 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Impressão e Customização de etiquetas (Etiqueta Builder)** - Customize suas etiquetas com varios modelos, remssa conforme, padrão, internacional e nacional para impressão em lote ou individual.
 - **Frete Internacional Automatizado** - Exporte seu produto com Exporta Fácil, calculo de frete internacional, remessa conforme, etiqueta unitizadora, CN35, CN36 e muito mais.
 - **Pré-Postagem Automática** - Se você tiver um contrato com os correios, a pré-postagem é feita automática.
-- **Declaração de Conteúdo Eletronica (DCe ou DACE)** - Emissao de declaração de conteúdo eletrônica em conformidade com o sefaz e correios sem necessidade de nota fiscal.
 - **Alteração de Status do Pedido Automático** - Status do pedido é alterado para concluído automaticamente assim que o cliente receber o pedido, também pode ser configurado para mudar automáticamente para "Em transporte".
 - **Barra de Frete Grátis** - Adiciona uma barra com porcentagem mostrando o quanto falta para o cliente ter frete grátis na loja, a partir das suas configurações de desconto nos Correios Automático.
 - **Devolução Automática de Produto** - Seu cliente solicita a devolução e o plugin faz todo o resto para você.
@@ -140,7 +140,7 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 
 == Changelog ==
 
-= 1.7.7 2026-04-13 =
+= 1.7.8 2026-04-13 =
 * Melhorias na pré-postagem com DCe/DACE
 
 = 1.7.6 2026-04-07 =
