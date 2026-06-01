@@ -664,10 +664,11 @@ class PrepostService {
 	 * @since 1.6.0
 	 * 
 	 * @param int $prepost_id
+	 * @param string $dace_type 'C' = Completa, 'R' = Resumida
 	 * 
 	 * @return array|\WP_Error
 	 */
-	public function printDce( $prepost_id ) {
+	public function printDce( $prepost_id, $dace_type = 'C' ) {
 		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
 		$prepost = $this->prepostRepository->findById( $prepost_id );
 
@@ -680,7 +681,7 @@ class PrepostService {
 		}
 
 		// Call Correios API to get DCe PDF
-		$response = $this->correiosService->printDce( $prepost->object_code );
+		$response = $this->correiosService->printDce( $prepost->object_code, $dace_type );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;

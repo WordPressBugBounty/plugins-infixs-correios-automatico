@@ -470,7 +470,7 @@ jQuery( function ( $ ) {
 				return;
 			}
 
-			if ( invoiceKey.trim().length !== 44 ) {
+			if ( invoiceKey.trim().length < 44 ) {
 				alert( 'A chave da nota fiscal deve conter 44 caracteres.' );
 				return;
 			}

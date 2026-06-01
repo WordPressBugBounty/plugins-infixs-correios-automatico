@@ -1244,10 +1244,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			if ( $this->hidden_others_when_match && $matched ) {
 				$meta_data['_hide_others_rates'] = true;
 			}
-
-			if ( isset( $matched_rule_method_title ) && ! empty( $matched_rule_method_title ) ) {
-				$meta_data['_matched_rule_method_title'] = $matched_rule_method_title;
-			}
 		}
 
 		if ( $insurance_cost ) {
@@ -1295,7 +1291,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$meta_data['_final_cost'] = $cost;
 
 		$default_rate_title = $cost > 0 ? $this->title : $this->discount_free_title;
-		$rate_title = $meta_data['_matched_rule_method_title'] ?? $default_rate_title;
+		$rate_title = isset( $matched_rule_method_title ) && ! empty( $matched_rule_method_title ) ? $matched_rule_method_title : $default_rate_title;
 
 		$rate = [
 			'id' => "{$this->id}_{$this->instance_id}",

@@ -264,7 +264,8 @@ class Admin {
 			'nonce' => wp_create_nonce( 'wp_rest' ),
 			'ceints' => CeintCode::getCeintsOptions(),
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'searchProductsNonce' => wp_create_nonce( 'search-products' )
+			'searchProductsNonce' => wp_create_nonce( 'search-products' ),
+			'checkLicense' => self::should_check_license(),
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {
@@ -282,6 +283,12 @@ class Admin {
 			'infixsCorreiosAutomaticoGlobals',
 			apply_filters( 'infixs_correios_automatico_dashboard_global_params', $scriptData )
 		);
+	}
+
+	private static function should_check_license() {
+		$option_name = 'infixs_correios_automatico_check_license_done';
+
+		return add_option( $option_name, '1', '', false );
 	}
 
 	/**

@@ -212,7 +212,7 @@ class Sanitizer {
 	 * @return string
 	 */
 	public static function clean_name( $value ) {
-		$value = str_replace( [ '–', '—', '−', '×', '&' ], [ '-', '-', '-', 'x', ' e ' ], $value );
+		$value = str_replace( [ '–', '—', '−', '×', '&', "\u{00A0}", "\u{202F}" ], [ '-', '-', '-', 'x', ' e ', ' ', ' ' ], $value );
 
 		$value = preg_replace_callback(
 			'/(.)/u',

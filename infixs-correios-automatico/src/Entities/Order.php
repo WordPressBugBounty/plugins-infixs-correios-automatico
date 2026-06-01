@@ -516,6 +516,10 @@ class Order {
 			'email_preparing_sent' => $this->order->get_meta( '_infixs_correios_automatico_email_preparing_sent', true ) ?: null,
 			'customer' => $customer,
 			'created_at' => $this->order->get_date_created()->date( 'Y-m-d H:i:s' ),
+			'meta_data' => array_values( array_filter( [
+				( $invoice_number = $this->order->get_meta( '_infixs_correios_automatico_invoice_number', true ) ) !== '' && $invoice_number !== false ? [ 'key' => '_infixs_correios_automatico_invoice_number', 'value' => $invoice_number ] : null,
+				( $invoice_key = $this->order->get_meta( '_infixs_correios_automatico_invoice_key', true ) ) !== '' && $invoice_key !== false ? [ 'key' => '_infixs_correios_automatico_invoice_key', 'value' => $invoice_key ] : null,
+			] ) ),
 			'preposts' => []
 		];
 

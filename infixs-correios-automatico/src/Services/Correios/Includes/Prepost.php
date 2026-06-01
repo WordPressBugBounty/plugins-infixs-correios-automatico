@@ -391,6 +391,13 @@ class Prepost {
 			$data['emiteDCe'] = 'S';
 		}
 
+		if ( ! empty( $this->invoice_key ) ) {
+			$data['chaveNFe'] = $this->invoice_key;
+		}
+
+		if ( ! empty( $this->invoice_number ) ) {
+			$data['numeroNotaFiscal'] = $this->invoice_number;
+		}
 
 		return $data;
 	}

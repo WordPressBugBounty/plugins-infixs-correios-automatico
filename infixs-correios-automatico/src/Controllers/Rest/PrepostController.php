@@ -47,13 +47,18 @@ class PrepostController {
 	 */
 	public function createFromOrder( \WP_REST_Request $request ) {
 		$params = $request->get_params();
+		$invoice_key = null;
 
 		if ( ! isset( $params['order_id'] ) ) {
 			return new \WP_Error( 'missing_order_id', 'Order ID is required.', [ 'status' => 400 ] );
 		}
 
-		if ( isset( $params['invoice_key'] ) && strlen( trim( $params['invoice_key'] ) ) !== 44 ) {
-			return new \WP_Error( 'invalid_invoice_key', 'A Chave da nota fiscal deve ter 44 caracteres.', [ 'status' => 400 ] );
+		if ( isset( $params['invoice_key'] ) ) {
+			$invoice_key = preg_replace( '/[^[:alnum:]]+/', '', (string) $params['invoice_key'] );
+
+			if ( strlen( $invoice_key ) !== 44 ) {
+				return new \WP_Error( 'invalid_invoice_key', 'A Chave da nota fiscal deve ter 44 caracteres.', [ 'status' => 400 ] );
+			}
 		}
 
 		if ( isset( $params['invoice_number'] ) && strlen( trim( $params['invoice_number'] ) ) == 0 ) {
@@ -66,8 +71,8 @@ class PrepostController {
 
 		$data = [];
 
-		if ( isset( $params['invoice_key'] ) ) {
-			$data['invoice_key'] = $params['invoice_key'];
+		if ( null !== $invoice_key ) {
+			$data['invoice_key'] = $invoice_key;
 		}
 
 		if ( isset( $params['invoice_number'] ) ) {
@@ -77,6 +82,8 @@ class PrepostController {
 		if ( array_key_exists( 'withDce', $params ) ) {
 			$with_dce = filter_var( $params['withDce'], FILTER_VALIDATE_BOOLEAN );
 			$data['emiteDCe'] = $with_dce ? 'S' : 'N';
+		} elseif ( isset( $params['invoice_number'] ) && isset( $params['invoice_key'] ) ) {
+			$data['emiteDCe'] = 'N';
 		}
 
 		if ( isset( $params['dangerousProduct'] ) ) {
@@ -188,9 +195,14 @@ class PrepostController {
 	 */
 	public function printDce( $request ) {
 		$prepost_id = $request['id'];
+		$dace_type = strtoupper( sanitize_text_field( $request->get_param( 'dace_type' ) ?: 'C' ) );
 
 		if ( ! $prepost_id ) {
 			return new \WP_Error( 'invalid_prepost_id', __( 'Invalid prepost ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		if ( ! in_array( $dace_type, [ 'C', 'R' ], true ) ) {
+			return new \WP_Error( 'invalid_dace_type', __( 'Invalid DCe type.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
 		}
 
 		try {
@@ -199,7 +211,7 @@ class PrepostController {
 			// Log the error but continue to attempt to print the DCE, as the sync failure might not prevent it from being printed.
 		}
 
-		$response = $this->prepostService->printDce( $prepost_id );
+		$response = $this->prepostService->printDce( $prepost_id, $dace_type );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
