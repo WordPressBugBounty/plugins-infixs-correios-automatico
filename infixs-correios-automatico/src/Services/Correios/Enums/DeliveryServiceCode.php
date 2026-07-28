@@ -58,6 +58,15 @@ class DeliveryServiceCode {
 
 	public const CARTA_COML_REG_B1_CHANC_ETIQ = '80250';
 
+	// Reverse logistics services (Logística Reversa)
+	public const PAC_REVERSO = '03301';
+	public const SEDEX_REVERSO = '03247';
+	public const SEDEX_10_REVERSO = '03182';
+	public const SEDEX_12_REVERSO = '03174';
+	public const SEDEX_HOJE_REVERSO = '03190';
+	public const LR_PAC_GRANDE_FORMATO = '06785';
+	public const LR_SEDEX_GRANDE_FORMATO = '03484';
+
 
 
 	private static $descriptions = [
@@ -102,6 +111,13 @@ class DeliveryServiceCode {
 		self::CARTA_COML_REG_B1_CHANC_ETIQ => 'CARTA COMERCIAL REGISTRADA B1 CHANCELADA ETIQUETA',
 		self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP => 'Impresso Normal NAC FAT CHANC NP',
 		self::IMPRESSO_NORMAL_20KG_NP => 'Impresso Normal Até 20KG NP',
+		self::PAC_REVERSO => 'PAC Reverso',
+		self::SEDEX_REVERSO => 'SEDEX Reverso',
+		self::SEDEX_10_REVERSO => 'SEDEX 10 Reverso',
+		self::SEDEX_12_REVERSO => 'SEDEX 12 Reverso',
+		self::SEDEX_HOJE_REVERSO => 'SEDEX Hoje Reverso',
+		self::LR_PAC_GRANDE_FORMATO => 'LR PAC Grandes Formatos',
+		self::LR_SEDEX_GRANDE_FORMATO => 'LR SEDEX Grandes Formatos',
 	];
 
 	/**
@@ -401,6 +417,68 @@ class DeliveryServiceCode {
 			self::IMPRESSO_NORMAL_NAC_FAT_CHANC_NP,
 			self::IMPRESSO_NORMAL_20KG_NP,
 		] );
+	}
+
+	/**
+	 * Get the reverse logistics service code for a given (forward) product code.
+	 *
+	 * Maps the order's shipping service to its reverse equivalent. When there is
+	 * no clean reverse for the service, falls back to PAC Reverso (03301).
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param string $product_code Forward delivery service code.
+	 *
+	 * @return string Reverse delivery service code.
+	 */
+	public static function getReverseServiceCode( $product_code ) {
+		if ( $product_code === self::PAC_CONTRATO_GRANDE_FORMATO ) {
+			return self::LR_PAC_GRANDE_FORMATO;
+		}
+
+		if ( $product_code === self::SEDEX_CONTRATO_GRANDE_FORMATO ) {
+			return self::LR_SEDEX_GRANDE_FORMATO;
+		}
+
+		switch ( self::getCommonId( $product_code ) ) {
+			case 'sedex':
+				return self::SEDEX_REVERSO;
+			case 'sedex10':
+				return self::SEDEX_10_REVERSO;
+			case 'sedex12':
+				return self::SEDEX_12_REVERSO;
+			case 'sedexHoje':
+				return self::SEDEX_HOJE_REVERSO;
+			case 'pac':
+			default:
+				return self::PAC_REVERSO;
+		}
+	}
+
+	/**
+	 * Get the list of available reverse logistics services as code => label.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @return array<string, string>
+	 */
+	public static function getReverseServices() {
+		$codes = [
+			self::PAC_REVERSO,
+			self::SEDEX_REVERSO,
+			self::SEDEX_10_REVERSO,
+			self::SEDEX_12_REVERSO,
+			self::SEDEX_HOJE_REVERSO,
+			self::LR_PAC_GRANDE_FORMATO,
+			self::LR_SEDEX_GRANDE_FORMATO,
+		];
+
+		$services = [];
+		foreach ( $codes as $code ) {
+			$services[ $code ] = self::getDescription( $code );
+		}
+
+		return $services;
 	}
 
 }

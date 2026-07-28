@@ -234,6 +234,10 @@ class SettingsGeneralController {
 			$updated_settings['calculator_style_id'] = sanitize_text_field( $data['calculator_style_id'] );
 		}
 
+		if ( isset( $data['calculator_full_width'] ) ) {
+			$updated_settings['calculator_full_width'] = rest_sanitize_boolean( $data['calculator_full_width'] );
+		}
+
 		if ( isset( $data['calculator_styles'] ) && is_array( $data['calculator_styles'] ) ) {
 			$updated_settings['calculator_styles'] = CalculatorStylesSanitizer::sanitize( $data['calculator_styles'] );
 		}
@@ -445,6 +449,7 @@ class SettingsGeneralController {
 			'hide_bar_until_postcode' => Config::boolean( 'general.hide_bar_until_postcode' ),
 			'when_api_update_tracking_code' => Config::string( 'general.when_api_update_tracking_code' ),
 			'calculator_style_id' => Config::string( 'general.calculator_style_id' ),
+			'calculator_full_width' => Config::boolean( 'general.calculator_full_width' ),
 			'calculator_styles' => Config::get( 'general.calculator_styles', [] ),
 			'show_additional_time' => Config::boolean( 'general.show_additional_time' ),
 			'force_shipping_cost' => Config::boolean( 'general.force_shipping_cost' ),

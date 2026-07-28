@@ -916,6 +916,10 @@ class ShippingService {
 				);
 			}
 
+			do_action( 'infixs_correios_automatico_shipping_cost_failed',
+				is_wp_error( $response ) ? $response : new \WP_Error( 'infixs_api_invalid_response', __( 'Resposta inválida da API de cálculo.', 'infixs-correios-automatico' ) ),
+				$shipping_cost
+			);
 		}
 
 		return false;

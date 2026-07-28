@@ -41,7 +41,22 @@ class WhatsappService {
 			$this->setupNotification();
 			add_filter( 'infixs_pingo_notify_woocommerce_order_placeholders', [ $this, 'add_placeholders' ], 10 );
 			add_filter( 'infixs_pingo_notify_woocommerce_order_transform', [ $this, 'transform_data' ], 10, 2 );
+			add_filter( 'infixs_pingo_notify_trigger_classes', [ $this, 'register_triggers' ], 10 );
 		}
+	}
+
+	/**
+	 * Register custom Pingo Notify triggers provided by this plugin.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param \Infixs\PingoNotify\Triggers\Trigger[] $triggers
+	 *
+	 * @return array
+	 */
+	public function register_triggers( $triggers ) {
+		$triggers[] = new \Infixs\CorreiosAutomatico\Integrations\Pingo\CustomerReturnTrigger();
+		return $triggers;
 	}
 
 	protected function setupNotification() {

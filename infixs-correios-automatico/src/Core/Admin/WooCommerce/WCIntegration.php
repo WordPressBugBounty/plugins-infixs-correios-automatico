@@ -57,6 +57,7 @@ class WCIntegration {
 		$this->product = new Product();
 
 		new ShippingClass();
+		new LinkedShippingSettings();
 		new Blocks();
 		new Email();
 		new Rest( $trackingService );
@@ -146,8 +147,8 @@ class WCIntegration {
 			$bulk_actions['infixs_correios_automatico_mark_waiting_pickup'] = "Mudar para $waiting_pickup";
 		}
 
-		if ( Config::boolean( 'general.active_returning' ) ) {
-			$returning = strtolower( Config::get( 'general.status_returning' ) );
+		if ( Config::boolean( 'return.active' ) ) {
+			$returning = strtolower( Config::get( 'return.status' ) );
 			$bulk_actions['infixs_correios_automatico_mark_returning'] = "Mudar para $returning";
 		}
 

@@ -26,6 +26,13 @@ defined( 'ABSPATH' ) || exit;
 class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 	/**
+	 * Action fired when the shipping cost calculation ends without a rate.
+	 *
+	 * @since 1.8.0
+	 */
+	const CALCULATION_FAILED_HOOK = 'infixs_correios_automatico_shipping_calculation_failed';
+
+	/**
 	 * Advanced mode
 	 *
 	 * @var bool
@@ -124,6 +131,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	protected $receipt_notice = false;
 
 	/**
+	 * Electronic receipt notice
+	 *
+	 * @var bool
+	 */
+	protected $receipt_notice_electronic = false;
+
+	/**
 	 * Insurance
 	 *
 	 * @var bool
@@ -188,6 +202,27 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @var bool
 	 */
 	protected $auto_prepost = true;
+
+	/**
+	 * Auto prepost delay type: immediate or delayed
+	 *
+	 * @var string
+	 */
+	protected $auto_prepost_delay_type = 'immediate';
+
+	/**
+	 * Auto prepost delay value
+	 *
+	 * @var int
+	 */
+	protected $auto_prepost_delay_value = 1;
+
+	/**
+	 * Auto prepost delay unit: minutes, hours or days
+	 *
+	 * @var string
+	 */
+	protected $auto_prepost_delay_unit = 'minutes';
 
 	/**
 	 * Hide when Exceed
@@ -315,6 +350,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->additional_tax_percentage = (int) $this->get_option( 'additional_tax_percentage' );
 		$this->own_hands = Sanitizer::boolean( $this->get_option( 'own_hands' ) );
 		$this->receipt_notice = Sanitizer::boolean( $this->get_option( 'receipt_notice' ) );
+		$this->receipt_notice_electronic = Sanitizer::boolean( $this->get_option( 'receipt_notice_electronic' ) );
 		$this->minimum_height = (float) $this->get_option( 'minimum_height' );
 		$this->minimum_width = (float) $this->get_option( 'minimum_width' );
 		$this->minimum_length = (float) $this->get_option( 'minimum_length' );
@@ -324,6 +360,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->min_insurance_value = (int) $this->get_option( 'min_insurance_value' );
 		$this->insurance_customer_cost = Sanitizer::boolean( $this->get_option( 'insurance_customer_cost' ) );
 		$this->auto_prepost = Sanitizer::boolean( $this->get_option( 'auto_prepost' ) );
+		$this->auto_prepost_delay_type = $this->get_option( 'auto_prepost_delay_type' ) ?? 'immediate';
+		$this->auto_prepost_delay_value = (int) $this->get_option( 'auto_prepost_delay_value', 1 );
+		$this->auto_prepost_delay_unit = $this->get_option( 'auto_prepost_delay_unit' ) ?? 'minutes';
 		$this->extra_weight_type = $this->get_option( 'extra_weight_type' );
 		$this->discount_rules = $this->get_option( 'discount_rules' );
 		$this->discount_free_title = $this->get_option( 'discount_free_title' );
@@ -510,6 +549,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'no',
 			],
+			'receipt_notice_electronic' => [
+				'title' => __( 'Electronic Receipt Notice', 'infixs-correios-automatico' ),
+				'type' => 'checkbox',
+				'description' => __( 'Enable the electronic receipt notice.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'default' => 'no',
+			],
 			'insurance' => [
 				'title' => __( 'Insuranse', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
@@ -589,6 +635,37 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'description' => __( 'Enable the insurance for package.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => 'yes',
+			],
+			'auto_prepost_delay_type' => [
+				'title' => __( 'Auto Prepost Delay Type', 'infixs-correios-automatico' ),
+				'type' => 'select',
+				'description' => __( 'When to trigger the automatic pre-posting.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'options' => [
+					'immediate' => __( 'Immediately', 'infixs-correios-automatico' ),
+					'delayed' => __( 'After a delay', 'infixs-correios-automatico' ),
+				],
+				'default' => 'immediate',
+			],
+			'auto_prepost_delay_value' => [
+				'title' => __( 'Auto Prepost Delay Value', 'infixs-correios-automatico' ),
+				'type' => 'number',
+				'description' => __( 'Amount of time to wait before triggering the automatic pre-posting.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'sanitize_callback' => 'absint',
+				'default' => '1',
+			],
+			'auto_prepost_delay_unit' => [
+				'title' => __( 'Auto Prepost Delay Unit', 'infixs-correios-automatico' ),
+				'type' => 'select',
+				'description' => __( 'Unit of time for the automatic pre-posting delay.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'options' => [
+					'minutes' => __( 'Minutes', 'infixs-correios-automatico' ),
+					'hours' => __( 'Hours', 'infixs-correios-automatico' ),
+					'days' => __( 'Days', 'infixs-correios-automatico' ),
+				],
+				'default' => 'minutes',
 			],
 			'extra_weight_type' => [
 				'title' => __( 'Extra Weight Type', 'infixs-correios-automatico' ),
@@ -798,12 +875,36 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				if ( ! in_array( $product->get_shipping_class_id(), $shipping_classes ) ) {
 					$pass = false;
 					Log::info( "Não foi possível calcular o frete pois a classe requirida no método não existe no produto" );
+					$this->calculation_failed(
+						'shipping_class',
+						__( 'Há produtos fora da classe de entrega exigida por este método. Ajuste a classe de entrega dos produtos ou limpe o campo "Classe de entrega" nas configurações do método.', 'infixs-correios-automatico' ),
+						$package
+					);
 					break;
 				}
 			}
 		}
 
 		return $pass;
+	}
+
+	/**
+	 * Notify that the shipping cost could not be calculated.
+	 *
+	 * Fires an action with a machine readable code and a message written for the store
+	 * operator, so the reason of a quote that produced no rate can be shown in the admin
+	 * instead of being lost in the logs.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param string $code    Failure code.
+	 * @param string $message Message describing what has to be done.
+	 * @param array  $package Shipping package.
+	 *
+	 * @return void
+	 */
+	protected function calculation_failed( $code, $message, $package ) {
+		do_action( self::CALCULATION_FAILED_HOOK, $code, $message, $package, $this );
 	}
 
 	public function map_options() {
@@ -913,21 +1014,41 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 */
 	protected function can_be_calculated( $package, $product_code ) {
 		if ( ! in_array( $product_code, DeliveryServiceCode::getInternationals() ) ) {
-			if ( empty( $package['destination']['postcode'] ) || 'BR' !== $package['destination']['country'] ) {
+			if ( empty( $package['destination']['postcode'] ) || 'BR' !== ( $package['destination']['country'] ?? '' ) ) {
 				Log::info( "Não é possível calcular o frete para o pacote sem CEP de destino ou quando o país não é BR.",
 					[
 						'postcode' => $package['destination']['postcode'] ?? '',
 						'product_code' => $product_code,
 					]
 				);
+
+				if ( empty( $package['destination']['postcode'] ) ) {
+					$this->calculation_failed(
+						'destination_postcode',
+						__( 'CEP de entrega não informado. Preencha o CEP no endereço de entrega do pedido antes de calcular.', 'infixs-correios-automatico' ),
+						$package
+					);
+				} else {
+					$this->calculation_failed(
+						'destination_country',
+						__( 'Este serviço é nacional e o endereço de entrega do pedido não é do Brasil. Use um serviço internacional (Packet ou Exporta Fácil) para esse destino.', 'infixs-correios-automatico' ),
+						$package
+					);
+				}
+
 				return false;
 			}
 		} else {
-			if ( 'BR' === $package['destination']['country'] ) {
+			if ( 'BR' === ( $package['destination']['country'] ?? '' ) ) {
 				Log::info( "Não é possível calcular o frete internacional para o pacote com CEP de destino no Brasil.", [
 					'product_code' => $product_code,
 					'postcode' => $package['destination']['postcode'] ?? '',
 				] );
+				$this->calculation_failed(
+					'international_service',
+					__( 'Este é um serviço internacional e o endereço de entrega é no Brasil. Selecione um serviço nacional (PAC ou SEDEX) na linha de entrega.', 'infixs-correios-automatico' ),
+					$package
+				);
 				return false;
 			}
 		}
@@ -1030,7 +1151,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @return void
 	 */
 	public function calculate_shipping( $package = [] ) {
-		$product_code = $this->get_product_code();
+		$product_code = $this->resolve_product_code( $package );
 
 		Log::debug( "Iniciando o cálculo de frete para o serviço $product_code", [
 			'package' => $package,
@@ -1053,6 +1174,21 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'product_code' => $product_code,
 				'origin_postcode' => $origin_postcode,
 			] );
+
+			if ( empty( $origin_postcode ) ) {
+				$this->calculation_failed(
+					'origin_postcode',
+					__( 'CEP de origem não configurado. Preencha o CEP de origem nas configurações do método de entrega ou o CEP da loja em WooCommerce > Configurações > Geral.', 'infixs-correios-automatico' ),
+					$package
+				);
+			} else {
+				$this->calculation_failed(
+					'product_code',
+					__( 'Nenhum serviço dos Correios selecionado nas configurações do método de entrega. Escolha o serviço (PAC, SEDEX, etc.) na configuração da instância.', 'infixs-correios-automatico' ),
+					$package
+				);
+			}
+
 			return;
 		}
 
@@ -1068,17 +1204,27 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$shipping_cost->setPackage( $shipping_package );
 		$shipping_cost->setOwnHands( $this->own_hands );
 		$shipping_cost->setReceiptNotice( $this->receipt_notice );
+		$shipping_cost->setReceiptNoticeElectronic( $this->receipt_notice_electronic );
 
 		if ( $product_code === DeliveryServiceCode::IMPRESSO_MODICO ) {
 			$shipping_cost->setModico( true );
 		}
 
+		/**
+		 * Allows overriding the package data used in the quote, keeping the dimensions and the
+		 * weight informed manually (in an order, for example) instead of the ones calculated
+		 * from the products.
+		 *
+		 * @since 1.8.0
+		 *
+		 * @param ShippingCost           $shipping_cost Shipping cost data.
+		 * @param array                  $package       Shipping package.
+		 * @param CorreiosShippingMethod $method        Shipping method.
+		 */
+		$shipping_cost = apply_filters( 'infixs_correios_automatico_shipping_cost_data', $shipping_cost, $package, $this );
+
 		if ( $this->insurance && ( isset( $package['contents_cost'] ) || isset( $package['cart_subtotal'] ) ) ) {
 			$content_cost = NumberHelper::parseNumber( $package['cart_subtotal'] ?? $package['contents_cost'] );
-
-			if ( Config::boolean( 'general.consider_quantity' ) && isset( $package['contents'], $package['contents'][0], $package['contents'][0]['quantity'] ) ) {
-				$content_cost = $content_cost * (int) $package['contents'][0]['quantity'];
-			}
 
 			if ( (int) $this->min_insurance_value / 100 <= $content_cost ) {
 				$shipping_cost->setInsuranceDeclarationValue( $content_cost );
@@ -1091,6 +1237,11 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					'destination_postcode' => $destination_postcode,
 					'insurance_value' => $content_cost,
 				] );
+				$this->calculation_failed(
+					'insurance_limit',
+					__( 'O valor declarado do seguro está fora do limite deste serviço e o método está configurado para ser ocultado nesse caso. Nas configurações do método, mude "Ao exceder o seguro máximo" para "Ignorar seguro" ou revise o valor mínimo do seguro.', 'infixs-correios-automatico' ),
+					$package
+				);
 				return;
 			}
 		}
@@ -1098,6 +1249,11 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$passed = apply_filters( 'infixs_correios_automatico_calculate_shipping_cost_passed', true, $shipping_cost, $package, $this );
 
 		if ( ! $passed ) {
+			$this->calculation_failed(
+				'filter_blocked',
+				__( 'O cálculo foi bloqueado por uma personalização externa (filtro "infixs_correios_automatico_calculate_shipping_cost_passed"). Verifique snippets ou plugins de terceiros que alterem o frete.', 'infixs-correios-automatico' ),
+				$package
+			);
 			return;
 		}
 
@@ -1110,6 +1266,18 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$product_code
 		) ) {
 			Log::info( "Frete não calculado, dimensões excedidas." );
+			$this->calculation_failed(
+				'dimensions_exceeded',
+				sprintf(
+					/* translators: 1: length, 2: width, 3: height, 4: weight */
+					__( 'O pacote (%1$s x %2$s x %3$s cm, %4$s kg) ultrapassa os limites deste serviço dos Correios. Revise o peso e as dimensões dos produtos, ou desmarque "Ocultar quando exceder" nas configurações do método.', 'infixs-correios-automatico' ),
+					$shipping_cost->getLength(),
+					$shipping_cost->getWidth(),
+					$shipping_cost->getHeight(),
+					$shipping_cost->getWeight()
+				),
+				$package
+			);
 			return;
 		}
 
@@ -1120,14 +1288,25 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			]
 			);
 
+			$this->calculation_failed(
+				'weight_below_minimum',
+				sprintf(
+					/* translators: 1: package weight, 2: minimum weight configured */
+					__( 'O peso do pacote (%1$s kg) é menor que o peso mínimo configurado (%2$s kg) e o método está configurado para ser ocultado nesse caso. Cadastre o peso dos produtos ou mude "Quando menor que o mínimo" para "Forçar" nas configurações do método.', 'infixs-correios-automatico' ),
+					$shipping_cost->getWeight(),
+					$this->minimum_weight
+				),
+				$package
+			);
+
 			return;
 		}
 
-		$transient_key = 'shipping_cost_' . Helper::generateHashFromArray( [
+		$transient_key = $this->transient_key( 'shipping_cost', [
 			'data' => $shipping_cost->getData(),
 			'country' => $destination_country,
 			'product' => $shipping_cost->getProductCode()
-		] );
+		], $package );
 
 		$cached_data = get_transient( $transient_key );
 
@@ -1152,6 +1331,11 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		if ( $cost === false ) {
 			Log::info( "Não foi possível calcular o custo do frete." );
+			$this->calculation_failed(
+				'api_error',
+				__( 'Os Correios não retornaram o preço deste serviço. Verifique se os CEPs de origem e destino são válidos e se o contrato dos Correios está conectado em Correios Automático > Configurações.', 'infixs-correios-automatico' ),
+				$package
+			);
 			return;
 		}
 
@@ -1238,6 +1422,11 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 			if ( $this->hidden_when_no_match && ! $matched && count( $enabled_rules ) > 0 ) {
 				Log::info( "Frete não calculado, nenhuma regra de desconto foi atendida (Você optou por ocultar quando não há regras de desconto)." );
+				$this->calculation_failed(
+					'discount_rules_no_match',
+					__( 'Nenhuma regra de desconto do método corresponde a este pedido e o método está configurado para ser ocultado nesse caso. Revise as faixas de valor das regras ou desmarque "Ocultar quando nenhuma regra corresponder".', 'infixs-correios-automatico' ),
+					$package
+				);
 				return;
 			}
 
@@ -1258,14 +1447,15 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				$shipping_time = new ShippingTime(
 					$product_code,
 					$origin_postcode,
-					$destination_postcode
+					$destination_postcode,
+					$package
 				);
 
-				$transient_key = 'shipping_time_' . Helper::generateHashFromArray( [
+				$transient_key = $this->transient_key( 'shipping_time', [
 					$product_code,
 					$origin_postcode,
 					$destination_postcode
-				] );
+				], $package );
 
 				$cached_data = get_transient( $transient_key );
 
@@ -1356,8 +1546,95 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		return $this->auto_prepost;
 	}
 
+	public function get_auto_prepost_delay_type() {
+		return $this->auto_prepost_delay_type;
+	}
+
+	public function get_auto_prepost_delay_value() {
+		return $this->auto_prepost_delay_value;
+	}
+
+	public function get_auto_prepost_delay_unit() {
+		return $this->auto_prepost_delay_unit;
+	}
+
+	public function get_auto_prepost_delay_seconds() {
+		$value = max( 1, $this->auto_prepost_delay_value );
+		switch ( $this->auto_prepost_delay_unit ) {
+			case 'hours':
+				return $value * HOUR_IN_SECONDS;
+			case 'days':
+				return $value * DAY_IN_SECONDS;
+			default:
+				return $value * MINUTE_IN_SECONDS;
+		}
+	}
+
+	/**
+	 * Get the Correios product (service) code this method instance is set to.
+	 *
+	 * @return string
+	 */
 	public function get_product_code() {
 		return $this->advanced_mode ? $this->advanced_service : $this->resolve_basic_service( $this->basic_service );
+	}
+
+	/**
+	 * Resolve the Correios product code to quote a cart package with.
+	 *
+	 * Unlike get_product_code(), which answers what the method instance is
+	 * configured to sell, this one is package aware so a marketplace extension
+	 * can swap between the contract and the public table variants of a service
+	 * according to who ships the package.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param array $package Cart package.
+	 *
+	 * @return string
+	 */
+	public function resolve_product_code( $package ) {
+		/**
+		 * Filters the Correios product code used to quote a package.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param string $product_code
+		 * @param array $package
+		 * @param \Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod $this
+		 */
+		return apply_filters( 'infixs_correios_automatico_product_code', $this->get_product_code(), $package, $this );
+	}
+
+	/**
+	 * Build a transient key for a shipping lookup.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param string $type    Lookup type, such as `shipping_cost` or `shipping_time`.
+	 * @param array  $data    Values that identify the lookup.
+	 * @param array  $package Cart package.
+	 *
+	 * @return string
+	 */
+	protected function transient_key( $type, $data, $package ) {
+		$transient_key = $type . '_' . Helper::generateHashFromArray( $data );
+
+		/**
+		 * Filters the transient key used to cache a shipping lookup.
+		 *
+		 * Marketplace extensions must add the vendor to the key, otherwise two
+		 * vendors sharing the same origin postcode and package would also share
+		 * the cached result even when only one of them has a contract.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param string $transient_key
+		 * @param string $type
+		 * @param array $package
+		 * @param \Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod $this
+		 */
+		return apply_filters( 'infixs_correios_automatico_transient_key', $transient_key, $type, $package, $this );
 	}
 
 	public function use_range() {
@@ -1385,6 +1662,10 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 	public function is_receipt_notice() {
 		return $this->receipt_notice;
+	}
+
+	public function is_receipt_notice_electronic() {
+		return $this->receipt_notice_electronic;
 	}
 
 	public function is_own_hands() {

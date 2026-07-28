@@ -25,7 +25,7 @@ class Order {
 
 		add_filter( 'woocommerce_my_account_my_orders_columns', [ $this, 'add_tracking_order_column' ] );
 		add_action( 'woocommerce_my_account_my_orders_column_infixs-correios-automatico-tracking-column', [ $this, 'add_tracking_order_column_content' ] );
-		add_action( 'woocommerce_view_order', [ $this, 'add_content_above_order_details' ] );
+		add_action( 'woocommerce_view_order', [ $this, 'add_content_above_order_details' ], 5 );
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_order_details_script' ] );
 	}
 
@@ -107,6 +107,15 @@ class Order {
 				\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/components/tracking/tracking.css',
 				[],
 				filemtime( \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'assets/components/tracking/tracking.css' ),
+			);
+
+			wp_localize_script(
+				'infixs-correios-automatico-tracking-component',
+				'infixsCorreiosAutomaticoTracking',
+				[
+					'restUrl' => esc_url_raw( rest_url( 'infixs-correios-automatico/v1/' ) ),
+					'nonce' => wp_create_nonce( 'wp_rest' ),
+				]
 			);
 		}
 	}

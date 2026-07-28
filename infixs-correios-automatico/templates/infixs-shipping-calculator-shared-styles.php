@@ -30,7 +30,7 @@ class InfixsCalculatorStylesHelper {
 	 * 
 	 * @var array
 	 */
-	private static $result_dimensions = [ 
+	private static $result_dimensions = [
 		'result_column',
 		'result_price',
 		'result_address',
@@ -45,9 +45,10 @@ class InfixsCalculatorStylesHelper {
 	 * @param array  $calculator_styles Array of sanitized calculator styles
 	 * @param array  $allowed_dimensions Optional. Array of element keys that support width/height
 	 * @param array  $extra Optional. Additional CSS properties to add
+	 * @param array  $exclude Optional. Style property keys to skip (e.g. [ 'width' ])
 	 * @return string Inline style attribute or empty string
 	 */
-	public static function getInlineStyleAttribute( $element_key, $calculator_styles, $allowed_dimensions = [], $extra = [] ) {
+	public static function getInlineStyleAttribute( $element_key, $calculator_styles, $allowed_dimensions = [], $extra = [], $exclude = [] ) {
 		if ( ! isset( $calculator_styles[ $element_key ] ) || ! is_array( $calculator_styles[ $element_key ] ) ) {
 			return '';
 		}
@@ -62,6 +63,9 @@ class InfixsCalculatorStylesHelper {
 
 		// Process each style property
 		foreach ( $element_styles as $property => $value ) {
+			if ( in_array( $property, $exclude, true ) ) {
+				continue;
+			}
 			$processed_styles = self::processStyleProperty( $property, $value, $element_key, $allowed_dimensions );
 			if ( ! empty( $processed_styles ) ) {
 				$style_properties = array_merge( $style_properties, $processed_styles );
@@ -164,6 +168,89 @@ class InfixsCalculatorStylesHelper {
 		}
 
 		return $style_properties;
+	}
+
+	/**
+	 * Get calculator container classes
+	 *
+	 * @param array $calculator_styles Array of sanitized calculator styles
+	 * @param bool  $full_width Whether the calculator should take the full container width
+	 * @return string Space separated class list
+	 */
+	public static function getCalculatorContainerClasses( $calculator_styles, $full_width = false ) {
+		$classes = [ 'infixs-correios-automatico-calculator' ];
+
+		if ( $full_width ) {
+			$classes[] = 'infixs-correios-automatico-calculator--full-width';
+		}
+
+		$row_style = isset( $calculator_styles['result_table']['row_style'] ) ? $calculator_styles['result_table']['row_style'] : 'header_only';
+
+		if ( in_array( $row_style, [ 'striped', 'striped_lines' ], true ) ) {
+			$classes[] = 'infixs-correios-automatico-calculator--rows-striped';
+		}
+
+		if ( in_array( $row_style, [ 'lines', 'striped_lines' ], true ) ) {
+			$classes[] = 'infixs-correios-automatico-calculator--rows-lines';
+		}
+
+		return implode( ' ', $classes );
+	}
+
+	/**
+	 * Get calculator container style attribute with row style CSS variables
+	 *
+	 * @param array $calculator_styles Array of sanitized calculator styles
+	 * @return string Style attribute or empty string
+	 */
+	public static function getCalculatorContainerVars( $calculator_styles ) {
+		$vars = [];
+
+		if ( isset( $calculator_styles['result_row_odd']['background_color'] ) ) {
+			$vars[] = '--infixs-ca-row-odd-color: ' . $calculator_styles['result_row_odd']['background_color'];
+		}
+
+		if ( isset( $calculator_styles['result_row_even']['background_color'] ) ) {
+			$vars[] = '--infixs-ca-row-even-color: ' . $calculator_styles['result_row_even']['background_color'];
+		}
+
+		if ( isset( $calculator_styles['result_table'] ) && is_array( $calculator_styles['result_table'] ) ) {
+			$result_table = $calculator_styles['result_table'];
+
+			if ( isset( $result_table['border_color'] ) ) {
+				$vars[] = '--infixs-ca-row-line-color: ' . $result_table['border_color'];
+			}
+
+			if ( isset( $result_table['border_size'] ) ) {
+				$vars[] = '--infixs-ca-row-line-size: ' . absint( $result_table['border_size'] ) . 'px';
+			}
+		}
+
+		if ( isset( $calculator_styles['result_table_header'] ) && is_array( $calculator_styles['result_table_header'] ) ) {
+			$header = $calculator_styles['result_table_header'];
+
+			foreach ( [ 'top' => 'pt', 'right' => 'pr', 'bottom' => 'pb', 'left' => 'pl' ] as $side => $short ) {
+				if ( isset( $header[ 'padding_' . $side ] ) ) {
+					$vars[] = '--infixs-ca-header-' . $short . ': ' . absint( $header[ 'padding_' . $side ] ) . 'px';
+				}
+			}
+		}
+
+		if ( isset( $calculator_styles['result_row'] ) && is_array( $calculator_styles['result_row'] ) ) {
+			$result_row = $calculator_styles['result_row'];
+
+			foreach ( [ 'top' => 'pt', 'right' => 'pr', 'bottom' => 'pb', 'left' => 'pl' ] as $side => $short ) {
+				if ( isset( $result_row[ 'padding_' . $side ] ) ) {
+					$vars[] = '--infixs-ca-cell-' . $short . ': ' . absint( $result_row[ 'padding_' . $side ] ) . 'px';
+				}
+			}
+		}
+
+		if ( empty( $vars ) ) {
+			return '';
+		}
+
+		return 'style="' . esc_attr( implode( '; ', $vars ) ) . '"';
 	}
 
 	/**

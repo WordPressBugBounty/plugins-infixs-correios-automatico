@@ -4,9 +4,11 @@ namespace Infixs\CorreiosAutomatico\Entities;
 
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod;
+use Infixs\CorreiosAutomatico\Core\Shipping\LinkedShippingMethod;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Package;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
@@ -72,7 +74,7 @@ class Order {
 	protected function initializeShippingItems() {
 		$line_items_shipping = $this->order->get_items( 'shipping' );
 		foreach ( $line_items_shipping as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Shipping || $item->get_method_id() !== 'infixs-correios-automatico' ) {
+			if ( ! $item instanceof \WC_Order_Item_Shipping || ( $item->get_method_id() !== 'infixs-correios-automatico' && ! LinkedShippingMethod::resolve_from_item( $item ) ) ) {
 				$this->shipping_items[] = [
 					'instance_id' => $item->get_instance_id(),
 					'width' => 0,
@@ -372,7 +374,10 @@ class Order {
 
 	/**
 	 * Get the Correios shipping method from the order
-	 * 
+	 *
+	 * Falls back to the Correios method the merchant linked to a native shipping
+	 * method (e.g. "Frete Grátis"), so those orders can be pre-posted too.
+	 *
 	 * @return CorreiosShippingMethod|false
 	 */
 	public function getShippingMethod() {
@@ -382,6 +387,15 @@ class Order {
 				return \WC_Shipping_Zones::get_shipping_method( $instance_id );
 			}
 		}
+
+		foreach ( $this->order->get_shipping_methods() as $shipping_method ) {
+			$linked_method = LinkedShippingMethod::resolve_from_item( $shipping_method );
+
+			if ( $linked_method ) {
+				return $linked_method;
+			}
+		}
+
 		return false;
 	}
 
@@ -450,6 +464,50 @@ class Order {
 		return $this->shipping_items;
 	}
 
+	/**
+	 * Get the shipping package dimensions.
+	 *
+	 * Prefers the values frozen on the shipping item at checkout. Orders placed before
+	 * a Correios method was linked to their shipping method carry no such meta, so the
+	 * package is computed on demand from the resolved method's settings.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @return array{ width: float, height: float, lenght: float, weight: float }
+	 */
+	public function getShippingPackageDimensions() {
+		$shipping_item = $this->getFirstShippingItemData();
+
+		if ( $shipping_item['weight'] > 0 || $shipping_item['width'] > 0 || $shipping_item['height'] > 0 || $shipping_item['lenght'] > 0 ) {
+			return [
+				'width' => $shipping_item['width'],
+				'height' => $shipping_item['height'],
+				'lenght' => $shipping_item['lenght'],
+				'weight' => $shipping_item['weight'],
+			];
+		}
+
+		$shipping_method = $this->getShippingMethod();
+
+		if ( ! $shipping_method ) {
+			return [
+				'width' => 0,
+				'height' => 0,
+				'lenght' => 0,
+				'weight' => 0,
+			];
+		}
+
+		$package_data = $this->getPackage( $shipping_method )->get_data();
+
+		return [
+			'width' => $package_data['width'],
+			'height' => $package_data['height'],
+			'lenght' => $package_data['length'],
+			'weight' => $package_data['weight'],
+		];
+	}
+
 	public function toArray() {
 		$address = $this->getAddress()->toArray();
 		$customer = $this->getCustomer()->toArray();
@@ -484,6 +542,9 @@ class Order {
 
 		$shipping_metadata = $this->getFirstShippingItemData();
 
+		$prepost_errors = $this->order->get_meta( PrepostService::PREPOST_ERRORS_META_KEY );
+		$prepost_errors = is_array( $prepost_errors ) ? array_values( $prepost_errors ) : [];
+
 		$data = [
 			'id' => $this->order->get_id(),
 			'order_url' => $this->order->get_edit_order_url(),
@@ -508,6 +569,7 @@ class Order {
 				'additional_services' => [
 					'own_hands' => $shipping_method ? $shipping_method->is_own_hands() : false,
 					'receipt_notice' => $shipping_method ? $shipping_method->is_receipt_notice() : false,
+					'receipt_notice_electronic' => $shipping_method ? $shipping_method->is_receipt_notice_electronic() : false,
 					'dangerous_product' => $has_dangerous_product,
 				],
 			],
@@ -520,6 +582,7 @@ class Order {
 				( $invoice_number = $this->order->get_meta( '_infixs_correios_automatico_invoice_number', true ) ) !== '' && $invoice_number !== false ? [ 'key' => '_infixs_correios_automatico_invoice_number', 'value' => $invoice_number ] : null,
 				( $invoice_key = $this->order->get_meta( '_infixs_correios_automatico_invoice_key', true ) ) !== '' && $invoice_key !== false ? [ 'key' => '_infixs_correios_automatico_invoice_key', 'value' => $invoice_key ] : null,
 			] ) ),
+			'prepost_errors' => $prepost_errors,
 			'preposts' => []
 		];
 

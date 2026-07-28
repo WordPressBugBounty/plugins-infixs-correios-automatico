@@ -16,6 +16,11 @@ jQuery( function ( $ ) {
 		 * Initialize the class.
 		 */
 		init() {
+			$( '#woocommerce-order-items' ).on(
+				'woocommerce_order_meta_box_recalculate_ajax_data',
+				this.appendShippingAddress.bind( this )
+			);
+
 			$( document.body ).on(
 				'click',
 				'.infixs-correios-automatico-tracking-box .infixs-correios-automatico-add-tracking-code',
@@ -1159,6 +1164,32 @@ jQuery( function ( $ ) {
 					metas
 				);
 			}
+		},
+
+		/**
+		 * Append the shipping address to the WooCommerce recalculate request.
+		 *
+		 * WooCommerce only sends the taxable address, which may be the billing one.
+		 * The Correios quote must always use the shipping destination, so it is sent
+		 * in dedicated fields, without changing the address used for taxes.
+		 *
+		 * @param {Event} event Event object.
+		 * @param {Object} data Ajax data.
+		 *
+		 * @return {Object} Ajax data.
+		 */
+		appendShippingAddress( event, data ) {
+			const fields = [ 'country', 'state', 'postcode', 'city' ];
+
+			fields.forEach( ( field ) => {
+				const value = $( '#_shipping_' + field ).val();
+
+				if ( value ) {
+					data[ 'infixs_shipping_' + field ] = value;
+				}
+			} );
+
+			return data;
 		},
 
 		changeShippingInstance( event ) {

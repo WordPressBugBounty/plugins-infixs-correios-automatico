@@ -252,6 +252,18 @@ class Admin {
 			}
 		}
 
+		/**
+		 * Filters the plugins the dashboard reports as active.
+		 *
+		 * Lets an extension declare itself instead of requiring a new branch
+		 * here every time a marketplace integration is added.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param string[] $active_plugins
+		 */
+		$params['activePlugins'] = apply_filters( 'infixs_correios_automatico_active_plugins', $params['activePlugins'] );
+
 		$scriptData = array_merge( $params, [
 			'adminEmail' => get_option( 'admin_email' ),
 			'upgradeProUrl' => Plugin::PRO_URL,

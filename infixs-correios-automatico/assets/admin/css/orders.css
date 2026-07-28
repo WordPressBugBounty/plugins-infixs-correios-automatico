@@ -202,3 +202,49 @@ td.infixs-correios-automatico-actions-column.column-infixs-correios-automatico-a
 		transform: rotate(360deg);
 	}
 }
+
+/** Order Items Notice */
+
+.infixs-correios-automatico-notice-row td {
+	padding: 0 !important;
+}
+
+.infixs-correios-automatico-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin: 10px 0;
+	padding: 10px 12px;
+	border: 1px solid #e0e0e0;
+	border-left: 4px solid #dba617;
+	border-radius: 3px;
+	background: #fcf9e8;
+}
+
+.infixs-correios-automatico-notice-icon {
+	color: #dba617;
+	line-height: 1;
+}
+
+.infixs-correios-automatico-notice-content {
+	flex: 1;
+}
+
+.infixs-correios-automatico-notice-title {
+	margin: 0 0 4px;
+	font-weight: 600;
+}
+
+.infixs-correios-automatico-notice-message {
+	margin: 0 0 3px;
+	color: #646970;
+}
+
+.infixs-correios-automatico-notice-info {
+	border-left-color: #2271b1;
+	background: #f0f6fc;
+}
+
+.infixs-correios-automatico-notice-info .infixs-correios-automatico-notice-icon {
+	color: #2271b1;
+}

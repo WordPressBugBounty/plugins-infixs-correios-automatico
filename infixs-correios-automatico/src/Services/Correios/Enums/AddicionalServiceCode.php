@@ -8,6 +8,8 @@ class AddicionalServiceCode {
 	public const RECEIPT_NOTICE = '001';
 	public const OWN_HANDS = '002';
 
+	public const RECEIPT_NOTICE_ELECTRONIC = '021';
+
 	public const MODICO = '004';
 
 	public const INSURANCE_DECLARATION_SEDEX = '019';
@@ -20,6 +22,7 @@ class AddicionalServiceCode {
 	private static $descriptions = [ 
 		self::RECEIPT_NOTICE => 'Aviso de Recebimento',
 		self::OWN_HANDS => 'Mão Própria',
+		self::RECEIPT_NOTICE_ELECTRONIC => 'Aviso de Recebimento Eletrônico',
 		self::MODICO => 'Registro Módico',
 		self::INSURANCE_DECLARATION_SEDEX => 'Declaração de Valor Sedex',
 		self::INSURANCE_DECLARATION_PAC => 'Declaração de Valor PAC',

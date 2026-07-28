@@ -1,6 +1,7 @@
 <?php
 
 namespace Infixs\CorreiosAutomatico\Core\Front\WooCommerce;
+use Infixs\CorreiosAutomatico\Core\Shipping\LinkedShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
@@ -44,6 +45,10 @@ class Shipping {
 		}
 
 		add_filter( 'woocommerce_package_rates', [ $this, 'filter_rates' ], 10, 2 );
+
+		add_filter( 'woocommerce_package_rates', [ $this, 'attach_linked_correios_meta' ], 20, 2 );
+
+		add_action( 'woocommerce_checkout_create_order_shipping_item', [ $this, 'convert_linked_shipping_item' ], 10, 4 );
 
 		if ( Config::boolean( "general.force_shipping_cost" ) ) {
 			add_filter( 'woocommerce_package_rates', [ $this, 'force_shipping_cost' ], 999, 2 );
@@ -129,7 +134,33 @@ class Shipping {
 			);
 		}
 
-		return ob_get_clean();
+		return $this->minify_calculator_html( ob_get_clean() );
+	}
+
+	/**
+	 * Minify the calculator markup into a single line.
+	 *
+	 * Some themes render the product summary through the "the_content"
+	 * filter, which runs wpautop/wptexturize. Those functions inject
+	 * <p> and <br> tags based on line breaks, breaking the calculator
+	 * layout and mangling its inline <style> block. Removing line breaks
+	 * and the whitespace between tags makes the markup immune to it.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param string $html Calculator HTML.
+	 * 
+	 * @return string
+	 */
+	private function minify_calculator_html( $html ) {
+		if ( '' === trim( (string) $html ) ) {
+			return '';
+		}
+
+		$html = str_replace( [ "\r\n", "\r", "\n" ], '', $html );
+		$html = preg_replace( '/>[\t ]+</', '><', $html );
+
+		return $html;
 	}
 
 	public function display_shipping_calculator() {
@@ -314,11 +345,168 @@ class Shipping {
 	}
 
 	/**
-	 * Prevent other plugins to change shipping cost.
-	 * 
+	 * Attach the Correios package meta to rates of linked native shipping methods.
+	 *
+	 * Native methods like "Frete Grátis" produce a rate without any Correios data, so
+	 * the order line item ends up without the service code and the package dimensions
+	 * the pre-post needs. When the merchant links a Correios method to the native one,
+	 * the linked method's settings answer for those values here. WooCommerce copies the
+	 * rate meta into the shipping line item when the order is created.
+	 *
+	 * No Correios API call happens here: the package is computed locally.
+	 *
+	 * @since 1.8.0
+	 *
 	 * @param \WC_Shipping_Rate[] $rates Shipping rates.
 	 * @param array $package Package data.
-	 * 
+	 *
+	 * @return array
+	 */
+	public function attach_linked_correios_meta( $rates, $package ) {
+		foreach ( $rates as $rate_id => $rate ) {
+			if ( ! LinkedShippingMethod::is_supported( $rate->get_method_id() ) ) {
+				continue;
+			}
+
+			$linked_method = LinkedShippingMethod::get_linked_method( $rate->get_method_id(), $rate->get_instance_id() );
+
+			if ( ! $linked_method ) {
+				continue;
+			}
+
+			$package_data = $linked_method->get_package( $package )->get_data();
+
+			$rate->add_meta_data( '_weight', $package_data['weight'] );
+			$rate->add_meta_data( '_length', $package_data['length'] );
+			$rate->add_meta_data( '_width', $package_data['width'] );
+			$rate->add_meta_data( '_height', $package_data['height'] );
+			$rate->add_meta_data( 'shipping_product_code', $linked_method->get_product_code() );
+			$rate->add_meta_data( LinkedShippingMethod::ITEM_META_KEY, $linked_method->get_instance_id() );
+
+			$rates[ $rate_id ] = $rate;
+
+			Log::debug( 'Correios meta attached to linked rate', [
+				'rate_id' => $rate_id,
+				'linked_instance_id' => $linked_method->get_instance_id(),
+				'package_data' => $package_data,
+			] );
+		}
+
+		return $rates;
+	}
+
+	/**
+	 * Convert a native shipping line item into the linked Correios method.
+	 *
+	 * When the order goes out with a native method (Frete Grátis / Preço Fixo) that the
+	 * merchant linked to a Correios method, the whole plugin — which keys off
+	 * method_id === 'infixs-correios-automatico' — must see it as a native Correios order
+	 * (pré-postagem, etiqueta, rastreio, contagens do PRO). So the shipping item is
+	 * rewritten to the Correios method here, keeping the original cost (0 on free shipping)
+	 * and combining the titles into "SEDEX (Frete grátis)".
+	 *
+	 * Runs during WC_Checkout::create_order_shipping_lines(), which serves both the classic
+	 * and the block/Store API checkout. The item is not saved yet — WooCommerce persists it
+	 * on the following $order->save(), so no $item->save() is needed here.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param \WC_Order_Item_Shipping $item         Shipping line item being built.
+	 * @param string $package_key Package key.
+	 * @param array $package Shipping package.
+	 * @param \WC_Order $order Order being created.
+	 *
+	 * @return void
+	 */
+	public function convert_linked_shipping_item( $item, $package_key, $package, $order ) {
+		if ( ! $item instanceof \WC_Order_Item_Shipping ) {
+			return;
+		}
+
+		$original_method_id = $item->get_method_id();
+
+		if ( $original_method_id === 'infixs-correios-automatico' ) {
+			return;
+		}
+
+		$linked_method = LinkedShippingMethod::resolve_from_item( $item );
+
+		if ( ! $linked_method ) {
+			return;
+		}
+
+		$original_title = $item->get_method_title();
+
+		$item->set_method_id( 'infixs-correios-automatico' );
+		$item->set_instance_id( $linked_method->get_instance_id() );
+		$item->set_method_title( sprintf( '%s (%s)', $linked_method->get_title(), $original_title ) );
+		$item->update_meta_data( '_infixs_original_method_id', $original_method_id );
+		// Keep the native title ("Frete grátis") so the admin "recalcular frete" can rebuild the
+		// combined title ("SEDEX (Frete grátis)") instead of resetting it to the bare service name.
+		$item->update_meta_data( '_infixs_original_method_title', $original_title );
+
+		// Price the linked Correios method for this package — the same calculation the normal
+		// Correios checkout and the admin "recalcular frete" use. This freezes the real freight
+		// cost (_original_cost), delivery time and insurance on the item so the merchant sees how
+		// much the "free" shipment actually costs. The customer keeps paying the native total:
+		// the item total is never touched, so free shipping stays free.
+		$rate = null;
+		$rates = $linked_method->get_rates_for_package( $package );
+		if ( is_array( $rates ) ) {
+			$rate = reset( $rates );
+		}
+
+		if ( $rate instanceof \WC_Shipping_Rate ) {
+			$metas = $rate->get_meta_data();
+
+			foreach ( [ '_weight', '_length', '_width', '_height', 'shipping_product_code' ] as $meta_key ) {
+				if ( isset( $metas[ $meta_key ] ) ) {
+					$item->update_meta_data( $meta_key, $metas[ $meta_key ] );
+				}
+			}
+
+			$item->update_meta_data( LinkedShippingMethod::ITEM_META_KEY, $linked_method->get_instance_id() );
+
+			if ( isset( $metas['_original_cost'] ) ) {
+				$item->update_meta_data( '_original_cost', $metas['_original_cost'] );
+			}
+
+			if ( ! empty( $metas['_insurance_cost'] ) ) {
+				$item->update_meta_data( '_insurance_cost', $metas['_insurance_cost'] );
+			}
+
+			if ( isset( $metas['delivery_time'] ) ) {
+				$item->update_meta_data( 'delivery_time', $metas['delivery_time'] );
+			}
+		} elseif ( ! $item->get_meta( 'shipping_product_code' ) ) {
+			// The linked method produced no rate (unavailable / no price). Keep at least the
+			// dimensions and the service, computed locally, so the pré-postagem still works —
+			// only the freight cost is missing.
+			$package_data = $linked_method->get_package( $package )->get_data();
+
+			$item->update_meta_data( '_weight', $package_data['weight'] );
+			$item->update_meta_data( '_length', $package_data['length'] );
+			$item->update_meta_data( '_width', $package_data['width'] );
+			$item->update_meta_data( '_height', $package_data['height'] );
+			$item->update_meta_data( 'shipping_product_code', $linked_method->get_product_code() );
+			$item->update_meta_data( LinkedShippingMethod::ITEM_META_KEY, $linked_method->get_instance_id() );
+		}
+
+		Log::debug( 'Linked shipping item converted to Correios', [
+			'order_id' => $order instanceof \WC_Order ? $order->get_id() : null,
+			'original_method_id' => $original_method_id,
+			'linked_instance_id' => $linked_method->get_instance_id(),
+			'product_code' => $linked_method->get_product_code(),
+			'original_cost' => $rate instanceof \WC_Shipping_Rate ? ( $rate->get_meta_data()['_original_cost'] ?? null ) : null,
+		] );
+	}
+
+	/**
+	 * Prevent other plugins to change shipping cost.
+	 *
+	 * @param \WC_Shipping_Rate[] $rates Shipping rates.
+	 * @param array $package Package data.
+	 *
 	 * @return array
 	 */
 	public function force_shipping_cost( $rates, $package ) {

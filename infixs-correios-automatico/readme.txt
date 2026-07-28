@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.0
-Stable tag: 1.7.9
+Stable tag: 1.8.1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -139,6 +139,13 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.8.1 2026-07-28 =
+* Fix Bugs
+* Integracão com WCFM para marketplaces como Extensão
+* Agora alguns erros aparecem como alerta na dashbaord
+* Melhorias na etiqueta
+* Melhorias na customização da calculadora, com mais cores e personalizações
 
 = 1.7.9 2026-05-31 =
 * Fix Bugs

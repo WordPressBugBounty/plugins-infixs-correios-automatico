@@ -183,5 +183,23 @@ class Migration {
 			'created_at' => 'datetime NOT NULL',
 			'updated_at' => 'datetime NOT NULL',
 		] );
+
+		/**
+		 * Create table `infixs_correios_automatico_notifications`.
+		 *
+		 * @since 1.8.0
+		 */
+		Database::createOrUpdateTable( 'infixs_correios_automatico_notifications', [
+			'type' => 'varchar(50) NOT NULL',
+			'level' => "varchar(20) NOT NULL DEFAULT 'info'",
+			'title' => 'varchar(255) NOT NULL',
+			'message' => 'text DEFAULT NULL',
+			'context' => 'text DEFAULT NULL',
+			'dedupe_key' => 'varchar(191) DEFAULT NULL',
+			'is_read' => 'tinyint(1) unsigned NOT NULL DEFAULT 0',
+			'read_at' => 'datetime DEFAULT NULL',
+			'created_at' => 'datetime NOT NULL',
+			'updated_at' => 'datetime NOT NULL',
+		] );
 	}
 }

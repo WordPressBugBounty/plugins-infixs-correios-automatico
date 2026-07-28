@@ -137,3 +137,60 @@
 	width: 100%;
 	max-width: 400px;
 }
+
+/** Return (Devolução) */
+.infixs-caref-return-wrap {
+	margin: 20px 0;
+}
+
+.infixs-caref-return-requested {
+	padding: 12px 16px;
+	border-radius: 8px;
+	background: #f0f6ff;
+	border: 1px solid #cfe0ff;
+	color: #1d4ed8;
+}
+
+.infixs-caref-return-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 99999;
+	padding: 16px;
+}
+
+.infixs-caref-return-modal-content {
+	background: #fff;
+	border-radius: 10px;
+	padding: 24px;
+	max-width: 460px;
+	width: 100%;
+	box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.infixs-caref-return-modal-content h3 {
+	margin: 0 0 12px;
+}
+
+.infixs-caref-return-modal-actions {
+	display: flex;
+	gap: 10px;
+	justify-content: flex-end;
+	margin-top: 20px;
+}
+
+.infixs-caref-return-modal-message {
+	margin-top: 12px;
+	font-size: 14px;
+}
+
+.infixs-caref-return-modal-message.error {
+	color: #b91c1c;
+}
+
+.infixs-caref-return-modal-message.success {
+	color: #15803d;
+}

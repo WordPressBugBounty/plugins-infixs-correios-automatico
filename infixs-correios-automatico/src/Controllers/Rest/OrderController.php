@@ -178,7 +178,29 @@ class OrderController {
 
 		$shipping_item->set_instance_id( $params['instance_id'] );
 		$shipping_item->set_method_id( $shipping_method->id );
-		$shipping_item->set_name( $shipping_method->get_title() );
+
+		$method_name = $shipping_method->get_title();
+
+		// Converted orders (native Frete Grátis / Preço Fixo linked to a Correios method) carry a
+		// combined title like "PAC (Frete grátis)". Rebuild it here so recalculating does not reset
+		// it to the bare service name. If the operator switched the Correios service, the new title
+		// is combined with the same native suffix ("SEDEX (Frete grátis)").
+		if ( $shipping_method instanceof CorreiosShippingMethod ) {
+			$original_title = $shipping_item->get_meta( '_infixs_original_method_title' );
+
+			// Fallback for orders converted before this meta existed: reuse the suffix already on
+			// the item name (still combined at this point, before set_name below overwrites it).
+			if ( empty( $original_title ) && $shipping_item->get_meta( '_infixs_original_method_id' )
+				&& preg_match( '/\(([^)]+)\)\s*$/u', (string) $shipping_item->get_name(), $matches ) ) {
+				$original_title = $matches[1];
+			}
+
+			if ( ! empty( $original_title ) ) {
+				$method_name = sprintf( '%s (%s)', $method_name, $original_title );
+			}
+		}
+
+		$shipping_item->set_name( $method_name );
 
 		$shipping_item->update_meta_data( '_length', $params['length'] );
 		$shipping_item->update_meta_data( '_width', $params['width'] );
@@ -319,12 +341,67 @@ class OrderController {
 	}
 
 	/**
-	 * Send tracking whatsapp
-	 * 
-	 * @since 1.6.0
-	 * 
+	 * Dismiss a prepost error from an order.
+	 *
+	 * @since 1.8.0
+	 *
 	 * @param \WP_REST_Request $request
-	 * 
+	 *
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function dismiss_prepost_error( $request ) {
+		$order_id = $request->get_param( 'id' );
+		$error_id = $request->get_param( 'error_id' );
+
+		if ( ! $order_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_invalid_order_id', __( 'Invalid order ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		if ( ! $error_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_invalid_error_id', __( 'Invalid error ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		$response = Container::prepostService()->dismissOrderPrepostError( $order_id, $error_id );
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		return rest_ensure_response( [
+			'status' => 'success',
+		] );
+	}
+
+	/**
+	 * Clear every prepost error from an order.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function clear_prepost_errors( $request ) {
+		$order_id = $request->get_param( 'id' );
+
+		if ( ! $order_id ) {
+			return new \WP_Error( 'infixs_correios_automatico_invalid_order_id', __( 'Invalid order ID.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
+		}
+
+		Container::prepostService()->clearOrderPrepostErrors( $order_id );
+
+		return rest_ensure_response( [
+			'status' => 'success',
+		] );
+	}
+
+	/**
+	 * Send tracking whatsapp
+	 *
+	 * @since 1.6.0
+	 *
+	 * @param \WP_REST_Request $request
+	 *
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function send_tracking_whatsapp( $request ) {

@@ -94,11 +94,58 @@ class PrepostController {
 			$data['receiptNotice'] = filter_var( $params['receiptNotice'], FILTER_VALIDATE_BOOLEAN );
 		}
 
+		if ( isset( $params['receiptNoticeElectronic'] ) ) {
+			$data['receiptNoticeElectronic'] = filter_var( $params['receiptNoticeElectronic'], FILTER_VALIDATE_BOOLEAN );
+		}
+
 		if ( isset( $params['ownHands'] ) ) {
 			$data['ownHands'] = filter_var( $params['ownHands'], FILTER_VALIDATE_BOOLEAN );
 		}
 
 		$prepost = $this->prepostService->createPrepost( $params['order_id'], $data );
+
+		if ( is_wp_error( $prepost ) ) {
+			return $prepost;
+		}
+
+		do_action( 'infixs_correios_automatico_prepost_controller_created', $params['order_id'], $prepost );
+
+		return rest_ensure_response( $this->prepostService->prepareData( $prepost ) );
+	}
+
+	/**
+	 * Create a reverse logistics prepost (manual) from an order.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function createReverseFromOrder( $request ) {
+		$params = $request->get_params();
+
+		if ( ! isset( $params['order_id'] ) ) {
+			return new \WP_Error( 'missing_order_id', 'Order ID is required.', [ 'status' => 400 ] );
+		}
+
+		if ( ! Config::boolean( 'auth.active' ) ) {
+			return new \WP_Error( 'auth_not_active', 'O Contrato não está ativo, acesse as configurações para ativá-lo. Menu WooCommerce -> Correios Automático -> Configurações -> Contrato.', [ 'status' => 400 ] );
+		}
+
+		$data = [];
+
+		if ( isset( $params['service'] ) && ! empty( $params['service'] ) ) {
+			$data['service'] = sanitize_text_field( $params['service'] );
+		}
+
+		foreach ( [ 'weight', 'length', 'width', 'height' ] as $field ) {
+			if ( isset( $params[ $field ] ) && is_numeric( $params[ $field ] ) ) {
+				$data[ $field ] = (float) $params[ $field ];
+			}
+		}
+
+		$prepost = $this->prepostService->createReversePrepost( $params['order_id'], $data );
 
 		if ( is_wp_error( $prepost ) ) {
 			return $prepost;

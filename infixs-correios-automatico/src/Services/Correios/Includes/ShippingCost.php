@@ -19,10 +19,17 @@ class ShippingCost {
 
 	/**
 	 * Receipt notice
-	 * 
+	 *
 	 * @var bool
 	 */
 	private $receipt_notice = false;
+
+	/**
+	 * Electronic receipt notice
+	 *
+	 * @var bool
+	 */
+	private $receipt_notice_electronic = false;
 
 
 	/**
@@ -165,6 +172,14 @@ class ShippingCost {
 
 	public function setReceiptNotice( $receipt_notice ) {
 		$this->receipt_notice = $receipt_notice;
+	}
+
+	public function getReceiptNoticeElectronic() {
+		return $this->receipt_notice_electronic;
+	}
+
+	public function setReceiptNoticeElectronic( $receipt_notice_electronic ) {
+		$this->receipt_notice_electronic = $receipt_notice_electronic;
 	}
 
 	public function getModico() {
@@ -358,6 +373,10 @@ class ShippingCost {
 
 		if ( $this->getReceiptNotice() ) {
 			$data['servicosAdicionais'][] = AddicionalServiceCode::RECEIPT_NOTICE;
+		}
+
+		if ( $this->getReceiptNoticeElectronic() ) {
+			$data['servicosAdicionais'][] = AddicionalServiceCode::RECEIPT_NOTICE_ELECTRONIC;
 		}
 
 		if ( $this->getModico() ) {

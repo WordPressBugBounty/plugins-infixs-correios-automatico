@@ -16,7 +16,7 @@ class CalculatorStylesSanitizer {
 	 * 
 	 * @var array
 	 */
-	private static $valid_elements = [ 
+	private static $valid_elements = [
 		'title',
 		'result_column',
 		'result_price',
@@ -27,18 +27,34 @@ class CalculatorStylesSanitizer {
 		'result_address',
 		'result_title_column',
 		'result_table_header',
-		'result_delivery_time'
+		'result_delivery_time',
+		'result_table',
+		'result_row',
+		'result_row_odd',
+		'result_row_even'
 	];
 
 	/**
 	 * Valid text decorations
-	 * 
+	 *
 	 * @var array
 	 */
-	private static $valid_text_decorations = [ 
+	private static $valid_text_decorations = [
 		'bold',
 		'italic',
 		'underline'
+	];
+
+	/**
+	 * Valid result table row styles
+	 *
+	 * @var array
+	 */
+	private static $valid_row_styles = [
+		'header_only',
+		'lines',
+		'striped',
+		'striped_lines'
 	];
 
 	/**
@@ -46,12 +62,13 @@ class CalculatorStylesSanitizer {
 	 * 
 	 * @var array
 	 */
-	private static $limits = [ 
+	private static $limits = [
 		'font_size' => [ 'min' => 8, 'max' => 72 ],
 		'border_size' => [ 'min' => 0, 'max' => 20 ],
 		'border_radius' => [ 'min' => 0, 'max' => 100 ],
 		'width' => [ 'min' => 10, 'max' => 1000 ],
-		'height' => [ 'min' => 10, 'max' => 1000 ]
+		'height' => [ 'min' => 10, 'max' => 1000 ],
+		'padding' => [ 'min' => 0, 'max' => 50 ]
 	];
 
 
@@ -98,7 +115,7 @@ class CalculatorStylesSanitizer {
 		$sanitized = [];
 
 		// Sanitize each property
-		$properties = [ 
+		$properties = [
 			'icon' => 'sanitizeTextField',
 			'icon_color' => 'sanitizeHexColor',
 			'background_color' => 'sanitizeHexColor',
@@ -109,7 +126,13 @@ class CalculatorStylesSanitizer {
 			'border_size' => 'sanitizeBorderSize',
 			'border_radius' => 'sanitizeBorderRadius',
 			'width' => 'sanitizeWidth',
-			'height' => 'sanitizeHeight'
+			'height' => 'sanitizeHeight',
+			'padding' => 'sanitizePadding',
+			'padding_top' => 'sanitizePadding',
+			'padding_right' => 'sanitizePadding',
+			'padding_bottom' => 'sanitizePadding',
+			'padding_left' => 'sanitizePadding',
+			'row_style' => 'sanitizeRowStyle'
 		];
 
 		foreach ( $properties as $property => $sanitizer ) {
@@ -154,6 +177,11 @@ class CalculatorStylesSanitizer {
 	 */
 	private static function sanitizeHexColor( $color ) {
 		$color = sanitize_text_field( $color );
+
+		// Allow the explicit "transparent" keyword so presets/users can clear a background.
+		if ( 'transparent' === strtolower( $color ) ) {
+			return 'transparent';
+		}
 
 		// Remove # if exists
 		$color = ltrim( $color, '#' );
@@ -241,8 +269,29 @@ class CalculatorStylesSanitizer {
 	}
 
 	/**
+	 * Sanitize padding
+	 *
+	 * @param mixed $padding
+	 * @return int|null
+	 */
+	private static function sanitizePadding( $padding ) {
+		return self::sanitizeNumericValue( $padding, 'padding' );
+	}
+
+	/**
+	 * Sanitize result table row style
+	 *
+	 * @param string $row_style
+	 * @return string|null
+	 */
+	private static function sanitizeRowStyle( $row_style ) {
+		$row_style = sanitize_text_field( $row_style );
+		return in_array( $row_style, self::$valid_row_styles, true ) ? $row_style : null;
+	}
+
+	/**
 	 * Sanitize numeric value with limits
-	 * 
+	 *
 	 * @param mixed $value
 	 * @param string $type
 	 * @return int|null

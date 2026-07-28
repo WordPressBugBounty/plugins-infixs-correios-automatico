@@ -79,6 +79,10 @@ class CorreiosService {
 			);
 		}
 
+		do_action( 'infixs_correios_automatico_shipping_cost_failed',
+			is_wp_error( $response ) ? $response : new \WP_Error( 'correios_invalid_response', __( 'Resposta inválida dos Correios.', 'infixs-correios-automatico' ) ),
+			$shipping_cost
+		);
 
 		return false;
 	}
@@ -121,7 +125,32 @@ class CorreiosService {
 	public function create_prepost( $prepost ) {
 		$data = $prepost->getData();
 		Log::debug( "Enviando prepostagem para os correios.", $data );
-		return $this->correiosApi->prepostagens( $data );
+
+		return $this->prepost_api( $prepost )->prepostagens( $data );
+	}
+
+	/**
+	 * Get the Correios API instance used to post a prepost.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\Prepost $prepost Prepost.
+	 *
+	 * @return CorreiosApi
+	 */
+	protected function prepost_api( $prepost ) {
+		/**
+		 * Filters the Correios API instance used to create the prepost.
+		 *
+		 * Allows marketplace extensions to send the prepost using the vendor's
+		 * own contract instead of the store wide one.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param CorreiosApi $correiosApi
+		 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\Prepost $prepost
+		 */
+		return apply_filters( 'infixs_correios_automatico_prepost_correios_api', $this->correiosApi, $prepost );
 	}
 
 	/**
@@ -134,7 +163,7 @@ class CorreiosService {
 	 * @return array|\WP_Error
 	 */
 	public function create_packet( $prepost ) {
-		return $this->correiosApi->packages(
+		return $this->prepost_api( $prepost )->packages(
 			[
 				'packageList' => [
 					0 => $prepost->getPacketData()
@@ -156,15 +185,29 @@ class CorreiosService {
 
 	/**
 	 * Get Shipping Time
-	 * 
+	 *
 	 * @param string $product_code
 	 * @param array $params
-	 * 
+	 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\ShippingTime|null $shipping_time @since 1.8.1
+	 *
 	 * @return int|false
 	 */
-	public function get_shipping_time( $product_code, $params ) {
-		$response = $this->correiosApi->authenticated_get(
-			$this->correiosApi->join_url( 'prazo/v1/nacional', $product_code ),
+	public function get_shipping_time( $product_code, $params, $shipping_time = null ) {
+		/**
+		 * Filters the Correios API instance used to fetch the delivery time.
+		 *
+		 * Allows marketplace extensions to query the delivery time using the
+		 * vendor's own contract instead of the store wide one.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param \Infixs\CorreiosAutomatico\Services\Correios\CorreiosApi $correiosApi
+		 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\ShippingTime|null $shipping_time
+		 */
+		$correiosApi = apply_filters( 'infixs_correios_automatico_shipping_time_correios_api', $this->correiosApi, $shipping_time );
+
+		$response = $correiosApi->authenticated_get(
+			$correiosApi->join_url( 'prazo/v1/nacional', $product_code ),
 			$params
 		);
 

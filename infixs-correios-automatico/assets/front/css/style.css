@@ -5,6 +5,16 @@
 	margin-top: 1rem;
 }
 
+/* Predictable box model regardless of the theme (some themes default
+   inputs/buttons to content-box, which makes the padded input overflow
+   and overlap the button in full-width mode). */
+.infixs-correios-automatico-calculator,
+.infixs-correios-automatico-calculator *,
+.infixs-correios-automatico-calculator *::before,
+.infixs-correios-automatico-calculator *::after {
+	box-sizing: border-box;
+}
+
 .infixs-correios-automatico-calculator
 	.infixs-correios-automatico-calculator-title {
 	margin-bottom: 0.3rem;
@@ -13,6 +23,7 @@
 }
 
 .infixs-correios-automatico-calculator input.infixs-correios-automatico-input {
+	box-sizing: border-box !important;
 	max-width: 200px;
 	min-height: 44px;
 	height: 44px;
@@ -25,6 +36,7 @@
 
 .infixs-correios-automatico-calculator
 	.infixs-correios-automatico-calculate-submit {
+	box-sizing: border-box !important;
 	padding: 0 20px;
 	margin-top: 0;
 	margin-bottom: 0;
@@ -70,12 +82,29 @@
 	border-bottom: 1px solid #0002;
 }
 
-.infixs-correios-automatico-shipping-results-grid > :nth-child(n + 3) {
-	padding-top: 0.3rem;
+/* Coluna esquerda do cabeçalho: recuo externo + espaço fixo de 2rem entre as
+   colunas (fica dentro da célula, então o fundo da linha não tem lacuna). */
+.infixs-correios-automatico-shipping-results-grid > :nth-child(1) {
+	padding: var(--infixs-ca-header-pt, 0.3rem) 2rem
+		var(--infixs-ca-header-pb, 0.3rem) var(--infixs-ca-header-pl, 0);
 }
 
-.infixs-correios-automatico-shipping-results-grid > :nth-child(odd) {
-	padding-right: 2rem;
+/* Coluna direita do cabeçalho: recuo externo à direita. */
+.infixs-correios-automatico-shipping-results-grid > :nth-child(2) {
+	padding: var(--infixs-ca-header-pt, 0.3rem) var(--infixs-ca-header-pr, 0)
+		var(--infixs-ca-header-pb, 0.3rem) 0;
+}
+
+/* Coluna esquerda das linhas: recuo externo + espaço fixo de 2rem entre colunas. */
+.infixs-correios-automatico-shipping-results-grid > :nth-child(2n + 3) {
+	padding: var(--infixs-ca-cell-pt, 0.3rem) 2rem
+		var(--infixs-ca-cell-pb, 0.3rem) var(--infixs-ca-cell-pl, 0);
+}
+
+/* Coluna direita das linhas: recuo externo à direita. */
+.infixs-correios-automatico-shipping-results-grid > :nth-child(2n + 4) {
+	padding: var(--infixs-ca-cell-pt, 0.3rem) var(--infixs-ca-cell-pr, 0)
+		var(--infixs-ca-cell-pb, 0.3rem) 0;
 }
 
 .infixs-correios-automatico-shipping-results-empty {
@@ -99,6 +128,82 @@
 .infixs-correios-automatico-shipping-results-cost {
 	color: #046bd2;
 	font-weight: bold;
+}
+
+/** Full width */
+
+.infixs-correios-automatico-calculator--full-width {
+	width: 100%;
+}
+
+.infixs-correios-automatico-calculator--full-width
+	.infixs-correios-automatico-calculate-box {
+	width: 100%;
+}
+
+.infixs-correios-automatico-calculator--full-width
+	.infixs-correios-automatico-input-text {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+.infixs-correios-automatico-calculator--full-width
+	input.infixs-correios-automatico-input {
+	max-width: none;
+	width: 100%;
+}
+
+.infixs-correios-automatico-calculator--full-width
+	.infixs-correios-automatico-postcode-button-box {
+	flex: 0 0 auto;
+}
+
+.infixs-correios-automatico-calculator--full-width
+	.infixs-correios-automatico-shipping-results-grid {
+	display: grid;
+	width: 100%;
+	grid-template-columns: 1fr auto;
+}
+
+/** Result table row styles (custom style only) */
+
+.infixs-correios-automatico-calculator--rows-striped
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-child(4n + 3),
+.infixs-correios-automatico-calculator--rows-striped
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-child(4n + 4) {
+	background-color: var(--infixs-ca-row-odd-color, #f5f5f5);
+}
+
+.infixs-correios-automatico-calculator--rows-striped
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-child(4n + 5),
+.infixs-correios-automatico-calculator--rows-striped
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-child(4n + 6) {
+	background-color: var(--infixs-ca-row-even-color, transparent);
+}
+
+.infixs-correios-automatico-calculator:not(
+		.infixs-correios-automatico-calculator--rows-striped
+	)
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-child(n + 3) {
+	background-color: var(--infixs-ca-row-odd-color, transparent);
+}
+
+.infixs-correios-automatico-calculator--rows-lines
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-child(n + 3) {
+	border-bottom: var(--infixs-ca-row-line-size, 1px) solid
+		var(--infixs-ca-row-line-color, #dddddd);
+}
+
+.infixs-correios-automatico-calculator--rows-lines
+	.infixs-correios-automatico-shipping-results-grid
+	> :nth-last-child(-n + 2) {
+	border-bottom: none;
 }
 
 /** Button */

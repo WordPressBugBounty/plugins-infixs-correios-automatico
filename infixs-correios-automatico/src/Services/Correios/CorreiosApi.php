@@ -273,15 +273,21 @@ class CorreiosApi {
 			Log::error( 'Erro ao autenticar com cartão postagem nos correios, verifque as credenciais', [
 				'message' => $response->get_error_message(),
 			] );
+			do_action( 'infixs_correios_automatico_correios_auth_failed', $response );
 			return $response;
 		}
 
 		if ( ! isset( $response['token'] ) ) {
 			Log::error( 'Erro ao autenticar com cartão postagem nos correios, verifque as credenciais' );
-			return new \WP_Error( 'correios_auth_postcard', "Erro ao autenticar com os correios", [ 'status' => 400 ] );
+			$error = new \WP_Error( 'correios_auth_postcard', "Erro ao autenticar com os correios", [ 'status' => 400 ] );
+			do_action( 'infixs_correios_automatico_correios_auth_failed', $error );
+			return $error;
 		}
 
 		$this->auth->update_token( $response['token'] );
+
+		do_action( 'infixs_correios_automatico_correios_auth_success' );
+
 		return $response;
 	}
 

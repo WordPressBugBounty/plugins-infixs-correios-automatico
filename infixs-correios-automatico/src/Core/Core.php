@@ -42,6 +42,8 @@ class Core {
 		}
 
 		Container::whatsappService();
+		Container::returnService();
+		Container::notificationService();
 	}
 
 	/**

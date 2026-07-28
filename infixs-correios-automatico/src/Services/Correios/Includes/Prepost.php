@@ -67,12 +67,23 @@ class Prepost {
 
 	/**
 	 * Confirm non prohibited object (Required)
-	 * 
+	 *
 	 * @since 1.0.0
-	 * 
+	 *
 	 * @var int
 	 */
 	private $confirm_non_prohibited = 1;
+
+	/**
+	 * Reverse logistics flag.
+	 *
+	 * When true, the prepost is created as a reverse shipment (logística reversa).
+	 *
+	 * @since 1.8.0
+	 *
+	 * @var bool
+	 */
+	private $reverse_logistic = false;
 
 
 	/**
@@ -269,6 +280,19 @@ class Prepost {
 	}
 
 	/**
+	 * Sets the reverse logistics flag.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param bool $reverse_logistic
+	 *
+	 * @return void
+	 */
+	public function setReverseLogistic( $reverse_logistic ) {
+		$this->reverse_logistic = (bool) $reverse_logistic;
+	}
+
+	/**
 	 * Sets the package.
 	 *
 	 * @param Package $package
@@ -289,8 +313,22 @@ class Prepost {
 	public function setItemsFromPackage( $package ) {
 		$order = wc_get_order( $this->order_id );
 
+		/**
+		 * Filters the order items included in the prepost contents.
+		 *
+		 * Marketplace extensions use this to keep only the items belonging to
+		 * the vendor the prepost is being created for.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param \WC_Order_Item_Product[] $items
+		 * @param int $order_id
+		 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\Prepost $this
+		 */
+		$items = apply_filters( 'infixs_correios_automatico_prepost_order_items', $order->get_items(), $this->order_id, $this );
+
 		/** @var \WC_Order_Item_Product $item */
-		foreach ( $order->get_items() as $item ) {
+		foreach ( $items as $item ) {
 			$product_price = floatval( $item->get_subtotal() );
 			$product = $item->get_product();
 
@@ -370,7 +408,7 @@ class Prepost {
 			"codigoFormatoObjetoInformado" => $this->object_format_code,
 			"modalidadePagamento" => $this->payment_type,
 			"pesoInformado" => Sanitizer::integer_text( $this->getWeight( 'g' ) ),
-			"logisticaReversa" => "N",
+			"logisticaReversa" => $this->reverse_logistic ? "S" : "N",
 			"itensDeclaracaoConteudo" => $content_items,
 			"solicitarColeta" => "N"
 		];

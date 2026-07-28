@@ -24,6 +24,15 @@ defined( 'ABSPATH' ) || exit;
 class PrepostService {
 
 	/**
+	 * Meta key that stores the list of prepost errors on an order.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @var string
+	 */
+	const PREPOST_ERRORS_META_KEY = '_infixs_correios_automatico_prepost_errors';
+
+	/**
 	 * Prepost repository.
 	 * 
 	 * @since 1.0.0
@@ -56,21 +65,288 @@ class PrepostService {
 	}
 
 	/**
+	 * Build the store sender used on preposts.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param int $order_id Order ID the prepost belongs to.
+	 *
+	 * @return Person
+	 */
+	protected function buildSender( $order_id ) {
+		$sender = new Person(
+			Config::string( 'sender.name' ),
+			new Address(
+				Sanitizer::numeric_text( Config::string( 'sender.address_postalcode' ) ),
+				Config::string( 'sender.address_street' ),
+				Config::string( 'sender.address_number' ),
+				Config::string( 'sender.address_complement' ),
+				Config::string( 'sender.address_neighborhood' ),
+				Config::string( 'sender.address_city' ),
+				Config::string( 'sender.address_state' ),
+				Config::string( 'sender.address_country' )
+			),
+			Config::string( 'sender.document' ),
+			Config::string( 'sender.phone' ),
+			Config::string( 'sender.celphone' ),
+			Config::string( 'sender.email' )
+		);
+
+		/**
+		 * Filters the sender used on the prepost.
+		 *
+		 * Marketplace extensions use this to replace the store sender with the
+		 * vendor's own store address.
+		 *
+		 * @since 1.8.1
+		 *
+		 * @param Person $sender
+		 * @param int $order_id
+		 */
+		return apply_filters( 'infixs_correios_automatico_prepost_sender', $sender, $order_id );
+	}
+
+	/**
 	 * Create prepost.
-	 * 
-	 * This method is responsible for generating a prepost.
-	 * 
+	 *
+	 * Records the failure on the order when it errors, or clears any previous
+	 * errors when it succeeds, so the order list can flag pending problems.
+	 *
 	 * @since 1.0.0
-	 * 
+	 *
 	 * @param int $order_id Order ID.
 	 * @param array{
 	 * 		invoice_number: string,
 	 * 		invoice_key: string,
 	 * } $data Data.
-	 * 
+	 *
 	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
 	 */
 	public function createPrepost( $order_id, $data = [] ) {
+		$result = $this->doCreatePrepost( $order_id, $data );
+
+		if ( is_wp_error( $result ) ) {
+			$this->recordOrderPrepostError( $order_id, $result );
+		} else {
+			$this->clearOrderPrepostErrors( $order_id );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Create a reverse logistics prepost (Logística Reversa).
+	 *
+	 * Records the failure on the order when it errors, or clears any previous
+	 * errors when it succeeds, so the order list can flag pending problems.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param int   $order_id Order ID.
+	 * @param array $data     Optional overrides (used by the manual reverse prepost screen).
+	 *
+	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
+	 */
+	public function createReversePrepost( $order_id, $data = [] ) {
+		$result = $this->doCreateReversePrepost( $order_id, $data );
+
+		if ( is_wp_error( $result ) ) {
+			$this->recordOrderPrepostError( $order_id, $result );
+		} else {
+			$this->clearOrderPrepostErrors( $order_id );
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Record a prepost error on the order.
+	 *
+	 * Deduplicates by code + message: an identical error only refreshes its date
+	 * instead of piling up on every retry. Keeps at most the last 20 errors.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param int              $order_id Order ID.
+	 * @param \WP_Error|string $error    Error to record.
+	 *
+	 * @return void
+	 */
+	public function recordOrderPrepostError( $order_id, $error ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			return;
+		}
+
+		$message = is_wp_error( $error ) ? $error->get_error_message() : (string) $error;
+		$code = is_wp_error( $error ) ? $error->get_error_code() : '';
+
+		if ( '' === trim( $message ) ) {
+			return;
+		}
+
+		$errors = $this->getOrderPrepostErrors( $order );
+
+		foreach ( $errors as $index => $existing ) {
+			if ( isset( $existing['message'], $existing['code'] ) && $existing['message'] === $message && $existing['code'] === $code ) {
+				$errors[ $index ]['date'] = current_time( 'mysql' );
+				$order->update_meta_data( self::PREPOST_ERRORS_META_KEY, array_values( $errors ) );
+				$order->save();
+				$this->notifyPrepostError( $order, $message, $code );
+				return;
+			}
+		}
+
+		$errors[] = [
+			'id' => md5( uniqid( (string) $order_id, true ) ),
+			'code' => $code,
+			'message' => $message,
+			'date' => current_time( 'mysql' ),
+		];
+
+		if ( count( $errors ) > 20 ) {
+			$errors = array_slice( $errors, -20 );
+		}
+
+		$order->update_meta_data( self::PREPOST_ERRORS_META_KEY, array_values( $errors ) );
+		$order->save();
+
+		$this->notifyPrepostError( $order, $message, $code );
+	}
+
+	/**
+	 * Register a central notification for a prepost error.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param \WC_Order $order
+	 * @param string    $message
+	 * @param string    $code
+	 *
+	 * @return void
+	 */
+	private function notifyPrepostError( $order, $message, $code ) {
+		$order_id = $order->get_id();
+
+		Container::notificationService()->notify(
+			'prepost_error',
+			'error',
+			sprintf( 'Erro de pré-postagem no pedido #%s', $order->get_order_number() ),
+			$message,
+			[
+				'order_id' => (int) $order_id,
+				'order_number' => (string) $order->get_order_number(),
+				'code' => (string) $code,
+				'url' => $order->get_edit_order_url(),
+			],
+			sprintf( 'prepost_error:%d:%s', $order_id, $code )
+		);
+	}
+
+	/**
+	 * Get the prepost errors recorded on an order.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param int|\WC_Order $order Order or order ID.
+	 *
+	 * @return array<int, array{id: string, code: string, message: string, date: string}>
+	 */
+	public function getOrderPrepostErrors( $order ) {
+		if ( ! $order instanceof \WC_Order ) {
+			$order = wc_get_order( $order );
+		}
+
+		if ( ! $order ) {
+			return [];
+		}
+
+		$errors = $order->get_meta( self::PREPOST_ERRORS_META_KEY );
+
+		return is_array( $errors ) ? array_values( $errors ) : [];
+	}
+
+	/**
+	 * Dismiss a single prepost error from an order.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param int    $order_id Order ID.
+	 * @param string $error_id Error ID to dismiss.
+	 *
+	 * @return bool|\WP_Error
+	 */
+	public function dismissOrderPrepostError( $order_id, $error_id ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			return new \WP_Error( 'invalid_order', 'Pedido inválido.', [ 'status' => 404 ] );
+		}
+
+		$errors = $this->getOrderPrepostErrors( $order );
+
+		$filtered = array_values( array_filter( $errors, function ( $item ) use ( $error_id ) {
+			return ! isset( $item['id'] ) || $item['id'] !== $error_id;
+		} ) );
+
+		if ( count( $filtered ) === count( $errors ) ) {
+			return new \WP_Error( 'prepost_error_not_found', 'Erro de pré-postagem não encontrado.', [ 'status' => 404 ] );
+		}
+
+		if ( empty( $filtered ) ) {
+			$order->delete_meta_data( self::PREPOST_ERRORS_META_KEY );
+		} else {
+			$order->update_meta_data( self::PREPOST_ERRORS_META_KEY, $filtered );
+		}
+
+		$order->save();
+
+		return true;
+	}
+
+	/**
+	 * Clear every prepost error recorded on an order.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return void
+	 */
+	public function clearOrderPrepostErrors( $order_id ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			return;
+		}
+
+		Container::notificationService()->resolveByPrefix( sprintf( 'prepost_error:%d:', $order->get_id() ) );
+
+		$existing = $order->get_meta( self::PREPOST_ERRORS_META_KEY );
+
+		if ( empty( $existing ) ) {
+			return;
+		}
+
+		$order->delete_meta_data( self::PREPOST_ERRORS_META_KEY );
+		$order->save();
+	}
+
+	/**
+	 * Build and persist a prepost.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param int $order_id Order ID.
+	 * @param array{
+	 * 		invoice_number: string,
+	 * 		invoice_key: string,
+	 * } $data Data.
+	 *
+	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
+	 */
+	protected function doCreatePrepost( $order_id, $data = [] ) {
 		if ( empty( Config::string( 'sender.name' ) ) ) {
 			Log::notice( "Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem." );
 			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem.', [ 'status' => 400 ] );
@@ -88,7 +364,7 @@ class PrepostService {
 
 		if ( ! $shipping_method ) {
 			Log::notice( "Esse pedido não tem o método de envio dos correios automático, a prepostagem não pode ser criada." );
-			return new \WP_Error( 'invalid_shipping_method', 'Esse pedido não tem o método de envio dos correios automático, a prepostagem não pode ser criada.', [ 'status' => 400 ] );
+			return new \WP_Error( 'invalid_shipping_method', 'Esse pedido não tem um método de envio dos Correios Automático. Se o pedido usa um frete nativo do WooCommerce (Frete Grátis ou Preço Fixo), vincule um serviço dos Correios nas configurações desse frete, na zona de entrega.', [ 'status' => 400 ] );
 		}
 
 		$ca_address = $ca_order->getAddress();
@@ -127,23 +403,7 @@ class PrepostService {
 			$order->get_billing_email(),
 		);
 
-		$sender = new Person(
-			Config::string( 'sender.name' ),
-			new Address(
-				Sanitizer::numeric_text( Config::string( 'sender.address_postalcode' ) ),
-				Config::string( 'sender.address_street' ),
-				Config::string( 'sender.address_number' ),
-				Config::string( 'sender.address_complement' ),
-				Config::string( 'sender.address_neighborhood' ),
-				Config::string( 'sender.address_city' ),
-				Config::string( 'sender.address_state' ),
-				Config::string( 'sender.address_country' )
-			),
-			Config::string( 'sender.document' ),
-			Config::string( 'sender.phone' ),
-			Config::string( 'sender.celphone' ),
-			Config::string( 'sender.email' )
-		);
+		$sender = $this->buildSender( $order_id );
 
 		$shippingProductCode = $ca_order->getShippingProductCode();
 
@@ -180,6 +440,17 @@ class PrepostService {
 		if ( $use_receipt_notice ) {
 			$prepost->addAdditionalService( [
 				'code' => '001',
+				'declaredValue' => '0'
+			] );
+		}
+
+		$use_receipt_notice_electronic = isset( $data['receiptNoticeElectronic'] )
+			? filter_var( $data['receiptNoticeElectronic'], FILTER_VALIDATE_BOOLEAN )
+			: $shipping_method->is_receipt_notice_electronic();
+
+		if ( $use_receipt_notice_electronic ) {
+			$prepost->addAdditionalService( [
+				'code' => '021',
 				'declaredValue' => '0'
 			] );
 		}
@@ -229,10 +500,12 @@ class PrepostService {
 			}
 		}
 
-		$prepost->setLength( $shippingItem['lenght'] );
-		$prepost->setWidth( $shippingItem['width'] );
-		$prepost->setHeight( $shippingItem['height'] );
-		$prepost->setWeight( $shippingItem['weight'] );
+		$dimensions = $ca_order->getShippingPackageDimensions();
+
+		$prepost->setLength( $dimensions['lenght'] );
+		$prepost->setWidth( $dimensions['width'] );
+		$prepost->setHeight( $dimensions['height'] );
+		$prepost->setWeight( $dimensions['weight'] );
 
 		if ( isset( $data['invoice_number'] ) ) {
 			$prepost->setInvoiceNumber( $data['invoice_number'] );
@@ -292,12 +565,151 @@ class PrepostService {
 	}
 
 	/**
+	 * Build and persist a reverse logistics prepost (Logística Reversa).
+	 *
+	 * The package travels from the customer (sender) back to the store (recipient).
+	 * Uses the reverse equivalent of the order's shipping service, falling back to
+	 * PAC Reverso when there is no clean reverse.
+	 *
+	 * @since 1.8.0
+	 *
+	 * @param int $order_id Order ID.
+	 * @param array{
+	 * 		service?: string,
+	 * 		weight?: float,
+	 * 		length?: float,
+	 * 		width?: float,
+	 * 		height?: float,
+	 * } $data Optional overrides (used by the manual reverse prepost screen).
+	 *
+	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
+	 */
+	protected function doCreateReversePrepost( $order_id, $data = [] ) {
+		if ( empty( Config::string( 'sender.name' ) ) ) {
+			Log::notice( "Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem reversa." );
+			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a devolução.', [ 'status' => 400 ] );
+		}
+
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			Log::notice( "Pedido inválido ao criar a pré-postagem reversa." );
+			return new \WP_Error( 'invalid_order', 'Pedido inválido ao criar a devolução.', [ 'status' => 400 ] );
+		}
+
+		$ca_order = new Order( $order );
+
+		$shipping_method = $ca_order->getShippingMethod();
+
+		if ( ! $shipping_method ) {
+			Log::notice( "Esse pedido não tem o método de envio dos correios automático, a devolução não pode ser criada." );
+			return new \WP_Error( 'invalid_shipping_method', 'Esse pedido não tem um método de envio dos Correios Automático. Se o pedido usa um frete nativo do WooCommerce (Frete Grátis ou Preço Fixo), vincule um serviço dos Correios nas configurações desse frete, na zona de entrega.', [ 'status' => 400 ] );
+		}
+
+		$ca_address = $ca_order->getAddress();
+
+		$customer_postal_code_numeric = Sanitizer::numeric_text( trim( (string) $ca_address->getPostCode() ) );
+		$customer_neighborhood = trim( (string) $ca_address->getNeighborhood() );
+
+		if ( preg_match( '/000$/', $customer_postal_code_numeric ) && empty( $customer_neighborhood ) ) {
+			Log::notice( 'Bairro do cliente é obrigatório para CEP finalizado em 000.', [
+				'order_id' => $order_id,
+			] );
+
+			return new \WP_Error(
+				'invalid_customer_neighborhood',
+				'O campo Bairro do cliente é obrigatório quando o CEP termina com 000.',
+				[ 'status' => 400 ]
+			);
+		}
+
+		// On a reverse shipment the customer is the sender and the store is the recipient.
+		$customer = new Person(
+			$ca_order->getCustomerFullName(),
+			new Address(
+				$ca_address->getPostCode(),
+				$ca_address->getStreet(),
+				$ca_address->getNumber(),
+				$ca_address->getComplement(),
+				$ca_address->getNeighborhood(),
+				$ca_address->getCity(),
+				$ca_address->getState()
+			),
+			$ca_order->getCustomerDocument(),
+			$ca_order->getPhone(),
+			$ca_order->getCellphone(),
+			$order->get_billing_email(),
+		);
+
+		$store = $this->buildSender( $order_id );
+
+		$shippingProductCode = $ca_order->getShippingProductCode();
+
+		if ( isset( $data['service'] ) && ! empty( $data['service'] ) ) {
+			$service_code = $data['service'];
+		} elseif ( Config::boolean( 'return.same_service' ) ) {
+			$service_code = DeliveryServiceCode::getReverseServiceCode( $shippingProductCode );
+		} else {
+			$service_code = DeliveryServiceCode::PAC_REVERSO;
+		}
+
+		$prepost = new Prepost(
+			$order_id,
+			$customer,
+			$store,
+			$service_code,
+			ObjectFormatCode::PACOTE
+		);
+
+		$prepost->setReverseLogistic( true );
+		$prepost->setEmitDce( 'N' );
+		$prepost->setItemsFromPackage( $ca_order->getPackage() );
+
+		$shippingItem = $ca_order->getFirstShippingItemData();
+
+		$prepost->setLength( isset( $data['length'] ) ? $data['length'] : $shippingItem['lenght'] );
+		$prepost->setWidth( isset( $data['width'] ) ? $data['width'] : $shippingItem['width'] );
+		$prepost->setHeight( isset( $data['height'] ) ? $data['height'] : $shippingItem['height'] );
+		$prepost->setWeight( isset( $data['weight'] ) ? $data['weight'] : $shippingItem['weight'] );
+
+		$created_prepost = $this->processPrespost( $prepost );
+
+		if ( is_wp_error( $created_prepost ) ) {
+			Log::notice( "Erro ao criar a pré-postagem reversa.", [
+				'message' => $created_prepost->get_error_message(),
+			] );
+			return $created_prepost;
+		}
+
+		$order->update_meta_data( '_infixs_correios_automatico_reverse_prepost_id', $created_prepost->id );
+		$order->update_meta_data( '_infixs_correios_automatico_reverse_prepost_code', $created_prepost->object_code );
+		$order->save();
+
+		if ( function_exists( 'as_schedule_single_action' ) ) {
+			as_schedule_single_action( time() + 60, 'infixs_correios_automatico_prepost_sync_schedule', [ $created_prepost->id ] );
+		} else {
+			wp_schedule_single_event( time() + 60, 'infixs_correios_automatico_prepost_sync_schedule', [ $created_prepost->id ] );
+		}
+
+		do_action( 'infixs_correios_automatico_prepost_created', $order_id, $created_prepost );
+		do_action( 'infixs_correios_automatico_reverse_prepost_created', $order_id, $created_prepost );
+
+		Log::debug( 'Pré-postagem reversa criada com sucesso.', [
+			'prepost_id' => $created_prepost->id,
+			'order_id' => $order_id,
+			'service_code' => $service_code,
+		] );
+
+		return $created_prepost;
+	}
+
+	/**
 	 * Process prepost.
-	 * 
+	 *
 	 * @since 1.0.0
-	 * 
+	 *
 	 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\Prepost $prepost
-	 * 
+	 *
 	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
 	 */
 	public function processPrespost( $prepost ) {

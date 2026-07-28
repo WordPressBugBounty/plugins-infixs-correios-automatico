@@ -5,6 +5,8 @@ namespace Infixs\CorreiosAutomatico\Routes;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Controllers\Rest\InvoiceUnitController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\LabelController;
+use Infixs\CorreiosAutomatico\Controllers\Rest\CustomerReturnController;
+use Infixs\CorreiosAutomatico\Controllers\Rest\NotificationController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\OrderController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\PrepostController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\PrintController;
@@ -179,6 +181,19 @@ class RestRoutes {
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}
+		] );
+
+		$customer_return_controller = new CustomerReturnController( Container::returnService() );
+
+		register_rest_route( $this->namespace, '/customer-returns', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $customer_return_controller, 'create' ],
+			// Public: ownership is validated via the WooCommerce order key in the controller.
+			'permission_callback' => '__return_true',
+			'args' => [
+				'order_id' => [ 'required' => true, 'type' => 'integer' ],
+				'order_key' => [ 'required' => true, 'type' => 'string' ],
+			],
 		] );
 
 
@@ -373,6 +388,14 @@ class RestRoutes {
 			}
 		] );
 
+		register_rest_route( $this->namespace, '/preposts/reverse', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $prepost_controller, 'createReverseFromOrder' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
 		$unit_controller = new UnitController( Container::unitService(), Container::trackingService() );
 
 		register_rest_route( $this->namespace, '/units', [
@@ -533,6 +556,22 @@ class RestRoutes {
 			}
 		] );
 
+		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/prepost-errors', [
+			'methods' => \WP_REST_Server::DELETABLE,
+			'callback' => [ $order_controller, 'clear_prepost_errors' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/prepost-errors/(?P<error_id>[a-zA-Z0-9]+)', [
+			'methods' => \WP_REST_Server::DELETABLE,
+			'callback' => [ $order_controller, 'dismiss_prepost_error' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
 		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/send-tracking-whatsapp', [
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => [ $order_controller, 'send_tracking_whatsapp' ],
@@ -567,6 +606,58 @@ class RestRoutes {
 		register_rest_route( $this->namespace, '/print/data', [
 			'methods' => \WP_REST_Server::READABLE,
 			'callback' => [ $print_controller, 'getPrintData' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		$notification_controller = new NotificationController( Container::notificationService() );
+
+		register_rest_route( $this->namespace, '/notifications', [
+			'methods' => \WP_REST_Server::READABLE,
+			'callback' => [ $notification_controller, 'list' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			},
+			'args' => [
+				'page' => [
+					'default' => 1,
+					'sanitize_callback' => 'absint',
+				],
+				'per_page' => [
+					'default' => 15,
+					'sanitize_callback' => 'absint',
+				],
+			],
+		] );
+
+		register_rest_route( $this->namespace, '/notifications/read', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $notification_controller, 'markAllRead' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/notifications/(?P<id>\d+)/read', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $notification_controller, 'markRead' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/notifications/(?P<id>\d+)', [
+			'methods' => \WP_REST_Server::DELETABLE,
+			'callback' => [ $notification_controller, 'dismiss' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/notifications', [
+			'methods' => \WP_REST_Server::DELETABLE,
+			'callback' => [ $notification_controller, 'clearAll' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}

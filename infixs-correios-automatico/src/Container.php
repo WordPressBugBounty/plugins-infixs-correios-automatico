@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico;
 
 use Infixs\CorreiosAutomatico\Models\InvoiceUnit;
+use Infixs\CorreiosAutomatico\Models\Notification;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
@@ -30,6 +31,9 @@ use Infixs\CorreiosAutomatico\Services\InvoiceUnitService;
 use Infixs\CorreiosAutomatico\Services\SettingsService;
 use Infixs\CorreiosAutomatico\Services\ShippingService;
 use Infixs\CorreiosAutomatico\Services\WhatsappService;
+use Infixs\CorreiosAutomatico\Services\ReturnService;
+use Infixs\CorreiosAutomatico\Repositories\NotificationRepository;
+use Infixs\CorreiosAutomatico\Services\NotificationService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -93,6 +97,9 @@ class Container {
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
 		$this->container['settingsService'] = fn() => new SettingsService();
 		$this->container['whatsappService'] = fn( $c ) => new WhatsappService( $c['trackingService'] );
+		$this->container['returnService'] = fn( $c ) => new ReturnService( $c['prepostService'], $c['trackingService'] );
+		$this->container['notificationRepository'] = fn() => new NotificationRepository( Notification::class);
+		$this->container['notificationService'] = fn( $c ) => new NotificationService( $c['notificationRepository'] );
 	}
 
 	/**
@@ -199,8 +206,38 @@ class Container {
 		return self::getInstance()->container['shippingService'];
 	}
 
+	/**
+	 * Return Service
+	 *
+	 * @since 1.8.0
+	 * @return ReturnService
+	 */
+	public static function returnService() {
+		return self::getInstance()->container['returnService'];
+	}
+
 	public static function logRepository() {
 		return self::getInstance()->container['logRepository'];
+	}
+
+	/**
+	 * Notification Repository
+	 *
+	 * @since 1.8.0
+	 * @return NotificationRepository
+	 */
+	public static function notificationRepository() {
+		return self::getInstance()->container['notificationRepository'];
+	}
+
+	/**
+	 * Notification Service
+	 *
+	 * @since 1.8.0
+	 * @return NotificationService
+	 */
+	public static function notificationService() {
+		return self::getInstance()->container['notificationService'];
 	}
 
 	/**
