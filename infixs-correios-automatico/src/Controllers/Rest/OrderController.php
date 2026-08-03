@@ -172,9 +172,30 @@ class OrderController {
 
 		$order = wc_get_order( $order_id );
 
+		if ( ! $order ) {
+			return new \WP_Error( 'invalid_order', 'Invalid order.', [ 'status' => 404 ] );
+		}
+
 		/** @var \WC_Order_Item_Shipping $shipping_item */
 		$shipping_items = $order->get_items( 'shipping' );
-		$shipping_item = reset( $shipping_items );
+
+		/**
+		 * An order can carry one shipping line per vendor, so the dashboard names
+		 * which one it is editing. Without it the first line is used, as before.
+		 */
+		if ( ! empty( $params['shipping_item_id'] ) ) {
+			$shipping_item = $order->get_item( absint( $params['shipping_item_id'] ) );
+
+			if ( ! $shipping_item instanceof \WC_Order_Item_Shipping ) {
+				return new \WP_Error( 'invalid_shipping_item', 'Invalid shipping item for this order.', [ 'status' => 400 ] );
+			}
+		} else {
+			$shipping_item = reset( $shipping_items );
+		}
+
+		if ( ! $shipping_item ) {
+			return new \WP_Error( 'shipping_item_not_found', 'This order has no shipping line.', [ 'status' => 400 ] );
+		}
 
 		$shipping_item->set_instance_id( $params['instance_id'] );
 		$shipping_item->set_method_id( $shipping_method->id );

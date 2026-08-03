@@ -224,6 +224,28 @@ class Prepost {
 
 	private $order_id;
 
+	/**
+	 * Vendor this prepost is being created for.
+	 *
+	 * Zero when it belongs to the store itself.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @var int
+	 */
+	private $vendor_id = 0;
+
+	/**
+	 * Shipping line this prepost covers.
+	 *
+	 * Zero when the prepost covers the whole order.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @var int
+	 */
+	private $shipping_item_id = 0;
+
 
 	/**
 	 * Tax Payment Method (Required When is packet)
@@ -484,6 +506,54 @@ class Prepost {
 
 	public function getOrderId() {
 		return $this->order_id;
+	}
+
+	/**
+	 * Set the vendor this prepost is being created for.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @param int $vendor_id Vendor ID, zero for the store itself.
+	 *
+	 * @return void
+	 */
+	public function setVendorId( $vendor_id ) {
+		$this->vendor_id = (int) $vendor_id;
+	}
+
+	/**
+	 * Get the vendor this prepost is being created for.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @return int Zero when it belongs to the store.
+	 */
+	public function getVendorId() {
+		return $this->vendor_id;
+	}
+
+	/**
+	 * Set the shipping line this prepost covers.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @param int $shipping_item_id Shipping line item ID, zero for the whole order.
+	 *
+	 * @return void
+	 */
+	public function setShippingItemId( $shipping_item_id ) {
+		$this->shipping_item_id = (int) $shipping_item_id;
+	}
+
+	/**
+	 * Get the shipping line this prepost covers.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @return int Zero when it covers the whole order.
+	 */
+	public function getShippingItemId() {
+		return $this->shipping_item_id;
 	}
 
 	public function getSender() {

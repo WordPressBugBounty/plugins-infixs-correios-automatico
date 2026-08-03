@@ -154,6 +154,32 @@ class CorreiosService {
 	}
 
 	/**
+	 * Get the Correios API instance used to act on an object that already exists.
+	 *
+	 * Cancelling, syncing, printing the DCe or tracking an object has to speak to
+	 * the contract that issued it, which on a marketplace is the vendor's own.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @param string $object_code Correios object code.
+	 * @param mixed  $source      Prepost or TrackingCode model the code came from.
+	 *
+	 * @return CorreiosApi
+	 */
+	protected function object_api( $object_code, $source = null ) {
+		/**
+		 * Filters the Correios API instance used to act on an existing object.
+		 *
+		 * @since 1.8.2
+		 *
+		 * @param CorreiosApi $correiosApi
+		 * @param string      $object_code
+		 * @param mixed       $source
+		 */
+		return apply_filters( 'infixs_correios_automatico_object_correios_api', $this->correiosApi, $object_code, $source );
+	}
+
+	/**
 	 * Create Packet
 	 * 
 	 * @since 1.1.7
@@ -179,8 +205,8 @@ class CorreiosService {
 	 * 
 	 * @return array|\WP_Error
 	 */
-	public function cancel_prepost( $prepost_id ) {
-		return $this->correiosApi->cancelarPrepostagem( $prepost_id );
+	public function cancel_prepost( $prepost_id, $source = null ) {
+		return $this->object_api( $prepost_id, $source )->cancelarPrepostagem( $prepost_id );
 	}
 
 	/**
@@ -266,8 +292,8 @@ class CorreiosService {
 	 * 
 	 * @return array|\WP_Error
 	 */
-	public function get_object_tracking( $tracking_code ) {
-		return $this->correiosApi->rastroObjeto( $tracking_code );
+	public function get_object_tracking( $tracking_code, $source = null ) {
+		return $this->object_api( $tracking_code, $source )->rastroObjeto( $tracking_code );
 	}
 
 	/**
@@ -278,7 +304,57 @@ class CorreiosService {
 	 * @return array|\WP_Error
 	 */
 	public function get_object_trackings( $tracking_codes ) {
-		return $this->correiosApi->rastroObjetos( $tracking_codes );
+		/**
+		 * Filters how tracking codes are grouped before being queried.
+		 *
+		 * A batch can span several contracts on a marketplace, and one client
+		 * cannot serve all of them. Each entry is `[ 'api' => CorreiosApi|null,
+		 * 'codes' => string[] ]`; a null client means the store wide one. With
+		 * no listener there is exactly one batch, so this is a single request
+		 * just like before 1.8.2.
+		 *
+		 * @since 1.8.2
+		 *
+		 * @param array    $batches
+		 * @param string[] $tracking_codes
+		 */
+		$batches = apply_filters(
+			'infixs_correios_automatico_object_trackings_batches',
+			[ [ 'api' => null, 'codes' => $tracking_codes ] ],
+			$tracking_codes
+		);
+
+		if ( count( $batches ) === 1 ) {
+			$batch = reset( $batches );
+			$api = ! empty( $batch['api'] ) ? $batch['api'] : $this->correiosApi;
+
+			return $api->rastroObjetos( $batch['codes'] );
+		}
+
+		$merged = [];
+
+		foreach ( $batches as $batch ) {
+			if ( empty( $batch['codes'] ) ) {
+				continue;
+			}
+
+			$api = ! empty( $batch['api'] ) ? $batch['api'] : $this->correiosApi;
+			$response = $api->rastroObjetos( $batch['codes'] );
+
+			if ( is_wp_error( $response ) ) {
+				Log::notice( 'Falha ao rastrear um lote de objetos: ' . $response->get_error_message(), [
+					'codes' => $batch['codes'],
+				] );
+
+				continue;
+			}
+
+			if ( isset( $response['objetos'] ) && is_array( $response['objetos'] ) ) {
+				$merged = array_merge( $merged, $response['objetos'] );
+			}
+		}
+
+		return [ 'objetos' => $merged ];
 	}
 
 	/**
@@ -288,8 +364,8 @@ class CorreiosService {
 	 * 
 	 * @return array|\WP_Error
 	 */
-	public function suspend_shipping( $tracking_code ) {
-		return $this->correiosApi->suspenderEntrega( $tracking_code );
+	public function suspend_shipping( $tracking_code, $source = null ) {
+		return $this->object_api( $tracking_code, $source )->suspenderEntrega( $tracking_code );
 	}
 
 	/**
@@ -351,8 +427,8 @@ class CorreiosService {
 	 * 
 	 * @return array|\WP_Error
 	 */
-	public function get_prepost( $object_code ) {
-		return $this->correiosApi->getPrepostagens( [
+	public function get_prepost( $object_code, $source = null ) {
+		return $this->object_api( $object_code, $source )->getPrepostagens( [
 			'codigoObjeto' => $object_code
 		] );
 	}
@@ -364,8 +440,8 @@ class CorreiosService {
 	 * 
 	 * @return array|\WP_Error
 	 */
-	public function printDce( $object_code, $dace_type = 'C' ) {
-		return $this->correiosApi->printDce( [
+	public function printDce( $object_code, $dace_type = 'C', $source = null ) {
+		return $this->object_api( $object_code, $source )->printDce( [
 			'codigosObjetos' => [ $object_code ],
 			'tipoDace' => $dace_type
 		] );

@@ -51,11 +51,20 @@ class LabelService {
 	 * @param array $orders
 	 * @return array
 	 */
-	public function getLabelsFromOrders( $order_ids ) {
+	/**
+	 * Build the labels of several orders.
+	 *
+	 * @param int[] $order_ids Orders to build.
+	 * @param array $context   Caller context, with `vendor_id` to scope every
+	 *                         label to a single vendor. @since 1.8.2
+	 *
+	 * @return array
+	 */
+	public function getLabelsFromOrders( $order_ids, $context = [] ) {
 		$labels = [];
 
 		foreach ( $order_ids as $order_id ) {
-			$label = $this->getLabelFromOrder( $order_id );
+			$label = $this->getLabelFromOrder( $order_id, $context );
 			if ( ! $label ) {
 				continue;
 			}
@@ -65,12 +74,30 @@ class LabelService {
 		return $labels;
 	}
 
-	public function getLabelFromOrder( $order_id ) {
+	/**
+	 * Build the label of an order.
+	 *
+	 * Without a context the whole order is used, exactly as before 1.8.2. A
+	 * marketplace extension passing a vendor gets a label carrying only that
+	 * vendor's items, shipment and contract.
+	 *
+	 * @param int   $order_id Order to build.
+	 * @param array $context  Caller context, with `vendor_id` to scope the
+	 *                        label to a single vendor. @since 1.8.2
+	 *
+	 * @return array|false
+	 */
+	public function getLabelFromOrder( $order_id, $context = [] ) {
 		$order = Order::fromId( $order_id );
 
 		if ( ! $order ) {
 			return false;
 		}
+
+		$context = array_merge( [ 'for' => 'label' ], $context );
+		$scope = Order::resolveScope( $order, $context );
+
+		$order->applyScope( $scope );
 
 		$address = $order->getAddress();
 		$shipping_metadata = $order->getFirstShippingItemData();
@@ -124,6 +151,15 @@ class LabelService {
 
 		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
 		foreach ( Prepost::where( 'order_id', $order->get_id() )->orderBy( 'created_at', 'desc' )->get() as $prepost ) {
+			/**
+			 * Rows created before 1.8.2 carry no vendor, so they stay visible to
+			 * everyone: filtering them out would empty the panel of every vendor
+			 * on upgrade.
+			 */
+			if ( $scope['vendor_id'] && ! empty( $prepost->vendor_id ) && (int) $prepost->vendor_id !== $scope['vendor_id'] ) {
+				continue;
+			}
+
 			$prepost_data = $prepost->toArray();
 
 			$preposts[] = [
@@ -144,7 +180,7 @@ class LabelService {
 			];
 		}
 
-		return [
+		$data = [
 			'name' => $order->getCustomerFullName(),
 			'document' => $order->getCustomerDocument(),
 			'shipping_product_id' => DeliveryServiceCode::getCommonId( $product_code ),
@@ -163,8 +199,8 @@ class LabelService {
 			'subtotal_amount' => NumberHelper::numericToCents( $order->getSubtotal() ),
 			'total_amount' => NumberHelper::numericToCents( $order->getTotal() ),
 			'items_count' => $package->get_items_count(),
-			'contract_number' => Config::string( 'auth.contract_number' ),
-			'postcard' => Config::string( 'auth.postcard' ),
+			'contract_number' => $scope['contract_number'] !== null ? $scope['contract_number'] : Config::string( 'auth.contract_number' ),
+			'postcard' => $scope['postcard'] !== null ? $scope['postcard'] : Config::string( 'auth.postcard' ),
 			'tracking_code' => $order->getLastTrackingCode() ?: '',
 			'website' => site_url(),
 			'order_id' => $order->get_id(),
@@ -177,6 +213,21 @@ class LabelService {
 			'ceint' => $this->shippingService->getCeintByPostCode( $address->getPostCode() ),
 			'has_dangerous_product' => $has_dangerous_product,
 		];
+
+		/**
+		 * Filters the finished label payload.
+		 *
+		 * Supplementary to `infixs_correios_automatico_order_scope`: use that one
+		 * to say which items and which contract are in scope, and this one only
+		 * to add fields the base plugin does not know about.
+		 *
+		 * @since 1.8.2
+		 *
+		 * @param array $data    Label payload.
+		 * @param Order $order   Order the label was built from, already scoped.
+		 * @param array $context Caller context.
+		 */
+		return apply_filters( 'infixs_correios_automatico_label_data', $data, $order, $context );
 	}
 
 	/**

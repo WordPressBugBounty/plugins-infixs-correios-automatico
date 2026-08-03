@@ -24,6 +24,8 @@ class Migration {
 		Database::createOrUpdateTable( 'infixs_correios_automatico_tracking_codes', [
 			'order_id' => 'bigint(20) unsigned NOT NULL',
 			'user_id' => 'bigint(20) unsigned DEFAULT NULL',
+			'vendor_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.8.2
+			'shipping_item_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.8.3
 			'code' => 'varchar(255) DEFAULT NULL',
 			'description' => 'varchar(255) DEFAULT NULL', //@since 1.2.1
 			'category' => 'varchar(255) DEFAULT NULL', //@since 1.2.1
@@ -68,6 +70,8 @@ class Migration {
 		Database::createOrUpdateTable( 'infixs_correios_automatico_preposts', [
 			'external_id' => 'varchar(255) NOT NULL',
 			'order_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.1.3
+			'vendor_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.8.2
+			'shipping_item_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.8.3
 			'object_code' => 'varchar(255) DEFAULT NULL',
 			"service_code" => "varchar(8) NOT NULL",
 			"payment_type" => "tinyint(1) unsigned DEFAULT 2",

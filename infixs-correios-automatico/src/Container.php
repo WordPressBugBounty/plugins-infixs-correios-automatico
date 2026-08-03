@@ -34,6 +34,7 @@ use Infixs\CorreiosAutomatico\Services\WhatsappService;
 use Infixs\CorreiosAutomatico\Services\ReturnService;
 use Infixs\CorreiosAutomatico\Repositories\NotificationRepository;
 use Infixs\CorreiosAutomatico\Services\NotificationService;
+use Infixs\CorreiosAutomatico\Services\VendorContractService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -100,6 +101,17 @@ class Container {
 		$this->container['returnService'] = fn( $c ) => new ReturnService( $c['prepostService'], $c['trackingService'] );
 		$this->container['notificationRepository'] = fn() => new NotificationRepository( Notification::class);
 		$this->container['notificationService'] = fn( $c ) => new NotificationService( $c['notificationRepository'] );
+		$this->container['vendorContractService'] = fn() => new VendorContractService();
+	}
+
+	/**
+	 * Vendor Contract Service
+	 *
+	 * @since 1.8.2
+	 * @return VendorContractService
+	 */
+	public static function vendorContractService() {
+		return self::getInstance()->container['vendorContractService'];
 	}
 
 	/**

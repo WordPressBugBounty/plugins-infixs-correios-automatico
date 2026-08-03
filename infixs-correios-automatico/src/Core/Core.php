@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Core;
 
+use Infixs\CorreiosAutomatico\Config\VendorSettings;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\Admin;
 use Infixs\CorreiosAutomatico\Core\Front\Front;
@@ -26,6 +27,8 @@ class Core {
 	 */
 	public function init() {
 		add_action( 'init', [ $this, 'check_update' ] );
+
+		VendorSettings::register();
 
 		new Install();
 		new Admin( Container::infixsApi() );

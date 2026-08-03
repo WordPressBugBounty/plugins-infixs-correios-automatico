@@ -58,8 +58,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	</a>
 	<div class="infixs-correios-automatico-tracking-edit-form" style="display:none;">
 		<div style="flex: 1; position:relative;">
-			<input type="text" name="tracking-update-input-<?php echo esc_attr( $order->get_id() ); ?>" value=""
-				class="infixs-correios-automatico-tracking-update-input" style="width: 100%;">
+			<input type="text" value="" class="infixs-correios-automatico-tracking-update-input"
+				style="width: 100%;">
 			<div class="infixs-correios-automatico-spin-animation">
 				<svg xmlns="http://www.w3.org/2000/svg" class="infixs-correios-automatico-spin-icon" width="1.5em"
 					height="1.5em" viewBox="0 0 24 24">

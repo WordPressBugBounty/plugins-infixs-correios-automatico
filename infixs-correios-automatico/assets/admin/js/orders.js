@@ -109,6 +109,11 @@ jQuery( function ( $ ) {
 				this.confirmTrackingCodeForm.bind( this )
 			);
 			$( document.body ).on(
+				'keydown',
+				'.infixs-correios-automatico-tracking-update-input',
+				this.trackingInputKeydown.bind( this )
+			);
+			$( document.body ).on(
 				'change',
 				'#order_shipping_line_items .edit select.shipping_method',
 				this.editShippingMethodChanged.bind( this )
@@ -848,6 +853,19 @@ jQuery( function ( $ ) {
 			event.preventDefault();
 			const { form } = this.getTrackingElements( event );
 			form.hide();
+		},
+
+		trackingInputKeydown( event ) {
+			if ( event.key === 'Enter' ) {
+				event.preventDefault();
+				this.confirmTrackingCodeForm( event );
+				return;
+			}
+
+			if ( event.key === 'Escape' ) {
+				event.preventDefault();
+				this.cancelUpdateTracking( event );
+			}
 		},
 
 		confirmTrackingCodeForm( event ) {

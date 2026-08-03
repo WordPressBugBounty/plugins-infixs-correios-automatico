@@ -42,14 +42,141 @@ class Order {
 	private $shipping_items = [];
 
 	/**
+	 * Portion of the order this instance represents.
+	 *
+	 * Defaults to the whole order. A marketplace extension narrows it down to a
+	 * single vendor through the `infixs_correios_automatico_order_scope` filter,
+	 * so labels and preposts of a shared order carry only that vendor's items,
+	 * shipment and contract.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @var array{
+	 * 		vendor_id: int,
+	 * 		shipping_item_id: int,
+	 * 		item_ids: int[],
+	 * 		contract_number: string|null,
+	 * 		postcard: string|null
+	 * }
+	 */
+	private $scope = [
+		'vendor_id' => 0,
+		'shipping_item_id' => 0,
+		'item_ids' => [],
+		'contract_number' => null,
+		'postcard' => null,
+	];
+
+	/**
 	 * Order constructor.
-	 * 
+	 *
 	 * @param \WC_Order $order
 	 */
 	public function __construct( $order ) {
 		$this->order = $order;
 
 		$this->initializeShippingItems();
+	}
+
+	/**
+	 * Build the scope of an order and let extensions narrow it down.
+	 *
+	 * The vendor is taken from the caller's context and never guessed from the
+	 * current user: an admin side call passes no context, so the scope stays
+	 * empty and the whole order is used, exactly as before 1.8.2.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @param Order $order   Order being scoped.
+	 * @param array $context Caller context, with `for` and optionally `vendor_id`.
+	 *
+	 * @return array
+	 */
+	public static function resolveScope( $order, $context = [] ) {
+		$scope = [
+			'vendor_id' => isset( $context['vendor_id'] ) ? (int) $context['vendor_id'] : 0,
+			'shipping_item_id' => isset( $context['shipping_item_id'] ) ? absint( $context['shipping_item_id'] ) : 0,
+			'item_ids' => [],
+			'contract_number' => null,
+			'postcard' => null,
+		];
+
+		/**
+		 * Filters the portion of an order a label or prepost is built from.
+		 *
+		 * Marketplace extensions answer which items, which shipping line and
+		 * which contract belong to the vendor being served. Everything else —
+		 * the totals, the weights, the declared contents — stays owned by the
+		 * base plugin.
+		 *
+		 * A caller naming a `shipping_item_id` already gets that line honoured
+		 * without any extension: the item ownership is what only a marketplace
+		 * knows, so `item_ids` is left for it to fill in.
+		 *
+		 * @since 1.8.2
+		 *
+		 * @param array $scope   Scope, all defaults meaning the whole order.
+		 * @param Order $order   Order being scoped.
+		 * @param array $context Caller context, with `for` and optionally `vendor_id` or `shipping_item_id`.
+		 */
+		return apply_filters( 'infixs_correios_automatico_order_scope', $scope, $order, $context );
+	}
+
+	/**
+	 * Narrow this instance down to a portion of the order.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @param array $scope Scope as built by resolveScope().
+	 *
+	 * @return $this
+	 */
+	public function applyScope( $scope ) {
+		$this->scope = [
+			'vendor_id' => isset( $scope['vendor_id'] ) ? (int) $scope['vendor_id'] : 0,
+			'shipping_item_id' => isset( $scope['shipping_item_id'] ) ? (int) $scope['shipping_item_id'] : 0,
+			'item_ids' => isset( $scope['item_ids'] ) && is_array( $scope['item_ids'] ) ? array_map( 'absint', $scope['item_ids'] ) : [],
+			'contract_number' => isset( $scope['contract_number'] ) ? $scope['contract_number'] : null,
+			'postcard' => isset( $scope['postcard'] ) ? $scope['postcard'] : null,
+		];
+
+		$this->shipping_items = [];
+		$this->initializeShippingItems();
+
+		return $this;
+	}
+
+	/**
+	 * Get the scope currently applied.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @return array
+	 */
+	public function getScope() {
+		return $this->scope;
+	}
+
+	/**
+	 * Get the vendor this instance is scoped to.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @return int Zero when the whole order is in scope.
+	 */
+	public function getScopedVendorId() {
+		return $this->scope['vendor_id'];
+	}
+
+	/**
+	 * Get the shipping line this instance is scoped to.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @return int Zero when every shipping line is in scope.
+	 */
+	public function getScopedShippingItemId() {
+		return $this->scope['shipping_item_id'];
 	}
 
 
@@ -74,9 +201,18 @@ class Order {
 	protected function initializeShippingItems() {
 		$line_items_shipping = $this->order->get_items( 'shipping' );
 		foreach ( $line_items_shipping as $item ) {
+			if ( $this->scope['shipping_item_id'] && (int) $item->get_id() !== $this->scope['shipping_item_id'] ) {
+				continue;
+			}
+
 			if ( ! $item instanceof \WC_Order_Item_Shipping || ( $item->get_method_id() !== 'infixs-correios-automatico' && ! LinkedShippingMethod::resolve_from_item( $item ) ) ) {
 				$this->shipping_items[] = [
+					'item_id' => $item->get_id(),
 					'instance_id' => $item->get_instance_id(),
+					'method_title' => TextHelper::removeShippingTime( $item->get_name() ),
+					'cost' => $item->get_total(),
+					'vendor_id' => (int) $item->get_meta( 'vendor_id' ) ?: null,
+					'is_correios' => false,
 					'width' => 0,
 					'height' => 0,
 					'lenght' => 0,
@@ -90,7 +226,12 @@ class Order {
 			}
 
 			$this->shipping_items[] = [
+				'item_id' => $item->get_id(),
 				'instance_id' => $item->get_instance_id(),
+				'method_title' => TextHelper::removeShippingTime( $item->get_name() ),
+				'cost' => $item->get_total(),
+				'vendor_id' => (int) $item->get_meta( 'vendor_id' ) ?: null,
+				'is_correios' => true,
 				'width' => $item->get_meta( '_width' ) ?: 0,
 				'height' => $item->get_meta( '_height' ) ?: 0,
 				'lenght' => $item->get_meta( '_length' ) ?: 0,
@@ -101,6 +242,46 @@ class Order {
 				'shipping_product_code' => $item->get_meta( 'shipping_product_code' ) ?: null,
 			];
 		}
+	}
+
+	/**
+	 * Build the per shipping line payload of the order.
+	 *
+	 * The `shipping` object of `toArray()` describes the order as a single
+	 * shipment, which is what a store with one freight per order needs. A
+	 * marketplace order carries one line per vendor, so the dashboard also gets
+	 * every line separately here.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @return array<int, array>
+	 */
+	public function getShippingItemsPayload() {
+		$items = [];
+
+		foreach ( $this->getShippingItemsData() as $shipping_item ) {
+			$product_code = $shipping_item['shipping_product_code'];
+
+			$items[] = [
+				'item_id' => (int) $shipping_item['item_id'],
+				'instance_id' => (int) $shipping_item['instance_id'],
+				'method_title' => (string) $shipping_item['method_title'],
+				'cost' => NumberHelper::numericToCents( $shipping_item['cost'] ),
+				'original_cost' => $shipping_item['original_cost'] !== null ? NumberHelper::numericToCents( $shipping_item['original_cost'] ) : null,
+				'insurance_cost' => NumberHelper::numericToCents( $shipping_item['insurance_cost'] ),
+				'delivery_time' => (int) $shipping_item['delivery_time'],
+				'width' => $shipping_item['width'],
+				'height' => $shipping_item['height'],
+				'length' => $shipping_item['lenght'],
+				'weight' => $shipping_item['weight'],
+				'shipping_product_code' => $product_code,
+				'shipping_product_title' => $product_code ? DeliveryServiceCode::getDescription( $product_code ) : null,
+				'vendor_id' => $shipping_item['vendor_id'],
+				'is_correios' => (bool) $shipping_item['is_correios'],
+			];
+		}
+
+		return $items;
 	}
 
 	/**
@@ -233,7 +414,13 @@ class Order {
 	}
 
 	public function getShippingTotal() {
-		return $this->order->get_shipping_total();
+		if ( ! $this->scope['shipping_item_id'] ) {
+			return $this->order->get_shipping_total();
+		}
+
+		$item = $this->order->get_item( $this->scope['shipping_item_id'] );
+
+		return $item ? $item->get_total() : $this->order->get_shipping_total();
 	}
 
 	/**
@@ -298,7 +485,13 @@ class Order {
 	}
 
 	public function getItems() {
-		return $this->order->get_items();
+		$items = $this->order->get_items();
+
+		if ( ! $this->scope['item_ids'] ) {
+			return $items;
+		}
+
+		return array_intersect_key( $items, array_flip( $this->scope['item_ids'] ) );
 	}
 
 	public function getContents() {
@@ -381,14 +574,16 @@ class Order {
 	 * @return CorreiosShippingMethod|false
 	 */
 	public function getShippingMethod() {
-		foreach ( $this->order->get_shipping_methods() as $shipping_method ) {
+		$shipping_methods = $this->getScopedShippingMethods();
+
+		foreach ( $shipping_methods as $shipping_method ) {
 			if ( strpos( $shipping_method->get_method_id(), 'infixs-correios-automatico' ) === 0 ) {
 				$instance_id = $shipping_method->get_instance_id();
 				return \WC_Shipping_Zones::get_shipping_method( $instance_id );
 			}
 		}
 
-		foreach ( $this->order->get_shipping_methods() as $shipping_method ) {
+		foreach ( $shipping_methods as $shipping_method ) {
 			$linked_method = LinkedShippingMethod::resolve_from_item( $shipping_method );
 
 			if ( $linked_method ) {
@@ -397,6 +592,23 @@ class Order {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Get the shipping lines in scope.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @return \WC_Order_Item_Shipping[]
+	 */
+	private function getScopedShippingMethods() {
+		$shipping_methods = $this->order->get_shipping_methods();
+
+		if ( ! $this->scope['shipping_item_id'] ) {
+			return $shipping_methods;
+		}
+
+		return array_intersect_key( $shipping_methods, [ $this->scope['shipping_item_id'] => true ] );
 	}
 
 	public function getSubtotal() {
@@ -415,13 +627,23 @@ class Order {
 	 * @return string|null
 	 */
 	public function getShippingProductCode() {
+		$first_shipping_item = $this->getFirstShippingItemData();
+		$shipping_product_code = $first_shipping_item['shipping_product_code'];
+
+		/**
+		 * Scoped to a single shipment the frozen value wins: the method instance
+		 * resolves its service against the store wide contract flag, which would
+		 * quote a vendor on the public table with the contract code, and vice
+		 * versa. It is also the only value that is per shipping line.
+		 */
+		if ( ( $this->scope['vendor_id'] || $this->scope['shipping_item_id'] ) && $shipping_product_code ) {
+			return $shipping_product_code;
+		}
+
 		$shipping_method = $this->getShippingMethod();
 		if ( $shipping_method ) {
 			return $shipping_method->get_product_code();
 		}
-
-		$first_shipping_item = $this->getFirstShippingItemData();
-		$shipping_product_code = $first_shipping_item['shipping_product_code'];
 
 		if ( $shipping_product_code )
 			return $shipping_product_code;
@@ -582,6 +804,7 @@ class Order {
 				( $invoice_number = $this->order->get_meta( '_infixs_correios_automatico_invoice_number', true ) ) !== '' && $invoice_number !== false ? [ 'key' => '_infixs_correios_automatico_invoice_number', 'value' => $invoice_number ] : null,
 				( $invoice_key = $this->order->get_meta( '_infixs_correios_automatico_invoice_key', true ) ) !== '' && $invoice_key !== false ? [ 'key' => '_infixs_correios_automatico_invoice_key', 'value' => $invoice_key ] : null,
 			] ) ),
+			'shipping_items' => $this->getShippingItemsPayload(),
 			'prepost_errors' => $prepost_errors,
 			'preposts' => []
 		];
@@ -601,6 +824,8 @@ class Order {
 				$tracking_code_data = [
 					'id' => $tracking_code['id'],
 					'code' => $tracking_code['code'],
+					'vendor_id' => ! empty( $tracking_code['vendor_id'] ) ? (int) $tracking_code['vendor_id'] : null,
+					'shipping_item_id' => ! empty( $tracking_code['shipping_item_id'] ) ? (int) $tracking_code['shipping_item_id'] : null,
 				];
 				if ( isset( $tracking_code['unit'] ) ) {
 					$tracking_code_data['unit'] = Container::unitService()->prepareData( $tracking_code['unit'] );

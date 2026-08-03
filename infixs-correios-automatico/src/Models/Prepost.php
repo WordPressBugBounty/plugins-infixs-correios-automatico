@@ -14,6 +14,8 @@ defined( 'ABSPATH' ) || exit;
  * 
  * @property int $id
  * @property int $order_id
+ * @property int $vendor_id
+ * @property int $shipping_item_id
  * @property string $external_id
  * @property string $object_code
  * @property string $service_code

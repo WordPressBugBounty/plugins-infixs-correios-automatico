@@ -3,8 +3,8 @@ Contributors: infixs
 Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 7.0
-Stable tag: 1.8.1
+Tested up to: 7.1
+Stable tag: 1.8.5
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -26,7 +26,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 = 🌟 Recursos =
 
 - **Configuração Rápida e Inteligente** - Importamos as configurações de plugins antigos como Claudio Sanches e Virtuaria Correios rapidamente para você não precisar criar as configurações manualmente. Caso opte por adicionar as configurações manualmente, o plugin detecta automaticamente as configuraçõe ideais baseado se existe ou não um contrato com os correios.
-- **Calculo de frete na Página do Produto** - Adicione o calculo de frete na página do produto, para que seu cliente saiba rapidamente o custo de envio.
+- **Calculo de frete na Página do Produto** - Adicione o calculo de frete (calculadora de frete) na página do produto, para que seu cliente saiba rapidamente o custo de envio.
 - **Preenchimento Automático de Endereço** - No checkout, quando seu cliente preencher o CEP, os campos de endereço, bairro, cidade e estado são preenchidos automaticamente.
 - **Declaração de Conteúdo Eletronica (DCe ou DACE)** - Emissao de declaração de conteúdo eletrônica em conformidade com o sefaz e correios sem necessidade de nota fiscal.
 - **Calculo de frete simplificado no Carrinho** - Calculo de frete rápido e simplificado no carrinho, sem campos desnecessários substituindo plugins que fazem o mesmo em um só.
@@ -48,6 +48,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 = 💎 Recursos PRO =
 
 - **Impressão e Customização de etiquetas (Etiqueta Builder)** - Customize suas etiquetas com varios modelos, remssa conforme, padrão, internacional e nacional para impressão em lote ou individual.
+- **Impressão Automatica de Etiqueta (Sem clicar)** - Instale nosso aplicativo para Windows, Linux ou MAC para que todos os pedidos que sairem sejam impressos automáticamente sem você precisar fazer nada.
 - **Frete Internacional Automatizado** - Exporte seu produto com Exporta Fácil, calculo de frete internacional, remessa conforme, etiqueta unitizadora, CN35, CN36 e muito mais.
 - **Pré-Postagem Automática** - Se você tiver um contrato com os correios, a pré-postagem é feita automática.
 - **Alteração de Status do Pedido Automático** - Status do pedido é alterado para concluído automaticamente assim que o cliente receber o pedido, também pode ser configurado para mudar automáticamente para "Em transporte".
@@ -139,6 +140,12 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.8.5 2026-07-28 =
+* Auto Impressão (PRO): Imprima automaticamente sem cliques, direto pela impressora instalada em seu computador
+* Devolução: Funcionalidade devolução já funcinoa 100% direto pelo plugin.
+* Etiqueta: Melhorias na etiqueta
+* Calculadora de Frete: Melhorias de UI
 
 = 1.8.1 2026-07-28 =
 * Fix Bugs

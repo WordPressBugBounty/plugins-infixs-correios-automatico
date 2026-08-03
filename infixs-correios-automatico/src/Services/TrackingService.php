@@ -88,10 +88,33 @@ class TrackingService {
 			return new \WP_Error( 'tracking_code_exists', 'Já existe o mesmo código de rastreio neste pedido, tente adicionar outro.' );
 		}
 
+		/**
+		 * Filters the vendor a tracking code belongs to.
+		 *
+		 * Distinct from `user_id`, which records who typed the code in: on a
+		 * marketplace that is the administrator as often as the vendor.
+		 *
+		 * @since 1.8.2
+		 *
+		 * @param int|null $vendor_id
+		 * @param int      $order_id
+		 * @param string   $code
+		 * @param array    $data
+		 */
+		$vendor_id = apply_filters(
+			'infixs_correios_automatico_tracking_vendor_id',
+			isset( $data['vendor_id'] ) ? $data['vendor_id'] : null,
+			$order_id,
+			$code,
+			$data
+		);
+
 		$created = $this->trackingRepository->create( [
 			'order_id' => $order_id,
 			'code' => $code,
 			'user_id' => get_current_user_id(),
+			'vendor_id' => $vendor_id ? (int) $vendor_id : null,
+			'shipping_item_id' => isset( $data['shipping_item_id'] ) && $data['shipping_item_id'] ? absint( $data['shipping_item_id'] ) : null,
 			'tracking_range_code_id' => $data['tracking_range_code_id'] ?? null,
 		] );
 
@@ -437,7 +460,7 @@ class TrackingService {
 	public function sync_remote_tracking_code( TrackingCode $tracking ) {
 
 		$response = $this->configRepository->boolean( 'auth.active' ) && Helper::contractHasService( APIServiceCode::SRO_RASTRO )
-			? $this->correiosService->get_object_tracking( $tracking->code )
+			? $this->correiosService->get_object_tracking( $tracking->code, $tracking )
 			: Container::infixsApi()->getTrackingHistory( $tracking->code );
 
 		if ( is_wp_error( $response ) ) {
@@ -757,7 +780,7 @@ class TrackingService {
 			return new \WP_Error( 'tracking_code_not_found', 'Código de rastreio não encontrado.' );
 		}
 
-		return $this->correiosService->suspend_shipping( $tracking->code );
+		return $this->correiosService->suspend_shipping( $tracking->code, $tracking );
 	}
 
 	/**

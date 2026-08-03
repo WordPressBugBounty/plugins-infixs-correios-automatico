@@ -278,6 +278,8 @@ class Admin {
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'searchProductsNonce' => wp_create_nonce( 'search-products' ),
 			'checkLicense' => self::should_check_license(),
+			'canDownloadPdf' => false,
+			'canAutoPrint' => false,
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {

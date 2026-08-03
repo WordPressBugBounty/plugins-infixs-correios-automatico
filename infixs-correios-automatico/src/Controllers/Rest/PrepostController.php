@@ -102,6 +102,8 @@ class PrepostController {
 			$data['ownHands'] = filter_var( $params['ownHands'], FILTER_VALIDATE_BOOLEAN );
 		}
 
+		$data = array_merge( $data, $this->resolveShipmentScope( $params ) );
+
 		$prepost = $this->prepostService->createPrepost( $params['order_id'], $data );
 
 		if ( is_wp_error( $prepost ) ) {
@@ -144,6 +146,8 @@ class PrepostController {
 				$data[ $field ] = (float) $params[ $field ];
 			}
 		}
+
+		$data = array_merge( $data, $this->resolveShipmentScope( $params ) );
 
 		$prepost = $this->prepostService->createReversePrepost( $params['order_id'], $data );
 
@@ -265,5 +269,31 @@ class PrepostController {
 		}
 
 		return rest_ensure_response( $response );
+	}
+
+	/**
+	 * Read the shipment a prepost is being created for.
+	 *
+	 * An order with more than one shipping line — a marketplace order with one
+	 * freight per vendor — needs one prepost per line, each on its own contract.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @param array $params Request params.
+	 *
+	 * @return array Keys understood by the prepost service, empty for whole order preposts.
+	 */
+	private function resolveShipmentScope( $params ) {
+		$scope = [];
+
+		if ( ! empty( $params['shipping_item_id'] ) ) {
+			$scope['shipping_item_id'] = absint( $params['shipping_item_id'] );
+		}
+
+		if ( ! empty( $params['vendor_id'] ) ) {
+			$scope['vendor_id'] = absint( $params['vendor_id'] );
+		}
+
+		return $scope;
 	}
 }

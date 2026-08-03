@@ -43,10 +43,25 @@ class TrackingController {
 		}
 
 		$order = wc_get_order( $params['order_id'] );
+
+		if ( ! $order ) {
+			return new \WP_Error( 'order_not_found', __( 'Order not found.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
 		$send_email = isset( $params['sendmail'] ) && $params['sendmail'] === true ? true : false;
 
+		$data = [];
+
+		if ( ! empty( $params['shipping_item_id'] ) ) {
+			$data['shipping_item_id'] = absint( $params['shipping_item_id'] );
+		}
+
+		if ( ! empty( $params['vendor_id'] ) ) {
+			$data['vendor_id'] = absint( $params['vendor_id'] );
+		}
+
 		$tracking_code = apply_filters( 'infixs_correios_automatico_tracking_create', $params['code'], $params );
-		$created_tracking = $this->trackingService->add( $order->get_id(), $tracking_code, $send_email );
+		$created_tracking = $this->trackingService->add( $order->get_id(), $tracking_code, $send_email, $data );
 
 		if ( is_wp_error( $created_tracking ) ) {
 			return $created_tracking;
@@ -56,11 +71,13 @@ class TrackingController {
 			return new \WP_Error( 'tracking_code_not_created', __( 'Tracking code not created.', 'infixs-correios-automatico' ), [ 'status' => 500 ] );
 		}
 
-		return rest_ensure_response( [ 
+		return rest_ensure_response( [
 			"status" => "success",
-			"data" => [ 
+			"data" => [
 				"id" => $created_tracking->id,
 				"code" => $created_tracking->code,
+				"vendor_id" => $created_tracking->vendor_id ? (int) $created_tracking->vendor_id : null,
+				"shipping_item_id" => $created_tracking->shipping_item_id ? (int) $created_tracking->shipping_item_id : null,
 			]
 		] );
 	}

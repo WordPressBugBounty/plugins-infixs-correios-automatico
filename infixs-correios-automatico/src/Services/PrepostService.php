@@ -73,7 +73,7 @@ class PrepostService {
 	 *
 	 * @return Person
 	 */
-	protected function buildSender( $order_id ) {
+	protected function buildSender( $order_id, $vendor_id = 0 ) {
 		$sender = new Person(
 			Config::string( 'sender.name' ),
 			new Address(
@@ -102,8 +102,9 @@ class PrepostService {
 		 *
 		 * @param Person $sender
 		 * @param int $order_id
+		 * @param int $vendor_id Vendor the prepost belongs to, zero for the store. @since 1.8.2
 		 */
-		return apply_filters( 'infixs_correios_automatico_prepost_sender', $sender, $order_id );
+		return apply_filters( 'infixs_correios_automatico_prepost_sender', $sender, $order_id, $vendor_id );
 	}
 
 	/**
@@ -347,11 +348,6 @@ class PrepostService {
 	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
 	 */
 	protected function doCreatePrepost( $order_id, $data = [] ) {
-		if ( empty( Config::string( 'sender.name' ) ) ) {
-			Log::notice( "Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem." );
-			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem.', [ 'status' => 400 ] );
-		}
-
 		$order = wc_get_order( $order_id );
 
 		if ( ! $order ) {
@@ -359,6 +355,16 @@ class PrepostService {
 			return new \WP_Error( 'invalid_order', 'Pedido inválido ao criar a pré-postagem.', [ 'status' => 400 ] );
 		}
 		$ca_order = new Order( $order );
+
+		$scope = Order::resolveScope( $ca_order, [
+			'for' => 'prepost',
+			'vendor_id' => isset( $data['vendor_id'] ) ? absint( $data['vendor_id'] ) : 0,
+			'shipping_item_id' => isset( $data['shipping_item_id'] ) ? absint( $data['shipping_item_id'] ) : 0,
+		] );
+
+		$ca_order->applyScope( $scope );
+
+		$vendor_id = $ca_order->getScopedVendorId();
 
 		$shipping_method = $ca_order->getShippingMethod();
 
@@ -403,7 +409,12 @@ class PrepostService {
 			$order->get_billing_email(),
 		);
 
-		$sender = $this->buildSender( $order_id );
+		$sender = $this->buildSender( $order_id, $vendor_id );
+
+		if ( empty( $sender->getName() ) ) {
+			Log::notice( "Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem." );
+			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem.', [ 'status' => 400 ] );
+		}
 
 		$shippingProductCode = $ca_order->getShippingProductCode();
 
@@ -414,6 +425,9 @@ class PrepostService {
 			$shippingProductCode,
 			$shipping_method->get_object_type_code()
 		);
+
+		$prepost->setVendorId( $vendor_id );
+		$prepost->setShippingItemId( $ca_order->getScopedShippingItemId() );
 
 		if ( DeliveryServiceCode::isLetter( $shippingProductCode ) ) {
 			$prepost->setObjectFormatCode( ObjectFormatCode::ENVELOPE );
@@ -585,11 +599,6 @@ class PrepostService {
 	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
 	 */
 	protected function doCreateReversePrepost( $order_id, $data = [] ) {
-		if ( empty( Config::string( 'sender.name' ) ) ) {
-			Log::notice( "Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem reversa." );
-			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a devolução.', [ 'status' => 400 ] );
-		}
-
 		$order = wc_get_order( $order_id );
 
 		if ( ! $order ) {
@@ -598,6 +607,16 @@ class PrepostService {
 		}
 
 		$ca_order = new Order( $order );
+
+		$scope = Order::resolveScope( $ca_order, [
+			'for' => 'reverse_prepost',
+			'vendor_id' => isset( $data['vendor_id'] ) ? absint( $data['vendor_id'] ) : 0,
+			'shipping_item_id' => isset( $data['shipping_item_id'] ) ? absint( $data['shipping_item_id'] ) : 0,
+		] );
+
+		$ca_order->applyScope( $scope );
+
+		$vendor_id = $ca_order->getScopedVendorId();
 
 		$shipping_method = $ca_order->getShippingMethod();
 
@@ -641,7 +660,12 @@ class PrepostService {
 			$order->get_billing_email(),
 		);
 
-		$store = $this->buildSender( $order_id );
+		$store = $this->buildSender( $order_id, $vendor_id );
+
+		if ( empty( $store->getName() ) ) {
+			Log::notice( "Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem reversa." );
+			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a devolução.', [ 'status' => 400 ] );
+		}
 
 		$shippingProductCode = $ca_order->getShippingProductCode();
 
@@ -661,6 +685,8 @@ class PrepostService {
 			ObjectFormatCode::PACOTE
 		);
 
+		$prepost->setVendorId( $vendor_id );
+		$prepost->setShippingItemId( $ca_order->getScopedShippingItemId() );
 		$prepost->setReverseLogistic( true );
 		$prepost->setEmitDce( 'N' );
 		$prepost->setItemsFromPackage( $ca_order->getPackage() );
@@ -783,6 +809,8 @@ class PrepostService {
 		$data = [
 			'external_id' => $response['id'],
 			'order_id' => $prepost->getOrderId(),
+			'vendor_id' => $prepost->getVendorId() ?: null,
+			'shipping_item_id' => $prepost->getShippingItemId() ?: null,
 			'object_code' => $response['codigoObjeto'],
 			'service_code' => $response['codigoServico'],
 			'payment_type' => $response['modalidadePagamento'],
@@ -874,6 +902,8 @@ class PrepostService {
 		return [
 			"id" => (int) $prepost->id,
 			"order_id" => (int) $prepost->order_id,
+			"vendor_id" => $prepost->vendor_id ? (int) $prepost->vendor_id : null,
+			"shipping_item_id" => $prepost->shipping_item_id ? (int) $prepost->shipping_item_id : null,
 			"expire_at" => $prepost->expire_at,
 			"created_at" => $prepost->created_at,
 			"object_code" => $prepost->object_code,
@@ -905,7 +935,7 @@ class PrepostService {
 			return new \WP_Error( 'invalid_prepost_id', 'Pré-postagem inválida.', [ 'status' => 400 ] );
 		}
 
-		$response = $this->correiosService->get_prepost( $prepost->object_code );
+		$response = $this->correiosService->get_prepost( $prepost->object_code, $prepost );
 
 		if ( is_wp_error( $response ) ) {
 			Log::notice( "Erro ao sincronizar pré-postagem.", [ 'error' => $response->get_error_message() ] );
@@ -926,7 +956,7 @@ class PrepostService {
 		];
 
 		if ( isset( $prepost_data['statusAtual'] ) && (int) $prepost_data['statusAtual'] === 2 ) {
-			$dce_response = $this->correiosService->printDce( $prepost->object_code, 'T' );
+			$dce_response = $this->correiosService->printDce( $prepost->object_code, 'T', $prepost );
 
 			if ( ! is_wp_error( $dce_response ) && ! empty( $dce_response['dados'] ) ) {
 				$dce_text_data = $this->extractDceTextData( $dce_response['dados'] );
@@ -1093,7 +1123,7 @@ class PrepostService {
 		}
 
 		// Call Correios API to get DCe PDF
-		$response = $this->correiosService->printDce( $prepost->object_code, $dace_type );
+		$response = $this->correiosService->printDce( $prepost->object_code, $dace_type, $prepost );
 
 		if ( is_wp_error( $response ) ) {
 			return $response;
