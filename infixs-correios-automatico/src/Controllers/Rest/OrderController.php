@@ -69,12 +69,34 @@ class OrderController {
 	}
 
 	/**
-	 * Patch order by ID.
-	 * 
-	 * @since 1.3.8
-	 * 
+	 * Get a single order, with the same payload of the listing.
+	 *
+	 * @since 1.9.1
+	 *
 	 * @param \WP_REST_Request $request
-	 * 
+	 *
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function retrieve( $request ) {
+		$order = $this->orderService->getOrder( absint( $request['id'] ) );
+
+		if ( null === $order ) {
+			return new \WP_Error( 'invalid_order', __( 'Pedido inválido.', 'infixs-correios-automatico' ), [ 'status' => 404 ] );
+		}
+
+		return rest_ensure_response( [
+			'status' => 'success',
+			'order' => $order,
+		] );
+	}
+
+	/**
+	 * Patch order by ID.
+	 *
+	 * @since 1.3.8
+	 *
+	 * @param \WP_REST_Request $request
+	 *
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function update( $request ) {

@@ -1,6 +1,8 @@
 <?php
 namespace Infixs\CorreiosAutomatico\Traits;
 
+use Infixs\CorreiosAutomatico\Core\Support\Log;
+
 trait HttpTrait {
 	/**
 	 * Post request
@@ -32,16 +34,105 @@ trait HttpTrait {
 
 		$accepted_codes = [ 200, 201, 202, 204 ];
 		if ( ! in_array( wp_remote_retrieve_response_code( $response ), $accepted_codes, true ) ) {
-			$message = 'Erro ao enviar solicitação post.';
-			if ( isset( $data['msgs'] ) && is_array( $data['msgs'] ) ) {
-				$message = join( '. ', $data['msgs'] );
-			} elseif ( isset( $data['message'] ) ) {
-				$message = $data['message'];
-			}
+			$message = $this->extract_error_message( $data );
+
+			Log::error( 'A API respondeu com erro.', [
+				'url' => $url,
+				'status' => $code,
+				'body' => is_string( $body ) ? substr( $body, 0, 2000 ) : '',
+			] );
+
 			return new \WP_Error( "http_error", $message, [ 'status' => $code ] );
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Extract a human readable message out of an API error body.
+	 *
+	 * The Correios APIs answer in more than one shape depending on the service
+	 * and on which gateway rejected the call: `msgs` (strings ou objetos),
+	 * `message`, `mensagem`, `causa` e `erros[].mensagem` são os conhecidos.
+	 * Anything else falls back to the generic message, with the raw body
+	 * already recorded in the log by post().
+	 *
+	 * @since 1.10.1
+	 *
+	 * @param mixed $data Decoded response body, null when it was not JSON.
+	 *
+	 * @return string
+	 */
+	protected function extract_error_message( $data ) {
+		if ( ! is_array( $data ) ) {
+			return 'Erro ao enviar solicitação post.';
+		}
+
+		if ( isset( $data['msgs'] ) && is_array( $data['msgs'] ) ) {
+			$messages = [];
+
+			foreach ( $data['msgs'] as $msg ) {
+				if ( is_string( $msg ) && $this->is_usable_message( $msg ) ) {
+					$messages[] = trim( $msg );
+				} elseif ( is_array( $msg ) && isset( $msg['mensagem'] ) && $this->is_usable_message( $msg['mensagem'] ) ) {
+					$messages[] = trim( $msg['mensagem'] );
+				}
+			}
+
+			if ( $messages ) {
+				return join( '. ', $messages );
+			}
+		}
+
+		if ( isset( $data['erros'] ) && is_array( $data['erros'] ) ) {
+			$messages = [];
+
+			foreach ( $data['erros'] as $error ) {
+				if ( is_array( $error ) && isset( $error['mensagem'] ) && $this->is_usable_message( $error['mensagem'] ) ) {
+					$messages[] = trim( $error['mensagem'] );
+				}
+			}
+
+			if ( $messages ) {
+				return join( '. ', $messages );
+			}
+		}
+
+		foreach ( [ 'message', 'mensagem', 'causa' ] as $key ) {
+			if ( isset( $data[ $key ] ) && is_string( $data[ $key ] ) && $this->is_usable_message( $data[ $key ] ) ) {
+				return trim( $data[ $key ] );
+			}
+		}
+
+		return 'Erro ao enviar solicitação post.';
+	}
+
+	/**
+	 * Check whether an API message says anything to the person reading it.
+	 *
+	 * The Correios prepost endpoint answers a rejected sender with
+	 * `{"msgs":["null"],"causa":"ApiNegocioRuntimeException: "}` — placeholders
+	 * that read worse than the generic message, since they look like an answer
+	 * while carrying none. The raw body is in the log either way.
+	 *
+	 * @since 1.10.1
+	 *
+	 * @param mixed $message Candidate message.
+	 *
+	 * @return bool
+	 */
+	protected function is_usable_message( $message ) {
+		if ( ! is_string( $message ) ) {
+			return false;
+		}
+
+		$message = trim( $message );
+
+		if ( $message === '' || strtolower( $message ) === 'null' ) {
+			return false;
+		}
+
+		return ! preg_match( '/^[A-Za-z_\\\\]*Exception:?$/', $message );
 	}
 
 	/**

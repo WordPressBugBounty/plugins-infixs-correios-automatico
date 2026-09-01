@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.8.5
+Stable tag: 1.10.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -140,6 +140,15 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.10.4 2026-09-01 =
+* Marketplace: suporte a Dokan e WCFM — remetente e contrato do vendedor, uma etiqueta por frete do pedido e escolha do que fazer com o vendedor sem contrato
+* Prépostagem: documento, telefone e bairro do remetente conferidos antes do envio
+* Logs: erros da API dos Correios com a mensagem real
+* Área do cliente: rastreio e devolução aparecem só nos envios feitos pelo plugin
+* Correção: pedido não fica mais sem o método de entrega com o frete cobrado
+* Correção: ação em massa "Imprimir Etiquetas" no WordPress 7.1
+* Compatibilidade com PHP 8.1
 
 = 1.8.5 2026-07-28 =
 * Auto Impressão (PRO): Imprima automaticamente sem cliques, direto pela impressora instalada em seu computador

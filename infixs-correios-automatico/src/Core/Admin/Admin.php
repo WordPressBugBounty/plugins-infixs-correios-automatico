@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Core\Admin;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\Dokan\Dokan;
+use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\OrderScreenReplacement;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\OrderTrackingColumn;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\WCIntegration;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
@@ -164,7 +165,10 @@ class Admin {
 	 * @since 1.0.0
 	 */
 	public function enqueue_scripts( $hook ) {
-		if ( WCIntegration::is_edit_order_page() || WCIntegration::is_list_order_page() ) {
+		$is_order_screen = WCIntegration::is_edit_order_page() || WCIntegration::is_list_order_page();
+		$is_replaced_order_screen = OrderScreenReplacement::is_replacing_current_screen();
+
+		if ( $is_order_screen && ! $is_replaced_order_screen ) {
 			wp_enqueue_script( 'select2' );
 			wp_enqueue_style( 'select2' );
 
@@ -196,7 +200,7 @@ class Admin {
 			);
 		}
 
-		if ( $this->is_dashboard_page() || 'plugins.php' === $hook || WCIntegration::is_edit_order_page() || WCIntegration::is_list_order_page() ) {
+		if ( $this->is_dashboard_page() || 'plugins.php' === $hook || $is_order_screen ) {
 			wp_enqueue_media();
 			$scriptData = [];
 			if ( 'plugins.php' === $hook ) {
@@ -205,8 +209,12 @@ class Admin {
 			if ( $this->is_dashboard_page() ) {
 				$scriptData['notices'] = $this->dashboard->display_notices();
 				$scriptData['nonceNotice'] = wp_create_nonce( 'infixs_correios_automatico_dismiss_notice' );
-				$scriptData['order']['statuses'] = function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : [];
-				$scriptData['order']['preferences']['status'] = Config::get( 'preferences.order.status' );
+			}
+			if ( $is_replaced_order_screen ) {
+				$scriptData['replaceOrdersScreen'] = true;
+			}
+			if ( $this->is_dashboard_page() || $is_replaced_order_screen ) {
+				$scriptData['order'] = $this->get_order_script_data();
 				$scriptData['termsAndConditionsOfUseAccepted'] = Config::boolean( 'general.terms_and_conditions_of_use_accepted' );
 				$scriptData['serviceCodes'] = DeliveryServiceCode::getAll();
 			}
@@ -216,6 +224,22 @@ class Admin {
 
 			self::load_dashboard_scripts( $scriptData );
 		}
+	}
+
+	/**
+	 * Order data needed by the dashboard order screen.
+	 *
+	 * @since 1.9.0
+	 *
+	 * @return array
+	 */
+	private function get_order_script_data() {
+		return [
+			'statuses' => function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : [],
+			'preferences' => [
+				'status' => Config::get( 'preferences.order.status' ),
+			],
+		];
 	}
 
 	public static function load_dashboard_scripts( $params = [] ) {
@@ -229,6 +253,8 @@ class Admin {
 		$url_part = wp_parse_url( admin_url() );
 		$relative_path = $url_part['path'];
 
+		$params['activePlugins'] = isset( $params['activePlugins'] ) ? (array) $params['activePlugins'] : [];
+
 		if ( class_exists( 'WC_Shipping_Calculator_Improvements' ) ) {
 			$params['activePlugins'][] = 'wc-shipping-calculator-improvements';
 		}
@@ -239,6 +265,10 @@ class Admin {
 
 		if ( class_exists( 'WeDevs_Dokan' ) ) {
 			$params['activePlugins'][] = 'dokan-lite';
+		}
+
+		if ( defined( 'INFIXS_CHECKOUT_FIELDS_FILE_NAME' ) ) {
+			$params['activePlugins'][] = 'infixs-checkout-fields';
 		}
 
 		if ( class_exists( 'Infixs\PingoNotify\Services\NotificationService' ) ) {
@@ -262,14 +292,15 @@ class Admin {
 		 *
 		 * @param string[] $active_plugins
 		 */
-		$params['activePlugins'] = apply_filters( 'infixs_correios_automatico_active_plugins', $params['activePlugins'] );
+		$active_plugins = apply_filters( 'infixs_correios_automatico_active_plugins', $params['activePlugins'] );
+		$params['activePlugins'] = is_array( $active_plugins ) ? $active_plugins : $params['activePlugins'];
 
 		$scriptData = array_merge( $params, [
 			'adminEmail' => get_option( 'admin_email' ),
 			'upgradeProUrl' => Plugin::PRO_URL,
 			'siteUrl' => site_url(),
 			'adminUrl' => admin_url(),
-			'activePlugins' => $params['activePlugins'] ?? [],
+			'activePlugins' => $params['activePlugins'],
 			'adminPath' => $relative_path,
 			'restUrl' => Container::routes()->get_rest_url(),
 			'resourcesUrl' => \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/dashboard',
@@ -311,7 +342,7 @@ class Admin {
 	 * @since 1.0.0
 	 */
 	public function hide_notices() {
-		if ( ! $this->is_dashboard_page() ) {
+		if ( ! $this->is_dashboard_page() && ! OrderScreenReplacement::is_replacing_current_screen() ) {
 			return;
 		}
 		remove_all_actions( 'user_admin_notices' );
@@ -328,7 +359,7 @@ class Admin {
 			include_once \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'src/Presentation/admin/views/html-uninstall.php';
 		}
 
-		if ( WCIntegration::is_edit_order_page() || WCIntegration::is_list_order_page() ) {
+		if ( ( WCIntegration::is_edit_order_page() || WCIntegration::is_list_order_page() ) && ! OrderScreenReplacement::is_replacing_current_screen() ) {
 			include_once \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'src/Presentation/admin/views/html-tracking-modal.php';
 		}
 
@@ -399,6 +430,10 @@ class Admin {
 
 		if ( $this->is_dashboard_page() ) {
 			$classes .= ' infixs-correios-automatico-dashboard-page';
+		}
+
+		if ( OrderScreenReplacement::is_replacing_current_screen() ) {
+			$classes .= ' infixs-correios-automatico-dashboard-page infixs-correios-automatico-orders-screen';
 		}
 
 		return $classes;

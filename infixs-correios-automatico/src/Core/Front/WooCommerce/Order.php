@@ -86,10 +86,43 @@ class Order {
 			[
 				'objects' => $objects,
 				'order' => $order->getOrder(),
+				'show_tracking' => $this->show_tracking( $order, $objects ),
 			],
 			'infixs-correios-automatico/',
 			\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'templates/'
 		);
+	}
+
+	/**
+	 * Whether the tracking section belongs on this order page.
+	 *
+	 * The section follows a shipment this plugin handles, so it only shows for
+	 * an order shipped by one of our methods — Correios Automático, a method
+	 * linked to it, or a carrier extension such as PEX and JadLog. An order
+	 * already carrying a tracking object keeps the section whatever the method
+	 * is: the store registered that code by hand and the customer has to see
+	 * it.
+	 *
+	 * @since 1.10.4
+	 *
+	 * @param CAOrder $order   Order being rendered.
+	 * @param array   $objects Tracking objects of the order.
+	 *
+	 * @return bool
+	 */
+	private function show_tracking( $order, $objects ) {
+		$show_tracking = ! empty( $objects ) || $order->hasInfixsShippingMethod();
+
+		/**
+		 * Filters whether the tracking section shows on the customer order page.
+		 *
+		 * @since 1.10.4
+		 *
+		 * @param bool      $show_tracking Whether the section is rendered.
+		 * @param \WC_Order $order         Order being rendered.
+		 * @param array     $objects       Tracking objects of the order.
+		 */
+		return (bool) apply_filters( 'infixs_correios_automatico_show_order_tracking', $show_tracking, $order->getOrder(), $objects );
 	}
 
 	public function enqueue_order_details_script() {

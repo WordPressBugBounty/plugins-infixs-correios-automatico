@@ -38,10 +38,10 @@ class Rest {
 
 		if ( ! $trackings->isEmpty() ) {
 			foreach ( $trackings as $track ) {
-				$response_codes[] = [ 
+				$response_codes[] = [
 					'id' => $track->id,
 					'code' => $track->code,
-					'carrier' => 'correios',
+					'carrier' => ! empty( $track->carrier ) ? $track->carrier : 'correios',
 					'description' => $track->description ?? "",
 					'category' => $track->category ?? "",
 					'date_created_gmt' => wc_rest_prepare_date_response( $track->created_at )

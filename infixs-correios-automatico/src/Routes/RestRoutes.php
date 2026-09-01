@@ -493,11 +493,20 @@ class RestRoutes {
 		$order_controller = new OrderController( Container::orderService() );
 
 		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)', [
-			'methods' => \WP_REST_Server::EDITABLE,
-			'callback' => [ $order_controller, 'update' ],
-			'permission_callback' => function () {
-				return current_user_can( 'manage_woocommerce' );
-			}
+			[
+				'methods' => \WP_REST_Server::READABLE,
+				'callback' => [ $order_controller, 'retrieve' ],
+				'permission_callback' => function () {
+					return current_user_can( 'manage_woocommerce' );
+				}
+			],
+			[
+				'methods' => \WP_REST_Server::EDITABLE,
+				'callback' => [ $order_controller, 'update' ],
+				'permission_callback' => function () {
+					return current_user_can( 'manage_woocommerce' );
+				}
+			],
 		] );
 
 		register_rest_route( $this->namespace, '/orders/batch', [

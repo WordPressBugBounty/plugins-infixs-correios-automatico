@@ -5,6 +5,7 @@ namespace Infixs\CorreiosAutomatico\Entities;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Shipping\LinkedShippingMethod;
+use Infixs\CorreiosAutomatico\Marketplace\MarketplaceRegistry;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
@@ -211,8 +212,24 @@ class Order {
 					'instance_id' => $item->get_instance_id(),
 					'method_title' => TextHelper::removeShippingTime( $item->get_name() ),
 					'cost' => $item->get_total(),
-					'vendor_id' => (int) $item->get_meta( 'vendor_id' ) ?: null,
+					'vendor_id' => $this->resolveShippingItemVendorId( $item ),
 					'is_correios' => false,
+					/**
+					 * Filters the carrier that owns a shipping line the base plugin
+					 * does not recognize.
+					 *
+					 * A carrier extension answers with its slug (e.g. `pex`) when the
+					 * line belongs to its own shipping method, so the dashboard can
+					 * offer that carrier's actions instead of the Correios ones.
+					 *
+					 * @since 1.9.0
+					 *
+					 * @param string|null                    $carrier Carrier slug, null when unknown.
+					 * @param \WC_Order_Item_Shipping|mixed $item    Shipping order item.
+					 */
+					'carrier' => $item instanceof \WC_Order_Item_Shipping
+						? apply_filters( 'infixs_correios_automatico_shipping_item_carrier', null, $item )
+						: null,
 					'width' => 0,
 					'height' => 0,
 					'lenght' => 0,
@@ -230,8 +247,9 @@ class Order {
 				'instance_id' => $item->get_instance_id(),
 				'method_title' => TextHelper::removeShippingTime( $item->get_name() ),
 				'cost' => $item->get_total(),
-				'vendor_id' => (int) $item->get_meta( 'vendor_id' ) ?: null,
+				'vendor_id' => $this->resolveShippingItemVendorId( $item ),
 				'is_correios' => true,
+				'carrier' => 'correios',
 				'width' => $item->get_meta( '_width' ) ?: 0,
 				'height' => $item->get_meta( '_height' ) ?: 0,
 				'lenght' => $item->get_meta( '_length' ) ?: 0,
@@ -242,6 +260,38 @@ class Order {
 				'shipping_product_code' => $item->get_meta( 'shipping_product_code' ) ?: null,
 			];
 		}
+	}
+
+	/**
+	 * Get the vendor a shipping line belongs to.
+	 *
+	 * The `vendor_id` meta is the convention of a marketplace that puts several
+	 * vendors on one order and tags each line. A marketplace that splits the
+	 * order into one per vendor writes no such meta, and there the vendor of the
+	 * line is simply the vendor of the order — which only the extension knows.
+	 *
+	 * @since 1.10.0
+	 *
+	 * @param \WC_Order_Item $item Shipping order item.
+	 *
+	 * @return int|null Null when no vendor owns the line.
+	 */
+	private function resolveShippingItemVendorId( $item ) {
+		$vendor_id = (int) $item->get_meta( 'vendor_id' );
+
+		if ( $vendor_id ) {
+			return $vendor_id;
+		}
+
+		$adapter = MarketplaceRegistry::forOrder( $this->order );
+
+		if ( ! $adapter ) {
+			return null;
+		}
+
+		$vendor_id = (int) $adapter->getShippingItemVendorId( $this->order, $item->get_id() );
+
+		return $vendor_id ? $vendor_id : null;
 	}
 
 	/**
@@ -278,6 +328,7 @@ class Order {
 				'shipping_product_title' => $product_code ? DeliveryServiceCode::getDescription( $product_code ) : null,
 				'vendor_id' => $shipping_item['vendor_id'],
 				'is_correios' => (bool) $shipping_item['is_correios'],
+				'carrier' => $shipping_item['carrier'] ?? ( $shipping_item['is_correios'] ? 'correios' : null ),
 			];
 		}
 
@@ -631,12 +682,17 @@ class Order {
 		$shipping_product_code = $first_shipping_item['shipping_product_code'];
 
 		/**
-		 * Scoped to a single shipment the frozen value wins: the method instance
-		 * resolves its service against the store wide contract flag, which would
-		 * quote a vendor on the public table with the contract code, and vice
-		 * versa. It is also the only value that is per shipping line.
+		 * Scoped to a vendor the frozen value wins: the method instance resolves
+		 * its service against the store wide contract flag, which would quote a
+		 * vendor on the public table with the contract code, and vice versa. It
+		 * is also the only value that is per shipping line.
+		 *
+		 * Naming a shipping line is not enough on its own. Without a vendor there
+		 * is no contract mismatch to protect against, and preferring the frozen
+		 * code would send an order placed before the store connected its contract
+		 * to Correios with a retail service the postcard does not accept.
 		 */
-		if ( ( $this->scope['vendor_id'] || $this->scope['shipping_item_id'] ) && $shipping_product_code ) {
+		if ( $this->scope['vendor_id'] && $shipping_product_code ) {
 			return $shipping_product_code;
 		}
 
@@ -679,11 +735,36 @@ class Order {
 			'insurance_cost' => 0,
 			'original_cost' => null,
 			'shipping_product_code' => null,
+			'carrier' => null,
 		];
 	}
 
 	public function getShippingItemsData() {
 		return $this->shipping_items;
+	}
+
+	/**
+	 * Whether any shipping line of the order is handled by this plugin.
+	 *
+	 * A line is ours when the base plugin recognises it as Correios — its own
+	 * method, or a third party method linked to a Correios service — or when a
+	 * carrier extension such as PEX or JadLog claims it through
+	 * `infixs_correios_automatico_shipping_item_carrier`. A line shipped by an
+	 * unrelated plugin answers neither, so an order served only by those is not
+	 * ours to talk about.
+	 *
+	 * @since 1.10.4
+	 *
+	 * @return bool
+	 */
+	public function hasInfixsShippingMethod() {
+		foreach ( $this->shipping_items as $shipping_item ) {
+			if ( ! empty( $shipping_item['is_correios'] ) || ! empty( $shipping_item['carrier'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -826,6 +907,7 @@ class Order {
 					'code' => $tracking_code['code'],
 					'vendor_id' => ! empty( $tracking_code['vendor_id'] ) ? (int) $tracking_code['vendor_id'] : null,
 					'shipping_item_id' => ! empty( $tracking_code['shipping_item_id'] ) ? (int) $tracking_code['shipping_item_id'] : null,
+					'carrier' => ! empty( $tracking_code['carrier'] ) ? $tracking_code['carrier'] : 'correios',
 				];
 				if ( isset( $tracking_code['unit'] ) ) {
 					$tracking_code_data['unit'] = Container::unitService()->prepareData( $tracking_code['unit'] );

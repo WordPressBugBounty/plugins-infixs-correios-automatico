@@ -115,6 +115,7 @@ class TrackingService {
 			'user_id' => get_current_user_id(),
 			'vendor_id' => $vendor_id ? (int) $vendor_id : null,
 			'shipping_item_id' => isset( $data['shipping_item_id'] ) && $data['shipping_item_id'] ? absint( $data['shipping_item_id'] ) : null,
+			'carrier' => isset( $data['carrier'] ) && $data['carrier'] ? sanitize_key( $data['carrier'] ) : 'correios', //@since 1.9.0
 			'tracking_range_code_id' => $data['tracking_range_code_id'] ?? null,
 		] );
 
@@ -459,6 +460,27 @@ class TrackingService {
 	 */
 	public function sync_remote_tracking_code( TrackingCode $tracking ) {
 
+		$carrier = ! empty( $tracking->carrier ) ? $tracking->carrier : 'correios';
+
+		if ( 'correios' !== $carrier ) {
+			/**
+			 * Filters the sync of a tracking code owned by another carrier.
+			 *
+			 * The base plugin only knows how to fetch events from the Correios
+			 * APIs. The extension owning the carrier fetches the events itself,
+			 * records them on the tracking code and returns it (or a WP_Error).
+			 * Returning null keeps the code untouched.
+			 *
+			 * @since 1.9.0
+			 *
+			 * @param TrackingCode|\WP_Error|null $result   Sync result, null when unhandled.
+			 * @param TrackingCode                $tracking Tracking code being synced.
+			 */
+			$result = apply_filters( 'infixs_correios_automatico_sync_tracking_code', null, $tracking );
+
+			return null !== $result ? $result : $tracking;
+		}
+
 		$response = $this->configRepository->boolean( 'auth.active' ) && Helper::contractHasService( APIServiceCode::SRO_RASTRO )
 			? $this->correiosService->get_object_tracking( $tracking->code, $tracking )
 			: Container::infixsApi()->getTrackingHistory( $tracking->code );
@@ -566,7 +588,15 @@ class TrackingService {
 	 */
 	public function sync_remote_mutiples_tracking_codes( $trackings ) {
 
+		$trackings = $trackings->filter( function ( $tracking ) {
+			return 'correios' === ( ! empty( $tracking->carrier ) ? $tracking->carrier : 'correios' );
+		} );
+
 		$codes = $trackings->pluck( 'code' )->toArray();
+
+		if ( empty( $codes ) ) {
+			return false;
+		}
 
 		if ( ! $this->configRepository->boolean( 'auth.active' ) || ! Helper::contractHasService( APIServiceCode::SRO_RASTRO ) ) {
 			return false;

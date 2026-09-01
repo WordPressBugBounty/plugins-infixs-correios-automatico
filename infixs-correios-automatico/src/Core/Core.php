@@ -10,6 +10,12 @@ use Infixs\CorreiosAutomatico\Core\Front\WooCommerce\AutofillAddress;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Database\Migration;
+use Infixs\CorreiosAutomatico\Marketplace\VendorLabelSender;
+use Infixs\CorreiosAutomatico\Marketplace\VendorObjectApi;
+use Infixs\CorreiosAutomatico\Marketplace\VendorOrderScope;
+use Infixs\CorreiosAutomatico\Marketplace\VendorPrepostService;
+use Infixs\CorreiosAutomatico\Marketplace\VendorRateGuard;
+use Infixs\CorreiosAutomatico\Marketplace\VendorTrackingService;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 
 defined( 'ABSPATH' ) || exit;
@@ -34,9 +40,33 @@ class Core {
 		new Admin( Container::infixsApi() );
 		new Front();
 
+		$this->load_marketplace();
 		$this->load_modules();
 
 		do_action( 'infixs_correios_automatico_plugin_loaded' );
+	}
+
+	/**
+	 * Wire the marketplace layer.
+	 *
+	 * Registered unconditionally: this runs while the plugin is being included,
+	 * and a marketplace extension only registers its adapter on `plugins_loaded`,
+	 * so there is nothing to test for yet. Each callback asks the registry when
+	 * it fires, and does nothing while no extension has registered — which is
+	 * also what keeps an older extension, still carrying its own copy of these
+	 * filters, from having them applied twice.
+	 *
+	 * @since 1.10.0
+	 *
+	 * @return void
+	 */
+	public function load_marketplace() {
+		new VendorOrderScope();
+		new VendorRateGuard();
+		new VendorPrepostService();
+		new VendorLabelSender();
+		new VendorObjectApi();
+		new VendorTrackingService();
 	}
 
 	public function load_modules() {

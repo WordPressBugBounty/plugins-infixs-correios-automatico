@@ -10,6 +10,7 @@ use Infixs\CorreiosAutomatico\Utils\Formatter;
  * 
  * @global array $objects
  * @global \WC_Order $order
+ * @global bool $show_tracking
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -59,11 +60,15 @@ if ( $order instanceof \WC_Order ) :
 endif;
 ?>
 
-<h2>Acompanhe seu Pedido</h2>
+<?php if ( ! isset( $show_tracking ) || $show_tracking ) : ?>
 
-<?php
-Template::loadComponent( "tracking/tracking-history.php", [
-	'objects' => $objects,
-	'order' => $order,
-] );
-?>
+	<h2>Acompanhe seu Pedido</h2>
+
+	<?php
+	Template::loadComponent( "tracking/tracking-history.php", [
+		'objects' => $objects,
+		'order' => $order,
+	] );
+	?>
+
+<?php endif; ?>

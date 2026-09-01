@@ -101,6 +101,30 @@ class OrderService {
 	}
 
 	/**
+	 * Get a single order with the same payload of the listing.
+	 *
+	 * Lets the dashboard refresh one row reactively instead of reloading the
+	 * whole list after an action on that order.
+	 *
+	 * @since 1.9.1
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return array|null Null when the order does not exist.
+	 */
+	public function getOrder( $order_id ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order instanceof \WC_Order ) {
+			return null;
+		}
+
+		$ca_order = new Order( $order );
+
+		return $ca_order->toArray();
+	}
+
+	/**
 	 * Transform a WC_Order object into the desired array format.
 	 *
 	 * @param \WC_Order[] $orders Orders.

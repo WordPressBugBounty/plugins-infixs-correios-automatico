@@ -517,6 +517,34 @@ class Prepost {
 	 *
 	 * @return void
 	 */
+	/**
+	 * Set the Correios user the prepost is declared under.
+	 *
+	 * Defaults to the store contract user in the constructor. A prepost that
+	 * goes out on a vendor contract carries the vendor's user instead, so the
+	 * payload matches the credential that signs the request.
+	 *
+	 * @since 1.10.1
+	 *
+	 * @param string $id Correios user name.
+	 *
+	 * @return void
+	 */
+	public function setId( $id ) {
+		$this->id = (string) $id;
+	}
+
+	/**
+	 * Get the Correios user the prepost is declared under.
+	 *
+	 * @since 1.10.1
+	 *
+	 * @return string
+	 */
+	public function getId() {
+		return $this->id;
+	}
+
 	public function setVendorId( $vendor_id ) {
 		$this->vendor_id = (int) $vendor_id;
 	}

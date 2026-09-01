@@ -4,14 +4,14 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2
+class ComposerStaticInitc870a29835b6a8998e0951046d394999
 {
     public static $prefixLengthsPsr4 = array (
-        'P' => 
+        'P' =>
         array (
             'Psr\\Container\\' => 14,
         ),
-        'I' => 
+        'I' =>
         array (
             'Infixs\\WordpressEloquent\\' => 25,
             'Infixs\\CorreiosAutomatico\\' => 26,
@@ -19,24 +19,24 @@ class ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2
     );
 
     public static $prefixDirsPsr4 = array (
-        'Psr\\Container\\' => 
+        'Psr\\Container\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/container/src',
         ),
-        'Infixs\\WordpressEloquent\\' => 
+        'Infixs\\WordpressEloquent\\' =>
         array (
             0 => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src',
         ),
-        'Infixs\\CorreiosAutomatico\\' => 
+        'Infixs\\CorreiosAutomatico\\' =>
         array (
             0 => __DIR__ . '/../..' . '/src',
         ),
     );
 
     public static $prefixesPsr0 = array (
-        'P' => 
+        'P' =>
         array (
-            'Pimple' => 
+            'Pimple' =>
             array (
                 0 => __DIR__ . '/..' . '/pimple/pimple/src',
             ),
@@ -45,15 +45,47 @@ class ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2
 
     public static $classMap = array (
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
+        'Infixs\\WordpressEloquent\\Collection' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Collection.php',
+        'Infixs\\WordpressEloquent\\Database' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Database.php',
+        'Infixs\\WordpressEloquent\\Model' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Model.php',
+        'Infixs\\WordpressEloquent\\QueryBuilder' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/QueryBuilder.php',
+        'Infixs\\WordpressEloquent\\Reflection' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Reflection.php',
+        'Infixs\\WordpressEloquent\\Relation' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Relation.php',
+        'Infixs\\WordpressEloquent\\Relations\\BelongsTo' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Relations/BelongsTo.php',
+        'Infixs\\WordpressEloquent\\Relations\\HasMany' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Relations/HasMany.php',
+        'Infixs\\WordpressEloquent\\Relations\\HasOne' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Relations/HasOne.php',
+        'Infixs\\WordpressEloquent\\Relations\\HasOneOrMany' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/Relations/HasOneOrMany.php',
+        'Infixs\\WordpressEloquent\\SoftDeletes' => __DIR__ . '/..' . '/infixs/wordpress-eloquent/src/SoftDeletes.php',
+        'Pimple\\Container' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Container.php',
+        'Pimple\\Exception\\ExpectedInvokableException' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Exception/ExpectedInvokableException.php',
+        'Pimple\\Exception\\FrozenServiceException' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Exception/FrozenServiceException.php',
+        'Pimple\\Exception\\InvalidServiceIdentifierException' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Exception/InvalidServiceIdentifierException.php',
+        'Pimple\\Exception\\UnknownIdentifierException' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Exception/UnknownIdentifierException.php',
+        'Pimple\\Psr11\\Container' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Psr11/Container.php',
+        'Pimple\\Psr11\\ServiceLocator' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Psr11/ServiceLocator.php',
+        'Pimple\\ServiceIterator' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/ServiceIterator.php',
+        'Pimple\\ServiceProviderInterface' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/ServiceProviderInterface.php',
+        'Pimple\\Tests\\Fixtures\\Invokable' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/Fixtures/Invokable.php',
+        'Pimple\\Tests\\Fixtures\\NonInvokable' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/Fixtures/NonInvokable.php',
+        'Pimple\\Tests\\Fixtures\\PimpleServiceProvider' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/Fixtures/PimpleServiceProvider.php',
+        'Pimple\\Tests\\Fixtures\\Service' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/Fixtures/Service.php',
+        'Pimple\\Tests\\PimpleServiceProviderInterfaceTest' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/PimpleServiceProviderInterfaceTest.php',
+        'Pimple\\Tests\\PimpleTest' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/PimpleTest.php',
+        'Pimple\\Tests\\Psr11\\ContainerTest' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/Psr11/ContainerTest.php',
+        'Pimple\\Tests\\Psr11\\ServiceLocatorTest' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/Psr11/ServiceLocatorTest.php',
+        'Pimple\\Tests\\ServiceIteratorTest' => __DIR__ . '/..' . '/pimple/pimple/src/Pimple/Tests/ServiceIteratorTest.php',
+        'Psr\\Container\\ContainerExceptionInterface' => __DIR__ . '/..' . '/psr/container/src/ContainerExceptionInterface.php',
+        'Psr\\Container\\ContainerInterface' => __DIR__ . '/..' . '/psr/container/src/ContainerInterface.php',
+        'Psr\\Container\\NotFoundExceptionInterface' => __DIR__ . '/..' . '/psr/container/src/NotFoundExceptionInterface.php',
     );
 
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->prefixLengthsPsr4 = ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2::$prefixLengthsPsr4;
-            $loader->prefixDirsPsr4 = ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2::$prefixDirsPsr4;
-            $loader->prefixesPsr0 = ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2::$prefixesPsr0;
-            $loader->classMap = ComposerStaticInitc34e0bfddc9266bc0acbe288c3f46aa2::$classMap;
+            $loader->prefixLengthsPsr4 = ComposerStaticInitc870a29835b6a8998e0951046d394999::$prefixLengthsPsr4;
+            $loader->prefixDirsPsr4 = ComposerStaticInitc870a29835b6a8998e0951046d394999::$prefixDirsPsr4;
+            $loader->prefixesPsr0 = ComposerStaticInitc870a29835b6a8998e0951046d394999::$prefixesPsr0;
+            $loader->classMap = ComposerStaticInitc870a29835b6a8998e0951046d394999::$classMap;
 
         }, null, ClassLoader::class);
     }

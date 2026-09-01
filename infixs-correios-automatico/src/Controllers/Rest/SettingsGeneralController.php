@@ -254,6 +254,10 @@ class SettingsGeneralController {
 			$updated_settings['emit_dce_auto_prepost'] = rest_sanitize_boolean( $data['emit_dce_auto_prepost'] );
 		}
 
+		if ( isset( $data['replace_orders_screen'] ) ) {
+			$updated_settings['replace_orders_screen'] = rest_sanitize_boolean( $data['replace_orders_screen'] );
+		}
+
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
@@ -454,6 +458,7 @@ class SettingsGeneralController {
 			'show_additional_time' => Config::boolean( 'general.show_additional_time' ),
 			'force_shipping_cost' => Config::boolean( 'general.force_shipping_cost' ),
 			'emit_dce_auto_prepost' => Config::boolean( 'general.emit_dce_auto_prepost' ),
+			'replace_orders_screen' => Config::boolean( 'general.replace_orders_screen' ),
 		];
 
 		return apply_filters( 'infixs_correios_automatico_prepare_general_settings', $sanitized_settings );

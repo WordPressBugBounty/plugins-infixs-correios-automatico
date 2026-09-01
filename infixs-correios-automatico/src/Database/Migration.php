@@ -26,6 +26,7 @@ class Migration {
 			'user_id' => 'bigint(20) unsigned DEFAULT NULL',
 			'vendor_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.8.2
 			'shipping_item_id' => 'bigint(20) unsigned DEFAULT NULL', //@since 1.8.3
+			'carrier' => "varchar(20) NOT NULL DEFAULT 'correios'", //@since 1.9.0
 			'code' => 'varchar(255) DEFAULT NULL',
 			'description' => 'varchar(255) DEFAULT NULL', //@since 1.2.1
 			'category' => 'varchar(255) DEFAULT NULL', //@since 1.2.1

@@ -63,6 +63,7 @@ class WCIntegration {
 		new Rest( $trackingService );
 		new OrderTrackingColumn( $trackingService );
 		new Checkout();
+		new OrderScreenReplacement();
 
 		$this->actions();
 		$this->filters();

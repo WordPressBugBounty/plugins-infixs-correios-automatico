@@ -5,6 +5,7 @@ namespace Infixs\CorreiosAutomatico\Services;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Entities\Order;
+use Infixs\CorreiosAutomatico\Marketplace\MarketplaceRegistry;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingRange;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
@@ -64,14 +65,75 @@ class LabelService {
 		$labels = [];
 
 		foreach ( $order_ids as $order_id ) {
-			$label = $this->getLabelFromOrder( $order_id, $context );
-			if ( ! $label ) {
-				continue;
+			foreach ( $this->resolveShipmentContexts( $order_id, $context ) as $shipment_context ) {
+				$label = $this->getLabelFromOrder( $order_id, $shipment_context );
+
+				if ( ! $label ) {
+					continue;
+				}
+
+				$labels[] = $label;
 			}
-			$labels[] = $label;
 		}
 
 		return $labels;
+	}
+
+	/**
+	 * Split an order into the shipments that have to be printed separately.
+	 *
+	 * A marketplace order carries one shipping line per vendor, each posted on
+	 * its own contract and from its own address, so printing it whole would put
+	 * one vendor's package under another vendor's label.
+	 *
+	 * Decided from the resolved scope, never from the raw order: a caller that
+	 * already named a vendor or a line — the vendor dashboard does — gets that
+	 * single shipment and nothing else, which is what keeps a vendor from
+	 * receiving the labels of the others.
+	 *
+	 * A store without a marketplace is left alone even when it does have more
+	 * than one freight on the order: there the extra lines are one shipment the
+	 * store split, not one shipment per seller.
+	 *
+	 * @since 1.10.0
+	 *
+	 * @param int   $order_id Order to split.
+	 * @param array $context  Caller context.
+	 *
+	 * @return array[] One context per label to build.
+	 */
+	private function resolveShipmentContexts( $order_id, $context ) {
+		$order = Order::fromId( $order_id );
+
+		if ( ! $order || ! MarketplaceRegistry::forOrder( $order->getOrder() ) ) {
+			return [ $context ];
+		}
+
+		$scope = Order::resolveScope( $order, array_merge( [ 'for' => 'label' ], $context ) );
+
+		if ( ! empty( $scope['vendor_id'] ) || ! empty( $scope['shipping_item_id'] ) ) {
+			return [ $context ];
+		}
+
+		$shipping_items = [];
+
+		foreach ( $order->getShippingItemsPayload() as $shipping_item ) {
+			if ( $shipping_item['is_correios'] ) {
+				$shipping_items[] = $shipping_item['item_id'];
+			}
+		}
+
+		if ( count( $shipping_items ) < 2 ) {
+			return [ $context ];
+		}
+
+		$contexts = [];
+
+		foreach ( $shipping_items as $shipping_item_id ) {
+			$contexts[] = array_merge( $context, [ 'shipping_item_id' => $shipping_item_id ] );
+		}
+
+		return $contexts;
 	}
 
 	/**
@@ -160,6 +222,10 @@ class LabelService {
 				continue;
 			}
 
+			if ( $scope['shipping_item_id'] && ! empty( $prepost->shipping_item_id ) && (int) $prepost->shipping_item_id !== $scope['shipping_item_id'] ) {
+				continue;
+			}
+
 			$prepost_data = $prepost->toArray();
 
 			$preposts[] = [
@@ -183,6 +249,7 @@ class LabelService {
 		$data = [
 			'name' => $order->getCustomerFullName(),
 			'document' => $order->getCustomerDocument(),
+			'carrier' => ! empty( $shipping_metadata['carrier'] ) ? $shipping_metadata['carrier'] : 'correios', //@since 1.9.0
 			'shipping_product_id' => DeliveryServiceCode::getCommonId( $product_code ),
 			'shipping_product_code' => $product_code,
 			'phone' => $order->getAlwaysPhone() ?: '',
@@ -212,6 +279,27 @@ class LabelService {
 			'items' => $items,
 			'ceint' => $this->shippingService->getCeintByPostCode( $address->getPostCode() ),
 			'has_dangerous_product' => $has_dangerous_product,
+			'vendor_id' => $scope['vendor_id'] ? $scope['vendor_id'] : null,
+			'shipping_item_id' => $scope['shipping_item_id'] ? $scope['shipping_item_id'] : null,
+			/**
+			 * Filters the return address printed on this label.
+			 *
+			 * The print screen resolves one sender for the whole session, which
+			 * is the store's whenever an administrator is printing. A marketplace
+			 * extension answers here with the address of the vendor that ships
+			 * this particular shipment; null leaves the session sender in place,
+			 * which is what a store without vendors always gets.
+			 *
+			 * The prepost counterpart is
+			 * `infixs_correios_automatico_prepost_sender`; keep the two in step.
+			 *
+			 * @since 1.10.0
+			 *
+			 * @param array|null $sender  Sender payload, null for the session one.
+			 * @param Order      $order   Order the label was built from, already scoped.
+			 * @param array      $context Caller context.
+			 */
+			'sender' => apply_filters( 'infixs_correios_automatico_label_sender', null, $order, $context ),
 		];
 
 		/**

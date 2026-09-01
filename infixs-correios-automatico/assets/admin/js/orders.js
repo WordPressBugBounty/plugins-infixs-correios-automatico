@@ -357,7 +357,7 @@ jQuery( function ( $ ) {
 			const notPrintedOrders = [];
 			let hasPrinted = false;
 			let hasSelection = false;
-			$( '.wp-list-table tbody tr th input[type=checkbox]' ).each(
+			$( '.wp-list-table tbody tr .check-column input[type=checkbox]' ).each(
 				function () {
 					if ( $( this ).is( ':checked' ) ) {
 						hasSelection = true;

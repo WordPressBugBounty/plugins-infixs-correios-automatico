@@ -2,6 +2,7 @@
 
 namespace Infixs\CorreiosAutomatico\Services;
 
+use Infixs\CorreiosAutomatico\Config\VendorSettings;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
@@ -108,6 +109,113 @@ class PrepostService {
 	}
 
 	/**
+	 * Check the store address against what Correios demands of it.
+	 *
+	 * Same rule already applied to the customer address: the neighborhood is
+	 * only mandatory on a postcode ending in `000`. Answering here keeps a
+	 * store — or a marketplace vendor — from having to read a raw Correios
+	 * rejection to find out which field is missing. Deliberately not asked when
+	 * the contract is registered: Correios does not need the neighborhood to
+	 * authenticate one, only to move a parcel.
+	 *
+	 * @since 1.10.1
+	 *
+	 * @param Person $store    Store side of the prepost, sender on a shipment and recipient on a return.
+	 * @param int    $order_id Order ID, for the log.
+	 *
+	 * @return \WP_Error|null Null when the address is usable.
+	 */
+	protected function validateStoreAddress( $store, $order_id ) {
+		$address = $store->getAddress();
+
+		if ( ! $address ) {
+			return null;
+		}
+
+		$postal_code = Sanitizer::numeric_text( trim( (string) $address->getPostalCode() ) );
+
+		if ( ! preg_match( '/000$/', $postal_code ) || trim( (string) $address->getNeighborhood() ) !== '' ) {
+			return null;
+		}
+
+		Log::notice( 'Bairro do endereço da loja é obrigatório para CEP finalizado em 000.', [
+			'order_id' => $order_id,
+			'postal_code' => $postal_code,
+		] );
+
+		return new \WP_Error(
+			'invalid_store_neighborhood',
+			'O campo Bairro do endereço da loja é obrigatório quando o CEP termina com 000. Preencha o bairro e tente novamente.',
+			[ 'status' => 400 ]
+		);
+	}
+
+	/**
+	 * Resolve the Correios user a prepost is declared under.
+	 *
+	 * Mirrors the rule that decides which client signs the request, so the
+	 * `idCorreios` of the payload never contradicts the credential in the
+	 * header.
+	 *
+	 * @see \Infixs\CorreiosAutomatico\Services\Correios\VendorApiFactory::forVendor()
+	 *
+	 * @since 1.10.1
+	 *
+	 * @param int $vendor_id Vendor the prepost belongs to, zero for the store.
+	 *
+	 * @return string
+	 */
+	protected function resolveCorreiosId( $vendor_id ) {
+		if ( $vendor_id && VendorSettings::hasActiveContract( $vendor_id ) ) {
+			return (string) VendorSettings::get( $vendor_id )->auth->user_name;
+		}
+
+		return Config::string( 'auth.user_name' );
+	}
+
+	/**
+	 * Check the store document Correios demands on every prepost.
+	 *
+	 * Confirmed against the live API: a sender without `cpfCnpj` is refused
+	 * with HTTP 400 and an empty body (`{"msgs":["null"]}`), which reaches the
+	 * store as an unreadable error. A marketplace vendor is the common way to
+	 * get here — the document may have no home on the vendor panel, and the
+	 * store contract is only lent when the marketplace says so.
+	 *
+	 * @since 1.10.1
+	 *
+	 * @param Person $store    Store side of the prepost.
+	 * @param int    $order_id Order ID, for the log.
+	 * @param int    $vendor_id Vendor the prepost belongs to, zero for the store.
+	 *
+	 * @return \WP_Error|null Null when the document is usable.
+	 */
+	protected function validateStoreDocument( $store, $order_id, $vendor_id = 0 ) {
+		if ( Sanitizer::numeric_text( $store->getCpfCnpj() ) !== '' ) {
+			return null;
+		}
+
+		Log::notice( 'Documento do remetente ausente ao criar a prépostagem.', [
+			'order_id' => $order_id,
+			'vendor_id' => $vendor_id,
+		] );
+
+		if ( $vendor_id ) {
+			return new \WP_Error(
+				'missing_store_document',
+				'O CNPJ/CPF do remetente é obrigatório nos Correios e o vendedor deste pedido está sem documento. Cadastre o contrato próprio do vendedor, preencha o documento dele ou ative o uso do contrato da loja pelos vendedores.',
+				[ 'status' => 400 ]
+			);
+		}
+
+		return new \WP_Error(
+			'missing_store_document',
+			'O CNPJ/CPF do remetente é obrigatório nos Correios. Preencha o documento do remetente nas configurações e tente novamente.',
+			[ 'status' => 400 ]
+		);
+	}
+
+	/**
 	 * Create prepost.
 	 *
 	 * Records the failure on the order when it errors, or clears any previous
@@ -185,6 +293,16 @@ class PrepostService {
 
 		if ( '' === trim( $message ) ) {
 			return;
+		}
+
+		// Marca o WP_Error (devolvido ao cliente REST) como registrado na meta:
+		// o front só insere o alerta otimista na linha quando esta marca existe,
+		// evitando erro fantasma para falhas que não passam por aqui.
+		if ( is_wp_error( $error ) ) {
+			$data = $error->get_error_data();
+			$data = is_array( $data ) ? $data : ( null === $data ? [] : [ 'previous_data' => $data ] );
+			$data['prepost_error_recorded'] = true;
+			$error->add_data( $data );
 		}
 
 		$errors = $this->getOrderPrepostErrors( $order );
@@ -416,6 +534,18 @@ class PrepostService {
 			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a pré-postagem.', [ 'status' => 400 ] );
 		}
 
+		$sender_error = $this->validateStoreAddress( $sender, $order_id );
+
+		if ( $sender_error ) {
+			return $sender_error;
+		}
+
+		$sender_error = $this->validateStoreDocument( $sender, $order_id, $vendor_id );
+
+		if ( $sender_error ) {
+			return $sender_error;
+		}
+
 		$shippingProductCode = $ca_order->getShippingProductCode();
 
 		$prepost = new Prepost(
@@ -427,6 +557,7 @@ class PrepostService {
 		);
 
 		$prepost->setVendorId( $vendor_id );
+		$prepost->setId( $this->resolveCorreiosId( $vendor_id ) );
 		$prepost->setShippingItemId( $ca_order->getScopedShippingItemId() );
 
 		if ( DeliveryServiceCode::isLetter( $shippingProductCode ) ) {
@@ -667,6 +798,18 @@ class PrepostService {
 			return new \WP_Error( 'invalid_sender_data', 'Dados do remetente inválidos, é necessário preencher os dados do remetente nas configurações para utilizar a devolução.', [ 'status' => 400 ] );
 		}
 
+		$store_error = $this->validateStoreAddress( $store, $order_id );
+
+		if ( $store_error ) {
+			return $store_error;
+		}
+
+		$store_error = $this->validateStoreDocument( $store, $order_id, $vendor_id );
+
+		if ( $store_error ) {
+			return $store_error;
+		}
+
 		$shippingProductCode = $ca_order->getShippingProductCode();
 
 		if ( isset( $data['service'] ) && ! empty( $data['service'] ) ) {
@@ -686,6 +829,7 @@ class PrepostService {
 		);
 
 		$prepost->setVendorId( $vendor_id );
+		$prepost->setId( $this->resolveCorreiosId( $vendor_id ) );
 		$prepost->setShippingItemId( $ca_order->getScopedShippingItemId() );
 		$prepost->setReverseLogistic( true );
 		$prepost->setEmitDce( 'N' );
@@ -765,6 +909,8 @@ class PrepostService {
 		$created_prepost = $this->prepostRepository->create( [
 			'external_id' => 0,
 			'order_id' => $prepost->getOrderId(),
+			'vendor_id' => $prepost->getVendorId() ?: null,
+			'shipping_item_id' => $prepost->getShippingItemId() ?: null,
 			'object_code' => $object_code,
 			'service_code' => $prepost->getServiceCode(),
 			'payment_type' => 1,

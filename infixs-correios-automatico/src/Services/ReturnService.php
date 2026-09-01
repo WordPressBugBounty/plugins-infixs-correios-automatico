@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico\Services;
 
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
+use Infixs\CorreiosAutomatico\Entities\Order;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -120,7 +121,25 @@ class ReturnService {
 	 * @return bool
 	 */
 	public function isEligible( $order ) {
-		return $this->getDaysRemaining( $order ) >= 0;
+		return $this->isOwnShipment( $order ) && $this->getDaysRemaining( $order ) >= 0;
+	}
+
+	/**
+	 * Whether the order was shipped by one of our methods.
+	 *
+	 * The return is a Correios reverse shipment, so it is only offered for an
+	 * order this plugin shipped: Correios Automático itself, a method linked to
+	 * it, or a carrier extension such as PEX and JadLog. An order carried by an
+	 * unrelated plugin is returned through whatever that plugin offers.
+	 *
+	 * @since 1.10.4
+	 *
+	 * @param \WC_Order $order
+	 *
+	 * @return bool
+	 */
+	public function isOwnShipment( $order ) {
+		return ( new Order( $order ) )->hasInfixsShippingMethod();
 	}
 
 	/**
@@ -155,6 +174,10 @@ class ReturnService {
 	public function requestReturn( $order ) {
 		if ( ! $this->isFeatureActive() ) {
 			return new \WP_Error( 'return_disabled', 'A devolução não está disponível para este pedido.', [ 'status' => 400 ] );
+		}
+
+		if ( ! $this->isOwnShipment( $order ) ) {
+			return new \WP_Error( 'return_not_supported', 'A devolução não está disponível para o método de envio deste pedido.', [ 'status' => 400 ] );
 		}
 
 		if ( ! $this->isEligible( $order ) ) {

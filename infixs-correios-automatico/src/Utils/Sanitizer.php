@@ -14,7 +14,7 @@ class Sanitizer {
 	 * @return string
 	 */
 	public static function numeric_text( $value ) {
-		return preg_replace( '/\D/', '', $value );
+		return preg_replace( '/\D/', '', (string) $value );
 	}
 
 
@@ -130,7 +130,7 @@ class Sanitizer {
 	 * @return string The sanitized cellphone number
 	 */
 	public static function celphone( $value ) {
-		$value = preg_replace( '/\D/', '', $value );
+		$value = preg_replace( '/\D/', '', (string) $value );
 
 		if ( strlen( $value ) === 10 ) {
 			return substr( $value, 0, 2 ) . '9' . substr( $value, 2 );
@@ -155,7 +155,7 @@ class Sanitizer {
 	 * @return string The sanitized phone number
 	 */
 	public static function phone( $value ) {
-		$value = preg_replace( '/\D/', '', $value );
+		$value = preg_replace( '/\D/', '', (string) $value );
 
 		if ( strlen( $value ) === 0 ) {
 			return '';

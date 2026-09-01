@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico\Core\Shipping;
 
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\Admin;
+use Infixs\CorreiosAutomatico\Core\Shipping\Concerns\HasDiscountRules;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Models\WoocommerceShippingZoneMethod;
@@ -24,6 +25,8 @@ defined( 'ABSPATH' ) || exit;
  * @since   1.0.0
  */
 class CorreiosShippingMethod extends \WC_Shipping_Method {
+
+	use HasDiscountRules;
 
 	/**
 	 * Action fired when the shipping cost calculation ends without a rate.
@@ -101,6 +104,28 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @var int
 	 */
 	protected $additional_days = 0;
+
+	/**
+	 * How the delivery time shown on the checkout is built.
+	 *
+	 * `add` sums `additional_days` to what the carrier estimates (the legacy
+	 * behaviour); `fixed` announces `fixed_delivery_days` and ignores the
+	 * carrier estimate entirely.
+	 *
+	 * @since 1.9.1
+	 *
+	 * @var string "add"|"fixed"
+	 */
+	protected $delivery_time_mode = 'add';
+
+	/**
+	 * Delivery time announced when the mode is `fixed`.
+	 *
+	 * @since 1.9.1
+	 *
+	 * @var int
+	 */
+	protected $fixed_delivery_days = 0;
 
 	/**
 	 * Additional tax percentage
@@ -239,32 +264,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	protected $extra_weight_type = 'order';
 
 	/**
-	 * Discount rules
-	 *
-	 * @since 1.1.2
-	 * 
-	 * @var array
-	 */
-	protected $discount_rules = [];
-
-
-	/**
-	 * Discount free title
-	 *
-	 * @since 1.2.2
-	 * 
-	 * @var string
-	 */
-	protected $discount_free_title = 'Frete Grátis';
-
-	/**
-	 * Hidden when no match
-	 *
-	 * @var bool
-	 */
-	protected $hidden_when_no_match = false;
-
-	/**
 	 * Enable import tax
 	 *
 	 * @var bool
@@ -293,20 +292,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @var array
 	 */
 	protected $advanced_rules = [];
-
-	/**
-	 * Hidden others when no match
-	 *
-	 * @var bool
-	 */
-	protected $hidden_others_when_match = false;
-
-	/**
-	 * Show original discounted shipping price
-	 *
-	 * @var bool
-	 */
-	protected $show_original_shipping_discount_price = false;
 
 	/**
 	 * When exceed maximum insurance
@@ -346,6 +331,10 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->origin_postcode = $this->get_option( 'origin_postcode' );
 		$this->estimated_delivery = Sanitizer::boolean( $this->get_option( 'estimated_delivery' ) );
 		$this->additional_days = $this->get_option( 'additional_days' );
+		// Normaliza aqui em vez de confiar só no default do form field: um valor
+		// salvo vazio não cai no default.
+		$this->delivery_time_mode = 'fixed' === $this->get_option( 'delivery_time_mode' ) ? 'fixed' : 'add';
+		$this->fixed_delivery_days = (int) $this->get_option( 'fixed_delivery_days' );
 		$this->additional_tax = $this->get_option( 'additional_tax' );
 		$this->additional_tax_percentage = (int) $this->get_option( 'additional_tax_percentage' );
 		$this->own_hands = Sanitizer::boolean( $this->get_option( 'own_hands' ) );
@@ -364,16 +353,12 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->auto_prepost_delay_value = (int) $this->get_option( 'auto_prepost_delay_value', 1 );
 		$this->auto_prepost_delay_unit = $this->get_option( 'auto_prepost_delay_unit' ) ?? 'minutes';
 		$this->extra_weight_type = $this->get_option( 'extra_weight_type' );
-		$this->discount_rules = $this->get_option( 'discount_rules' );
-		$this->discount_free_title = $this->get_option( 'discount_free_title' );
-		$this->hidden_when_no_match = Sanitizer::boolean( $this->get_option( 'hidden_when_no_match' ) );
+		$this->init_discount_options();
 		$this->hide_exceed = Sanitizer::boolean( $this->get_option( 'hide_exceed' ) );
 		$this->enable_import_tax = Sanitizer::boolean( $this->get_option( 'enable_import_tax' ) );
 		$this->enable_icms_tax = Sanitizer::boolean( $this->get_option( 'enable_icms_tax' ) );
 		$this->when_less_minimum = $this->get_option( 'when_less_minimum' );
 		$this->advanced_rules = $this->get_option( 'advanced_rules' ) ?? [];
-		$this->hidden_others_when_match = Sanitizer::boolean( $this->get_option( 'hidden_others_when_match' ) );
-		$this->show_original_shipping_discount_price = Sanitizer::boolean( $this->get_option( 'show_original_shipping_discount_price' ) );
 		$this->when_exceed_maximum_insurance = $this->get_option( 'when_exceed_maximum_insurance' );
 	}
 
@@ -512,10 +497,28 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'yes',
 			],
+			'delivery_time_mode' => [
+				'title' => __( 'Delivery Time Mode', 'infixs-correios-automatico' ),
+				'type' => 'select',
+				'description' => __( 'Define se o prazo exibido soma dias ao prazo da transportadora ou usa um valor fixo.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'options' => [
+					'add' => __( 'Somar dias ao prazo da transportadora', 'infixs-correios-automatico' ),
+					'fixed' => __( 'Definir um prazo fixo', 'infixs-correios-automatico' ),
+				],
+				'default' => 'add',
+			],
 			'additional_days' => [
 				'title' => __( 'Additional Days', 'infixs-correios-automatico' ),
 				'type' => 'number',
 				'description' => __( 'Enter the additional days for the estimated delivery.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'default' => '0',
+			],
+			'fixed_delivery_days' => [
+				'title' => __( 'Fixed Delivery Days', 'infixs-correios-automatico' ),
+				'type' => 'number',
+				'description' => __( 'Prazo anunciado no checkout, ignorando o prazo da transportadora. Os dias adicionais definidos no produto ou na classe de entrega continuam sendo somados.', 'infixs-correios-automatico' ),
 				'desc_tip' => true,
 				'default' => '0',
 			],
@@ -678,53 +681,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				],
 				'default' => 'order',
 			],
-			'discount_rules' => [
-				'title' => __( 'Discount Rules', 'infixs-correios-automatico' ),
-				'type' => 'array',
-				'description' => __( 'Add or remove discount rules.', 'infixs-correios-automatico' ),
-				'desc_tip' => true,
-				'sanitize_callback' => [ $this, 'sanitize_discount_rules' ],
-				'default' => [
-					[
-						'enabled' => false,
-						'min_amount' => 10000,
-						'max_amount' => 0,
-						'max_amount_enabled' => false,
-						'compare' => 'total',
-						'type' => 'percentage',
-						'value' => '100',
-						'value_amount' => 0,
-					]
-				],
-			],
-			'discount_free_title' => [
-				'title' => __( 'Título quando grátis', 'infixs-correios-automatico' ),
-				'type' => 'text',
-				'description' => __( 'Título do método quando for grátis.', 'infixs-correios-automatico' ),
-				'desc_tip' => true,
-				'default' => 'Frete Grátis',
-			],
-			'hidden_when_no_match' => [
-				'title' => __( 'Hide When no rules match', 'infixs-correios-automatico' ),
-				'type' => 'checkbox',
-				'description' => __( 'Hide the shipping method when no rules match.', 'infixs-correios-automatico' ),
-				'desc_tip' => true,
-				'default' => 'no',
-			],
-			'hidden_others_when_match' => [
-				'title' => __( 'Hide Others When no rules match', 'infixs-correios-automatico' ),
-				'type' => 'checkbox',
-				'description' => __( 'Hide the other shipping methods when no rules match.', 'infixs-correios-automatico' ),
-				'desc_tip' => true,
-				'default' => 'no',
-			],
-			'show_original_shipping_discount_price' => [
-				'title' => __( 'Exibir valor original riscado', 'infixs-correios-automatico' ),
-				'type' => 'checkbox',
-				'description' => __( 'Mostra o valor original do frete riscado antes do valor cobrado quando houver desconto.', 'infixs-correios-automatico' ),
-				'desc_tip' => true,
-				'default' => 'no',
-			],
 			'hide_exceed' => [
 				'title' => __( 'Hide When Exceed', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
@@ -766,7 +722,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'sanitize_callback' => [ $this, 'sanitize_advanced_rules' ],
 				'default' => [],
 			],
-		];
+		] + $this->discount_form_fields();
 	}
 
 	protected function sanitizer_shipping_classes( $value ) {
@@ -774,26 +730,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$available_classes = array_keys( $this->get_shipping_classes_options() );
 		$cleaned = array_intersect( $cleaned, $available_classes );
 		return $cleaned;
-	}
-
-	public function sanitize_discount_rules( $value ) {
-		if ( is_string( $value ) ) {
-			$value = json_decode( stripslashes( $value ), true );
-		}
-
-		if ( ! is_array( $value ) ) {
-			return [];
-		}
-
-		foreach ( $value as $key => $rule ) {
-			$value[ $key ]['min_amount'] = Sanitizer::numeric( $rule['min_amount'] );
-			$value[ $key ]['max_amount'] = Sanitizer::numeric( $rule['max_amount'] );
-			$value[ $key ]['value_amount'] = Sanitizer::numeric( $rule['value_amount'] ?? 0 );
-			$value[ $key ]['method_title_enabled'] = Sanitizer::boolean( $rule['method_title_enabled'] ?? false );
-			$value[ $key ]['method_title'] = sanitize_text_field( $rule['method_title'] ?? '' );
-		}
-
-		return $value;
 	}
 
 	public function sanitize_advanced_rules( $value ) {
@@ -828,6 +764,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'fields' => $this->map_options(),
 				'prefix' => "{$this->plugin_id}{$this->id}_",
 				'advanced_service_groups' => DeliveryServiceCode::getGroups(),
+				'carrier' => 'correios', //@since 1.9.0
 			]
 		);
 
@@ -951,16 +888,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			}
 
 			if ( $key === 'discount_rules' ) {
-				foreach ( $value as $rule_key => $rule ) {
-					$map[ $key ]['value'][ $rule_key ]['min_amount'] = NumberHelper::from100( $rule['min_amount'] );
-					$map[ $key ]['value'][ $rule_key ]['max_amount'] = NumberHelper::from100( $rule['max_amount'] ?? 0 );
-					$map[ $key ]['value'][ $rule_key ]['max_amount_enabled'] = $rule['max_amount_enabled'] ?? false;
-					$map[ $key ]['value'][ $rule_key ]['value_amount'] = isset( $rule['value_amount'] ) ? (int) $rule['value_amount'] / 100 : 0;
-					$map[ $key ]['value'][ $rule_key ]['method_title_enabled'] = Sanitizer::boolean( $rule['method_title_enabled'] ?? false );
-					$map[ $key ]['value'][ $rule_key ]['method_title'] = sanitize_text_field( $rule['method_title'] ?? '' );
-					if ( ! isset( $map[ $key ]['value'][ $rule_key ]['compare'] ) )
-						$map[ $key ]['value'][ $rule_key ]['compare'] = 'total';
-				}
+				$map[ $key ]['value'] = $this->map_discount_rules_value( $value );
 			}
 
 			if ( $key === 'advanced_rules' ) {
@@ -1359,68 +1287,17 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			"shipping_product_code" => $product_code
 		];
 
+		$matched_rule_method_title = null;
+
 		if ( is_array( $this->discount_rules ) ) {
+			$discount_result = $this->apply_discount_rules( $cost, $original_cost, $shipping_package->get_total() );
 
-			$enabled_rules = $this->get_enabled_discount_rules();
-			$matched_rule_method_title = null;
+			$cost = $discount_result['cost'];
+			$matched_rule_method_title = $discount_result['method_title'];
+			$matched = $discount_result['matched'];
+			$enabled_rules = $discount_result['enabled_count'];
 
-			usort( $enabled_rules, function ( $a, $b ) {
-				return $b['min_amount'] <=> $a['min_amount'];
-			} );
-
-			$matched = false;
-
-			foreach ( $enabled_rules as $rule ) {
-				$min_amount = NumberHelper::from100( $rule['min_amount'] );
-				$max_amount_enabled = $rule['max_amount_enabled'] ?? false;
-				$max_amount = NumberHelper::from100( $rule['max_amount'] ?? 0 );
-
-				$total_compare = $rule['compare'] === 'shipping' ? $original_cost : $shipping_package->get_total();
-
-				if ( $total_compare < $min_amount
-					|| (
-						$max_amount_enabled &&
-						$min_amount < $max_amount &&
-						$total_compare > $max_amount
-					)
-				) {
-					continue;
-				}
-
-				$matched = true;
-
-				$type = $rule['type'];
-
-				switch ( $type ) {
-					case 'percentage':
-						$discount = (int) $rule['value'];
-						$cost -= $cost * ( $discount / 100 );
-						break;
-					case 'amount':
-						$discount = (int) $rule['value_amount'] / 100;
-						$cost -= $discount;
-						break;
-					case 'fixed':
-						$price = (int) $rule['value_amount'] / 100;
-						$cost = $price;
-						break;
-				}
-
-				if ( $cost < 0 ) {
-					$cost = 0;
-				}
-
-				if ( Sanitizer::boolean( $rule['method_title_enabled'] ?? false ) ) {
-					$method_title = sanitize_text_field( $rule['method_title'] ?? '' );
-					if ( ! empty( $method_title ) ) {
-						$matched_rule_method_title = $method_title;
-					}
-				}
-
-				break;
-			}
-
-			if ( $this->hidden_when_no_match && ! $matched && count( $enabled_rules ) > 0 ) {
+			if ( $this->hidden_when_no_match && ! $matched && $enabled_rules > 0 ) {
 				Log::info( "Frete não calculado, nenhuma regra de desconto foi atendida (Você optou por ocultar quando não há regras de desconto)." );
 				$this->calculation_failed(
 					'discount_rules_no_match',
@@ -1443,7 +1320,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		if ( $this->estimated_delivery ) {
 
-			if ( $time === false ) {
+			// No modo fixo o prazo da transportadora é ignorado, então não vale
+			// gastar uma requisição para descobri-lo.
+			if ( 'fixed' !== $this->delivery_time_mode && $time === false ) {
 				$shipping_time = new ShippingTime(
 					$product_code,
 					$origin_postcode,
@@ -1469,8 +1348,9 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				}
 			}
 
-			if ( $time !== false ) {
-				$delivery_time = $time + $this->get_additional_days( $package );
+			$delivery_time = $this->resolve_delivery_time( $time, $package );
+
+			if ( false !== $delivery_time ) {
 				$meta_data['delivery_time'] = $delivery_time;
 				$delivery_time_text = $delivery_time . ( $delivery_time > 1 ? ' dias úteis' : ' dia útil' );
 			}
@@ -1480,8 +1360,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 		$meta_data['_final_cost'] = $cost;
 
-		$default_rate_title = $cost > 0 ? $this->title : $this->discount_free_title;
-		$rate_title = isset( $matched_rule_method_title ) && ! empty( $matched_rule_method_title ) ? $matched_rule_method_title : $default_rate_title;
+		$rate_title = $this->discount_rate_title( $cost, $matched_rule_method_title );
 
 		$rate = [
 			'id' => "{$this->id}_{$this->instance_id}",
@@ -1499,14 +1378,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 *
 	 * @return array
 	 */
-	public function get_enabled_discount_rules() {
-		$enabled_rules = array_filter( $this->discount_rules, function ( $rule ) {
-			return $rule['enabled'] === true;
-		} );
-
-		return $enabled_rules;
-	}
-
 	public function get_enabled_advanced_rules() {
 		$enabled_rules = array_filter( $this->advanced_rules, function ( $rule ) {
 			return $rule['enabled'] === true;
@@ -1517,6 +1388,22 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 
 	public function get_additional_days( $package ) {
+		return intval( $this->additional_days ) + $this->get_package_additional_days( $package );
+	}
+
+	/**
+	 * Get the extra days the package itself asks for.
+	 *
+	 * Production time the merchant configured per product or per shipping
+	 * class, independent of how long the carrier takes. The largest one wins.
+	 *
+	 * @since 1.9.1
+	 *
+	 * @param array $package Cart package.
+	 *
+	 * @return int
+	 */
+	public function get_package_additional_days( $package ) {
 		$product_additional_days = 0;
 		foreach ( $package['contents'] as $items ) {
 			/** @var \WC_Product $product */
@@ -1535,7 +1422,31 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			}
 		}
 
-		return intval( $this->additional_days ) + intval( $product_additional_days );
+		return intval( $product_additional_days );
+	}
+
+	/**
+	 * Resolve the delivery time to announce on the checkout.
+	 *
+	 * @since 1.9.1
+	 *
+	 * @param int|false $api_time Delivery time the carrier estimated, false when unknown.
+	 * @param array     $package  Cart package.
+	 *
+	 * @return int|false False when there is no delivery time to show.
+	 */
+	protected function resolve_delivery_time( $api_time, $package ) {
+		if ( 'fixed' === $this->delivery_time_mode ) {
+			$days = max( 0, (int) $this->fixed_delivery_days ) + $this->get_package_additional_days( $package );
+
+			return $days > 0 ? $days : false;
+		}
+
+		if ( false === $api_time ) {
+			return false;
+		}
+
+		return (int) $api_time + $this->get_additional_days( $package );
 	}
 
 	public function get_description( $with_code = true ) {

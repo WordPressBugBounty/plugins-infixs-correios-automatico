@@ -137,6 +137,21 @@ class Person {
 		$foregin_document = null,
 		$notes = null
 	) {
+		/**
+		 * A máscara precisa sair antes do corte do DDD: um telefone como
+		 * `(47)3377-1936` renderia `dddTelefone: "(4"` na prépostagem. Números
+		 * já limpos passam intactos.
+		 */
+		$phone_number = Sanitizer::numeric_text( (string) $phone_number );
+		$cell_number = Sanitizer::numeric_text( (string) $cell_number );
+
+		/**
+		 * Mesmo motivo do telefone: o documento chega do painel do vendedor ou
+		 * das configurações da loja como o usuário digitou, e os Correios
+		 * esperam só os dígitos. O documento estrangeiro tem campo próprio.
+		 */
+		$cpf_cnpj = $cpf_cnpj === null ? null : Sanitizer::numeric_text( (string) $cpf_cnpj );
+
 		$this->name = $name;
 		$this->address = $address;
 		$this->phone_area_code = substr( $phone_number, 0, 2 );
