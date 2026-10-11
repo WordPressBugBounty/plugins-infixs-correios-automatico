@@ -4,6 +4,8 @@
  *
  * @package Infixs\CorreiosAutomatico
  * @since   1.0.0
+ *
+ * @var bool $prepost_with_invoice The prepost of the order travels with the NF-e of the store (no DC-e to print).
  */
 
 defined( 'ABSPATH' ) || exit;
@@ -13,8 +15,14 @@ defined( 'ABSPATH' ) || exit;
 		Imprimir Etiqueta / Declaração
 	</button>
 
-	<button class="button" id="infixs-correios-automatico-print-dce" style="width: 100%;">
-		Imprimir DCe (PDF)
-	</button>
+	<?php if ( ! empty( $prepost_with_invoice ) ) : ?>
+		<p class="infixs-correios-automatico-label-invoice-note" style="margin: 0; text-align: center;">
+			<?php esc_html_e( 'Pré-postagem com NF-e — sem DC-e.', 'infixs-correios-automatico' ); ?>
+		</p>
+	<?php else : ?>
+		<button class="button" id="infixs-correios-automatico-print-dce" style="width: 100%;">
+			Imprimir DCe (PDF)
+		</button>
+	<?php endif; ?>
 
 </div>

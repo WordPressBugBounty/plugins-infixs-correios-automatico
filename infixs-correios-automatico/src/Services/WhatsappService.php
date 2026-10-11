@@ -39,10 +39,50 @@ class WhatsappService {
 	public function init_integration() {
 		if ( function_exists( 'infixs_pingo_notify_app' ) ) {
 			$this->setupNotification();
+			$this->setupOutForDeliveryNotification();
 			add_filter( 'infixs_pingo_notify_woocommerce_order_placeholders', [ $this, 'add_placeholders' ], 10 );
 			add_filter( 'infixs_pingo_notify_woocommerce_order_transform', [ $this, 'transform_data' ], 10, 2 );
 			add_filter( 'infixs_pingo_notify_trigger_classes', [ $this, 'register_triggers' ], 10 );
 		}
+	}
+
+	/**
+	 * Create the default "Saiu para entrega" notification in Pingo Notify.
+	 *
+	 * It has a flag of its own because the one of the first notifications is
+	 * already set on every store that has the plugin: created under that flag,
+	 * this notification would only reach a fresh install. It is created
+	 * inactive, as the others are, and Pingo Notify only matches it once the
+	 * status is turned on.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @return void
+	 */
+	protected function setupOutForDeliveryNotification() {
+		if ( get_option( '_infixs_correios_automatico_whatsapp_out_for_delivery_created', 0 ) ) {
+			return;
+		}
+
+		update_option( '_infixs_correios_automatico_whatsapp_out_for_delivery_created', 1 );
+
+		$notificationService = infixs_pingo_notify_app( \Infixs\PingoNotify\Services\NotificationService::class);
+
+		$notificationService->create( [
+			'title' => 'Saiu para entrega',
+			'triggerId' => 'woocommerce_order_status_change',
+			'connectionId' => '',
+			'isActive' => false,
+			'recipient' => '{{ order.full_phone }}',
+			'messages' => [
+				0 => [
+					'text' => '<p>Olá <strong>{{ order.shipping.first_name }}</strong>,</p><p></p><p>Seu pedido de número <strong>#{{ order.number }}</strong> <strong>saiu para entrega</strong> e deve chegar em breve. É importante ter alguém no endereço para receber.</p><p></p><p>🔍 Códigos:</p><p>{{#each order.correios_tracking_codes}}</p><p>- {{ code }}</p><p>{{/each}}</p><p></p><p>Obrigado!</p><p>Equipe {{ site_name }}</p>',
+				]
+			],
+			'metas' => [
+				'status' => 'wc-out-for-delivery'
+			]
+		] );
 	}
 
 	/**

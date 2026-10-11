@@ -5,7 +5,6 @@ namespace Infixs\CorreiosAutomatico\Services;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Entities\Order;
-use Infixs\CorreiosAutomatico\Marketplace\MarketplaceRegistry;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingRange;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
@@ -40,10 +39,28 @@ class LabelService {
 	 */
 	protected $rangeCodeRepository;
 
-	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository ) {
+	/**
+	 * Shipment context resolver
+	 *
+	 * @since 1.11.0
+	 * @var ShipmentContextResolver
+	 */
+	protected $shipmentContextResolver;
+
+	/**
+	 * Prepost service, which owns the rule of the DC-e of a prepost.
+	 *
+	 * @since 1.11.0
+	 * @var PrepostService
+	 */
+	protected $prepostService;
+
+	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository, ShipmentContextResolver $shipmentContextResolver, PrepostService $prepostService ) {
 		$this->trackingService = $trackingService;
 		$this->shippingService = $shippingService;
 		$this->rangeCodeRepository = $rangeCodeRepository;
+		$this->shipmentContextResolver = $shipmentContextResolver;
+		$this->prepostService = $prepostService;
 	}
 
 	/**
@@ -65,7 +82,7 @@ class LabelService {
 		$labels = [];
 
 		foreach ( $order_ids as $order_id ) {
-			foreach ( $this->resolveShipmentContexts( $order_id, $context ) as $shipment_context ) {
+			foreach ( $this->shipmentContextResolver->resolveShipmentContexts( $order_id, $context ) as $shipment_context ) {
 				$label = $this->getLabelFromOrder( $order_id, $shipment_context );
 
 				if ( ! $label ) {
@@ -77,63 +94,6 @@ class LabelService {
 		}
 
 		return $labels;
-	}
-
-	/**
-	 * Split an order into the shipments that have to be printed separately.
-	 *
-	 * A marketplace order carries one shipping line per vendor, each posted on
-	 * its own contract and from its own address, so printing it whole would put
-	 * one vendor's package under another vendor's label.
-	 *
-	 * Decided from the resolved scope, never from the raw order: a caller that
-	 * already named a vendor or a line — the vendor dashboard does — gets that
-	 * single shipment and nothing else, which is what keeps a vendor from
-	 * receiving the labels of the others.
-	 *
-	 * A store without a marketplace is left alone even when it does have more
-	 * than one freight on the order: there the extra lines are one shipment the
-	 * store split, not one shipment per seller.
-	 *
-	 * @since 1.10.0
-	 *
-	 * @param int   $order_id Order to split.
-	 * @param array $context  Caller context.
-	 *
-	 * @return array[] One context per label to build.
-	 */
-	private function resolveShipmentContexts( $order_id, $context ) {
-		$order = Order::fromId( $order_id );
-
-		if ( ! $order || ! MarketplaceRegistry::forOrder( $order->getOrder() ) ) {
-			return [ $context ];
-		}
-
-		$scope = Order::resolveScope( $order, array_merge( [ 'for' => 'label' ], $context ) );
-
-		if ( ! empty( $scope['vendor_id'] ) || ! empty( $scope['shipping_item_id'] ) ) {
-			return [ $context ];
-		}
-
-		$shipping_items = [];
-
-		foreach ( $order->getShippingItemsPayload() as $shipping_item ) {
-			if ( $shipping_item['is_correios'] ) {
-				$shipping_items[] = $shipping_item['item_id'];
-			}
-		}
-
-		if ( count( $shipping_items ) < 2 ) {
-			return [ $context ];
-		}
-
-		$contexts = [];
-
-		foreach ( $shipping_items as $shipping_item_id ) {
-			$contexts[] = array_merge( $context, [ 'shipping_item_id' => $shipping_item_id ] );
-		}
-
-		return $contexts;
 	}
 
 	/**
@@ -169,21 +129,15 @@ class LabelService {
 		//TODO: Deprecated
 		$products_total_weight = 0;
 
-		$has_dangerous_product = false;
-
 		foreach ( $order->getItems() as $item ) {
 			$product = $item->get_product();
 			if ( ! $product || ! $product->needs_shipping() ) {
 				continue;
 			}
 
-			if ( 'yes' === get_post_meta( $item->get_product_id(), '_infixs_correios_automatico_dangerous_product', true ) ) {
-				$has_dangerous_product = true;
-			}
-
-			$quantity = $item->get_quantity();
+			$quantity = $order->getScopedQuantity( $item );
 			$weight = wc_get_weight( (float) $product->get_weight(), 'kg' );
-			$amount = Sanitizer::money100( $item->get_total(), '.' );
+			$amount = Sanitizer::money100( $order->getScopedLineTotal( $item, $quantity ), '.' );
 			$unit_amount = Sanitizer::money100( $product->get_price(), '.' );
 
 			$items[] = [
@@ -209,6 +163,8 @@ class LabelService {
 
 		$product_code = $order->getShippingProductCode() ?? ( $shipping_method ? $shipping_method->get_product_code() : '00000' );
 
+		$is_volume_label = $scope['shipping_item_id'] && (int) $shipping_metadata['volume_total'] > 1;
+
 		$preposts = [];
 
 		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
@@ -228,6 +184,16 @@ class LabelService {
 
 			$prepost_data = $prepost->toArray();
 
+			/**
+			 * The DACE prints with the key of the DC-e, and that key is on
+			 * every prepost of a shipment that carries one — on the column of
+			 * the DC-e when a sync wrote it, on the key of the prepost when
+			 * the row is older than that column. Reading it here is what lets
+			 * the whole base print the block without asking the Correios
+			 * anything.
+			 */
+			$dce = $this->prepostService->resolveDceFields( $prepost );
+
 			$preposts[] = [
 				'id' => (int) $prepost->id,
 				'order_id' => (int) $prepost->order_id,
@@ -237,12 +203,14 @@ class LabelService {
 				'status_label' => $prepost->status_label,
 				'invoice_number' => $prepost_data['invoice_number'] ?? null,
 				'invoice_key' => $prepost_data['invoice_key'] ?? null,
-				'dce_number' => $prepost_data['dce_number'] ?? null,
-				'dce_series' => $prepost_data['dce_series'] ?? null,
+				'dce_number' => $dce['dce_number'],
+				'dce_series' => $dce['dce_series'],
 				'dce_authorization_protocol' => $prepost_data['dce_authorization_protocol'] ?? null,
+				'dce_access_key' => $dce['dce_access_key'],
+				'dce_issued_at' => $prepost_data['dce_issued_at'] ?? null,
 				'created_at' => $prepost->created_at,
 				'expire_at' => $prepost->expire_at,
-				'dce' => (bool) $prepost->dce,
+				'dce' => $dce['dce'],
 			];
 		}
 
@@ -278,9 +246,11 @@ class LabelService {
 			'preposts' => $preposts,
 			'items' => $items,
 			'ceint' => $this->shippingService->getCeintByPostCode( $address->getPostCode() ),
-			'has_dangerous_product' => $has_dangerous_product,
+			'has_dangerous_product' => $order->hasDangerousProduct(),
 			'vendor_id' => $scope['vendor_id'] ? $scope['vendor_id'] : null,
 			'shipping_item_id' => $scope['shipping_item_id'] ? $scope['shipping_item_id'] : null,
+			'volume_index' => $is_volume_label ? (int) $shipping_metadata['volume_index'] : 1,
+			'volume_total' => $is_volume_label ? (int) $shipping_metadata['volume_total'] : 1,
 			/**
 			 * Filters the return address printed on this label.
 			 *
@@ -556,10 +526,11 @@ class LabelService {
 	 * 
 	 * @param int $order_id
 	 * @param string $service_code
+	 * @param int $shipping_item_id Shipping line the code belongs to, zero for the whole order.
 	 * 
 	 * @return bool|\WP_Error
 	 */
-	public function attachRangeToOrder( $order_id, $service_code ) {
+	public function attachRangeToOrder( $order_id, $service_code, $shipping_item_id = 0 ) {
 		$tracking = $this->useRangeCode( $service_code );
 
 		if ( ! $tracking ) {
@@ -571,6 +542,7 @@ class LabelService {
 
 		$created = $this->trackingService->add( $order_id, $tracking->code, false, [
 			'tracking_range_code_id' => $tracking->id,
+			'shipping_item_id' => $shipping_item_id,
 		] );
 
 		if ( is_wp_error( $created ) ) {

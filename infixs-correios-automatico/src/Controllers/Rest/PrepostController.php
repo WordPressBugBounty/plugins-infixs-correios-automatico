@@ -272,6 +272,44 @@ class PrepostController {
 	}
 
 	/**
+	 * Refresh the DC-e data of a batch of preposts.
+	 *
+	 * The print screen asks for the preposts it is about to print with a DC-e
+	 * and no access key stored: rows created before 1.11.0 have the number and
+	 * the protocol of the DC-e but not the key, so the label cannot print the
+	 * QR Code. One prepost failing never takes the whole batch down — the
+	 * screen prints what it got and reports the rest, each failure with the
+	 * reason the service decided and the order it belongs to.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_REST_Response
+	 */
+	public function refreshDce( $request ) {
+		$preposts = [];
+		$failed = [];
+
+		foreach ( (array) $request->get_param( 'prepost_ids' ) as $prepost_id ) {
+			$prepost = $this->prepostService->ensureDceData( $prepost_id );
+
+			if ( is_wp_error( $prepost ) ) {
+				$failed[] = $this->prepostService->prepareDceFailure( $prepost_id, $prepost );
+
+				continue;
+			}
+
+			$preposts[] = $this->prepostService->prepareDceData( $prepost );
+		}
+
+		return rest_ensure_response( [
+			'preposts' => $preposts,
+			'failed' => $failed,
+		] );
+	}
+
+	/**
 	 * Read the shipment a prepost is being created for.
 	 *
 	 * An order with more than one shipping line — a marketplace order with one

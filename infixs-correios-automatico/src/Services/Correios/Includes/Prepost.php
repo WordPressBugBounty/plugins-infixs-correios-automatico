@@ -348,14 +348,24 @@ class Prepost {
 		 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\Prepost $this
 		 */
 		$items = apply_filters( 'infixs_correios_automatico_prepost_order_items', $order->get_items(), $this->order_id, $this );
+		$quantities = $this->quantitiesFromPackage( $package );
 
 		/** @var \WC_Order_Item_Product $item */
-		foreach ( $items as $item ) {
+		foreach ( $items as $item_id => $item ) {
+			if ( $quantities && ! isset( $quantities[ $item_id ] ) ) {
+				continue;
+			}
+
+			$quantity = isset( $quantities[ $item_id ] ) ? $quantities[ $item_id ] : $item->get_quantity();
 			$product_price = floatval( $item->get_subtotal() );
 			$product = $item->get_product();
 
 			if ( $product && ! $product->needs_shipping() ) {
 				continue;
+			}
+
+			if ( $product_price > 0 && $item->get_quantity() > 0 ) {
+				$product_price = ( $product_price / $item->get_quantity() ) * $quantity;
 			}
 
 			if ( $product_price <= 0 ) {
@@ -369,10 +379,44 @@ class Prepost {
 			$this->content_items[] = [
 				'ncm' => $product ? $product->get_meta( '_infixs_correios_automatico_ncm' ) : '',
 				'content' => preg_replace( '/\s{2,}/', ' ', $item->get_name() ),
-				'quantity' => strval( $item->get_quantity() ),
+				'quantity' => strval( $quantity ),
 				'total' => wc_format_decimal( $product_price, 2 )
 			];
 		}
+	}
+
+	/**
+	 * Units of each order item travelling in the package.
+	 *
+	 * A shipment broken into volumes builds one package per volume, keyed by
+	 * order item, so the prepost of a volume declares what is inside that box
+	 * instead of the whole order. A package that does not name order items —
+	 * one built from the cart, for instance — declares nothing here and leaves
+	 * the whole order in.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param Package|mixed $package Package the prepost is being built from.
+	 *
+	 * @return array<int, int>
+	 */
+	private function quantitiesFromPackage( $package ) {
+		if ( ! $package instanceof Package ) {
+			return [];
+		}
+
+		$order = wc_get_order( $this->order_id );
+		$quantities = [];
+
+		foreach ( $package->get_contents() as $item_id => $values ) {
+			if ( ! is_int( $item_id ) || ! $order->get_item( $item_id ) ) {
+				return [];
+			}
+
+			$quantities[ $item_id ] = isset( $values['quantity'] ) ? (int) $values['quantity'] : 0;
+		}
+
+		return $quantities;
 	}
 
 	public function getItemsTotal() {

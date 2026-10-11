@@ -1,5 +1,6 @@
 <?php
 
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\TrackingEventCode;
 use Infixs\CorreiosAutomatico\Utils\Formatter;
 /**
  * Tracking History Component
@@ -54,7 +55,7 @@ defined( 'ABSPATH' ) || exit;
 												<path fill="#2271b1"
 													d="M170.83 101.17a4 4 0 0 1 0 5.66l-56 56a4 4 0 0 1-5.66 0l-24-24a4 4 0 0 1 5.66-5.66L112 154.34l53.17-53.17a4 4 0 0 1 5.66 0M228 128A100 100 0 1 1 128 28a100.11 100.11 0 0 1 100 100m-8 0a92 92 0 1 0-92 92a92.1 92.1 0 0 0 92-92" />
 											</svg>
-										<?php elseif ( $event['code'] === 'OEC' && $event['type'] == '01' ) : ?>
+										<?php elseif ( TrackingEventCode::isOutForDelivery( $event['code'], $event['type'] ) ) : ?>
 
 											<svg width="266" height="187" viewBox="0 0 266 187" fill="none"
 												xmlns="http://www.w3.org/2000/svg">

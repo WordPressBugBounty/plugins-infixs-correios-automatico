@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Core\Admin\WooCommerce;
 
 use Infixs\CorreiosAutomatico\Core\Emails\DeliveredEmail;
+use Infixs\CorreiosAutomatico\Core\Emails\OutForDeliveryEmail;
 use Infixs\CorreiosAutomatico\Core\Emails\PreparingToShipEmail;
 use Infixs\CorreiosAutomatico\Core\Emails\ReturningEmail;
 use Infixs\CorreiosAutomatico\Core\Emails\TrackingCodeEmail;
@@ -36,6 +37,10 @@ class Email {
 
 		if ( ! isset( $emails['Correios_Automatico_Tracking_Code_Email'] ) ) {
 			$emails['Correios_Automatico_Tracking_Code_Email'] = new TrackingCodeEmail();
+		}
+
+		if ( ! isset( $emails['Correios_Automatico_Out_For_Delivery_Email'] ) ) {
+			$emails['Correios_Automatico_Out_For_Delivery_Email'] = new OutForDeliveryEmail();
 		}
 
 		if ( ! isset( $emails['Correios_Automatico_Waiting_Pickup_Email'] ) ) {

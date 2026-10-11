@@ -43,8 +43,21 @@ class Tracking {
 		add_action( 'infixs_correios_automatico_prepost_controller_created', [ $this, 'manual_prepost_created' ], 10, 2 );
 	}
 
+	/**
+	 * Record the object of a prepost as a tracking code of the order.
+	 *
+	 * The code follows the shipping line the prepost was created for, so an
+	 * order shipped in more than one volume keeps each object on its own line.
+	 *
+	 * @param int     $order_id Order the prepost belongs to.
+	 * @param Prepost $prepost  Prepost created.
+	 *
+	 * @return void
+	 */
 	public function manual_prepost_created( $order_id, Prepost $prepost ) {
-		$this->trackingService->add( $order_id, $prepost->object_code );
+		$this->trackingService->add( $order_id, $prepost->object_code, false, [ 
+			'shipping_item_id' => $prepost->shipping_item_id,
+		] );
 	}
 
 
@@ -190,6 +203,29 @@ class Tracking {
 	}
 
 	/**
+	 * Out for delivery notification.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int      $order_id       Order ID.
+	 * @param string[] $tracking_codes Codes of the objects out for delivery.
+	 *
+	 * @return bool
+	 */
+	public static function trigger_out_for_delivery_email( $order_id, $tracking_codes = [] ) {
+		$mailer = WC()->mailer();
+
+		/** @var \Infixs\CorreiosAutomatico\Core\Emails\OutForDeliveryEmail $notification */
+		$notification = $mailer->emails['Correios_Automatico_Out_For_Delivery_Email'];
+
+		if ( 'yes' === $notification->enabled ) {
+			return $notification->trigger( $order_id, $tracking_codes );
+		}
+
+		return false;
+	}
+
+	/**
 	 * Preparing to ship notification.
 	 *
 	 * @param int $order_id         Order data.
@@ -235,20 +271,22 @@ class Tracking {
 	/**
 	 * Returning notification.
 	 *
-	 * @param int $order_id         Order data.
-	 * @param string|array   $tracking_code The Correios tracking code string.
-	 * @param string $pickup_address The pickup address.
-	 * 
+	 * @since 1.11.0 Accepts the codes of every volume returned.
+	 *
+	 * @param int             $order_id       Order data.
+	 * @param string|string[] $tracking_codes Reverse code, or the codes of every volume returned.
+	 * @param string          $pickup_address The pickup address.
+	 *
 	 * @return bool
 	 */
-	public static function trigger_returning_email( $order_id, $tracking_code, $pickup_address ) {
+	public static function trigger_returning_email( $order_id, $tracking_codes, $pickup_address ) {
 		$mailer = WC()->mailer();
 
 		/** @var \Infixs\CorreiosAutomatico\Core\Emails\ReturningEmail $notification */
 		$notification = $mailer->emails['Correios_Automatico_Returning_Email'];
 
 		if ( 'yes' === $notification->enabled ) {
-			return $notification->trigger( $order_id, $tracking_code );
+			return $notification->trigger( $order_id, $tracking_codes );
 		}
 
 		return false;

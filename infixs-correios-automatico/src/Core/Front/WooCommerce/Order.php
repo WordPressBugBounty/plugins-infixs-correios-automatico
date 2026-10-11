@@ -130,7 +130,7 @@ class Order {
 			wp_enqueue_script(
 				'infixs-correios-automatico-tracking-component',
 				\INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/components/tracking/tracking.js',
-				[ 'jquery' ],
+				[ 'jquery', 'wp-api-fetch' ],
 				filemtime( \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'assets/components/tracking/tracking.js' ),
 				true
 			);
@@ -147,7 +147,6 @@ class Order {
 				'infixsCorreiosAutomaticoTracking',
 				[
 					'restUrl' => esc_url_raw( rest_url( 'infixs-correios-automatico/v1/' ) ),
-					'nonce' => wp_create_nonce( 'wp_rest' ),
 				]
 			);
 		}

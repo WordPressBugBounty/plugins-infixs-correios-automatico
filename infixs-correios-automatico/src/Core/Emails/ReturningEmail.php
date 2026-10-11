@@ -2,6 +2,8 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Emails;
 
+use Infixs\CorreiosAutomatico\Core\Emails\Concerns\ListsTrackingCodes;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -11,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
  * @since   1.4.4
  */
 class ReturningEmail extends \WC_Email {
+	use ListsTrackingCodes;
 
 	/**
 	 * Message.
@@ -148,13 +151,16 @@ class ReturningEmail extends \WC_Email {
 	/**
 	 * Trigger email.
 	 *
-	 * @param  int      $order_id      Order ID.
-	 * @param  \WC_Order $order         Order data.
-	 * @param  array|string   $tracking_codes Tracking code.
-	 * 
+	 * @since 1.4.4
+	 * @since 1.11.0 Accepts the codes of every volume returned.
+	 *
+	 * @param int             $order_id       Order ID.
+	 * @param string|string[] $tracking_codes Reverse code, or the codes of every volume returned.
+	 *
 	 * @return bool
 	 */
-	public function trigger( $order_id, $tracking_code ) {
+	public function trigger( $order_id, $tracking_codes ) {
+		$tracking_codes = array_values( array_filter( (array) $tracking_codes ) );
 
 		if ( ! $order_id ) {
 			return false;
@@ -174,7 +180,7 @@ class ReturningEmail extends \WC_Email {
 			$this->placeholders['{order_number}'] = $this->object->get_order_number();
 			$this->placeholders['{order_date}'] = wc_format_datetime( $this->object->get_date_created() );
 			$this->placeholders['{date}'] = date_i18n( wc_date_format(), time() );
-			$this->placeholders['{tracking_code}'] = $this->get_tracking_code_url( $tracking_code );
+			$this->placeholders['{tracking_code}'] = $tracking_codes ? $this->get_tracking_codes( $tracking_codes ) : '';
 		}
 
 		if ( ! $this->get_recipient() ) {
@@ -217,11 +223,7 @@ class ReturningEmail extends \WC_Email {
 	public function get_content_plain() {
 		ob_start();
 
-		// Format list.
-		$message = $this->get_message();
-		$message = str_replace( '<ul>', "\n", $message );
-		$message = str_replace( '<li>', "\n - ", $message );
-		$message = str_replace( [ '</ul>', '</li>' ], '', $message );
+		$message = $this->format_plain_tracking_codes( $this->get_message() );
 
 		wc_get_template(
 			$this->template_plain,

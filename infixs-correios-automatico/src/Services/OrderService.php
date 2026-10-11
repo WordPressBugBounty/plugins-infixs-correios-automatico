@@ -4,10 +4,12 @@ namespace Infixs\CorreiosAutomatico\Services;
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
+use Infixs\CorreiosAutomatico\Database\OrderFilterConditions;
 use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
+use Infixs\CorreiosAutomatico\Utils\OrderQuery;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 
 defined( 'ABSPATH' ) || exit;
@@ -22,82 +24,96 @@ class OrderService {
 	 * Get orders
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.0 Narrows the listing by carrier and by pendency.
 	 * 
 	 * @param array{
 	 * 			page: int,
-	 * 			per_page: int
-	 * 			search: string
-	 * } $query Query parameters.
+	 * 			per_page: int,
+	 * 			search: string,
+	 * 			status: string[],
+	 * 			carrier: string[],
+	 * 			pending: string[]
+	 * } $query Query parameters, with the filters already sanitized.
 	 * 
 	 * @return array
 	 */
 	public function getOrders( $query ) {
 
-		$page = $query['page'] ?? 1;
-		$per_page = $query['per_page'] ?? 10;
-		$search = $query['search'] ?? null;
-		$status = isset( $query['status'] ) ? explode( ",", $query['status'] ) : Config::get( 'preferences.order.status' );
+		$page = isset( $query['page'] ) ? max( 1, (int) $query['page'] ) : 1;
+		$per_page = isset( $query['per_page'] ) ? max( 1, (int) $query['per_page'] ) : 10;
+		$search = isset( $query['search'] ) ? $query['search'] : null;
+		$statuses = isset( $query['status'] ) ? (array) $query['status'] : [];
+		$carriers = isset( $query['carrier'] ) ? (array) $query['carrier'] : [];
+		$pending = isset( $query['pending'] ) ? (array) $query['pending'] : [];
 
-		$order_query_args = [
+		$order_query_args = [ 
 			'limit' => $per_page,
 			'page' => $page,
 			'paginate' => true,
 			'type' => "shop_order",
-			'status' => $status,
-			'order_by' => 'date',
+			'orderby' => 'date',
 			'order' => 'DESC'
 		];
 
+		$statuses = $statuses ? $statuses : $this->getUnfilteredStatuses();
+
+		if ( $statuses ) {
+			$order_query_args['status'] = $statuses;
+		}
+
+		$conditions = [];
+
+		if ( $carriers ) {
+			$conditions[] = OrderFilterConditions::carriers( $carriers );
+		}
+
+		if ( $pending ) {
+			$conditions[] = OrderFilterConditions::pending( $pending );
+		}
+
 		if ( ! empty( $search ) ) {
-			if ( function_exists( 'wc_get_container' ) &&
-				class_exists( 'Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController' ) &&
-				wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class)->custom_orders_table_usage_is_enabled() ) {
+			if ( OrderQuery::usesOrdersTable() ) {
 				$order_query_args['s'] = $search;
 				$order_query_args['search_filter'] = 'all';
 			} else {
-				$order_query_args['meta_query'] = [
-					'relation' => 'OR',
-					[
-						'key' => '_billing_first_name',
-						'value' => $search,
-						'compare' => 'LIKE'
-					],
-					[
-						'key' => '_billing_last_name',
-						'value' => $search,
-						'compare' => 'LIKE'
-					],
-					[
-						'key' => '_billing_email',
-						'value' => $search,
-						'compare' => 'LIKE'
-					],
-					[
-						'key' => '_billing_address_1',
-						'value' => $search,
-						'compare' => 'LIKE'
-					],
-				];
-
-				if ( is_numeric( $search ) ) {
-					$order_query_args['post__in'] = [ absint( $search ) ];
-				}
+				$conditions[] = OrderFilterConditions::search( $search );
 			}
 		}
 
-		$orders = wc_get_orders( $order_query_args );
+		$orders = wc_get_orders( OrderQuery::withConditions( $order_query_args, $conditions ) );
 
 		$data = $this->transformOrders( $orders->orders );
 
-		$max_num_pages = $orders->max_num_pages;
-
-		return [
+		return [ 
 			'page' => $page,
 			'per_page' => $per_page,
 			'total_results' => count( $data ),
-			'total' => $orders->total ?? 0,
+			'total' => isset( $orders->total ) ? (int) $orders->total : 0,
+			'total_pages' => isset( $orders->max_num_pages ) ? (int) $orders->max_num_pages : 0,
 			'orders' => $data,
 		];
+	}
+
+	/**
+	 * Get the statuses a listing without a status filter shows.
+	 *
+	 * Every order status of the store, but the ones kept out of searches: the
+	 * checkout drafts of the block checkout are carts that were never placed,
+	 * and the "Todos" list of the WooCommerce leaves them out too. On its own,
+	 * `wc_get_orders()` would bring them in.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @return string[]
+	 */
+	private function getUnfilteredStatuses() {
+		if ( ! function_exists( 'wc_get_order_statuses' ) ) {
+			return [];
+		}
+
+		$hidden = get_post_stati( [ 'exclude_from_search' => true ] );
+
+		return array_values( array_diff( array_keys( wc_get_order_statuses() ), $hidden ) );
 	}
 
 	/**
@@ -147,11 +163,19 @@ class OrderService {
 	 * 
 	 * @param int $instance_id Shipping method instance ID.
 	 * @param int $order_id Order ID.
+	 * @param int $shipping_item_id Shipping line being quoted, zero for the whole order. @since 1.11.0
 	 * 
 	 * @return array
 	 */
-	public function calculateShipping( $instance_id, $order_id ) {
+	public function calculateShipping( $instance_id, $order_id, $shipping_item_id = 0 ) {
 		$ca_order = Order::fromId( $order_id );
+
+		if ( $ca_order && $shipping_item_id ) {
+			$ca_order->applyScope( Order::resolveScope( $ca_order, [ 
+				'for' => 'calculate',
+				'shipping_item_id' => $shipping_item_id,
+			] ) );
+		}
 
 		$rates = Container::shippingService()->calculateShippingByMethod( $instance_id, $ca_order->getPackageData() );
 

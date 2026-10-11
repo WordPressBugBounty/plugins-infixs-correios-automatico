@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico\Core\Admin\WooCommerce;
 
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Services\LabelService;
+use Infixs\CorreiosAutomatico\Services\PrepostService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -24,12 +25,22 @@ class Label {
 	private $labelService;
 
 	/**
+	 * Prepost Service instance.
+	 *
+	 * @since 1.11.0
+	 * @var PrepostService
+	 */
+	private $prepostService;
+
+	/**
 	 * Label constructor.
 	 *
 	 * @since 1.0.0
+	 * @since 1.11.0 Takes the prepost service, to tell a prepost sent with the NF-e of the store.
 	 */
-	public function __construct( LabelService $labelService ) {
+	public function __construct( LabelService $labelService, PrepostService $prepostService ) {
 		$this->labelService = $labelService;
+		$this->prepostService = $prepostService;
 	}
 
 
@@ -48,8 +59,11 @@ class Label {
 	}
 
 	/**
-	 * Render the tracking code meta box.
-	 * 
+	 * Render the label meta box.
+	 *
+	 * @since 1.0.0
+	 * @since 1.11.0 No DC-e to print for a prepost sent with the NF-e of the store.
+	 *
 	 * @param \WP_Post|\WC_Order $post
 	 * @return void
 	 */
@@ -62,8 +76,11 @@ class Label {
 			return;
 
 		$order_id = $order->get_id();
+		$prepost_id = $order->get_meta( '_infixs_correios_automatico_prepost_id' );
+		$prepost = $prepost_id ? $this->prepostService->getPrepost( $prepost_id ) : null;
+		$prepost_with_invoice = $prepost && $this->prepostService->hasStoreInvoiceOnly( $prepost );
 
-		include_once INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'src/Presentation/admin/views/html-label-meta-box.php';
+		include INFIXS_CORREIOS_AUTOMATICO_PLUGIN_PATH . 'src/Presentation/admin/views/html-label-meta-box.php';
 
 	}
 

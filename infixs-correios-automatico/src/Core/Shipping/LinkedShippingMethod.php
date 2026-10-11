@@ -83,6 +83,59 @@ class LinkedShippingMethod {
 	}
 
 	/**
+	 * Get the native shipping method instances linked to a Correios method.
+	 *
+	 * The instances are read from their settings options, the same place
+	 * `resolve_from_item()` reads the link from, so a line of one of them counts
+	 * as a Correios line even when it was placed before the link existed. The
+	 * WooCommerce deletes those options along with the instance.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @return array<string, int[]> Instance ids keyed by native method id.
+	 */
+	public static function linked_instances() {
+		global $wpdb;
+
+		$method_ids = array_values( array_filter( (array) self::supported_method_ids(), 'is_string' ) );
+
+		if ( ! $method_ids ) {
+			return [];
+		}
+
+		$patterns = [];
+
+		foreach ( $method_ids as $method_id ) {
+			$patterns[] = $wpdb->esc_like( "woocommerce_{$method_id}_" ) . '%' . $wpdb->esc_like( '_settings' );
+		}
+
+		$option_names = $wpdb->get_col(
+			$wpdb->prepare(
+				"SELECT option_name FROM {$wpdb->options} WHERE " . implode( ' OR ', array_fill( 0, count( $patterns ), 'option_name LIKE %s' ) ),
+				$patterns
+			)
+		); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		$linked = [];
+
+		foreach ( (array) $option_names as $option_name ) {
+			foreach ( $method_ids as $method_id ) {
+				if ( ! preg_match( '/^woocommerce_' . preg_quote( $method_id, '/' ) . '_(\d+)_settings$/', $option_name, $matches ) ) {
+					continue;
+				}
+
+				$instance_id = absint( $matches[1] );
+
+				if ( self::get_linked_method( $method_id, $instance_id ) ) {
+					$linked[ $method_id ][] = $instance_id;
+				}
+			}
+		}
+
+		return $linked;
+	}
+
+	/**
 	 * Get the Correios method linked to a native shipping method instance.
 	 *
 	 * @since 1.8.0

@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.10.4
+Stable tag: 1.11.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -30,7 +30,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Preenchimento Automático de Endereço** - No checkout, quando seu cliente preencher o CEP, os campos de endereço, bairro, cidade e estado são preenchidos automaticamente.
 - **Declaração de Conteúdo Eletronica (DCe ou DACE)** - Emissao de declaração de conteúdo eletrônica em conformidade com o sefaz e correios sem necessidade de nota fiscal.
 - **Calculo de frete simplificado no Carrinho** - Calculo de frete rápido e simplificado no carrinho, sem campos desnecessários substituindo plugins que fazem o mesmo em um só.
-- **Novos Status de Pedido** - Opcionalmente você pode adicionar novos Status ao pedido, como "Preparando envio", "Em transporte", "Aguardando Retirada", "Entregue", "Em Devolução".
+- **Novos Status de Pedido** - Opcionalmente você pode adicionar novos Status ao pedido, como "Preparando envio", "Em transporte", "Saiu para entrega", "Aguardando Retirada", "Entregue", "Em Devolução".
 - **Código de rastreamento em Lote** - Atualize o código de rastreamento de vários pedidos ao memso tempo.
 - **Frete Grátis e Descontos** - Adicione regras para dar o frete grátis ou descontos para seu cliente a partir do total do carrinho.
 - **Devolução de Produto** - Habilite o botão de devolução de produto no seu site para seu cliente de forma fácil e rápida.
@@ -51,7 +51,7 @@ Qualquer pessoa pode usar o plugin, você não precisa de um contrato com os cor
 - **Impressão Automatica de Etiqueta (Sem clicar)** - Instale nosso aplicativo para Windows, Linux ou MAC para que todos os pedidos que sairem sejam impressos automáticamente sem você precisar fazer nada.
 - **Frete Internacional Automatizado** - Exporte seu produto com Exporta Fácil, calculo de frete internacional, remessa conforme, etiqueta unitizadora, CN35, CN36 e muito mais.
 - **Pré-Postagem Automática** - Se você tiver um contrato com os correios, a pré-postagem é feita automática.
-- **Alteração de Status do Pedido Automático** - Status do pedido é alterado para concluído automaticamente assim que o cliente receber o pedido, também pode ser configurado para mudar automáticamente para "Em transporte".
+- **Alteração de Status do Pedido Automático** - Status do pedido é alterado para concluído automaticamente assim que o cliente receber o pedido, também pode ser configurado para mudar automáticamente para "Em transporte" e "Saiu para entrega".
 - **Barra de Frete Grátis** - Adiciona uma barra com porcentagem mostrando o quanto falta para o cliente ter frete grátis na loja, a partir das suas configurações de desconto nos Correios Automático.
 - **Devolução Automática de Produto** - Seu cliente solicita a devolução e o plugin faz todo o resto para você.
 - **Rastreamento Automático** - Não se preocupe em adicionar o código de rastreamento, o plugin adiciona automáticamente pra você.
@@ -140,6 +140,47 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.11.0 2026-10-08 =
+* Status: novo status de pedido "Saiu para entrega", com e-mail para o cliente e aviso por WhatsApp pelo Pingo Notify
+* Rastreio: o ícone de saída para entrega aparece em todos os eventos de saída dos Correios
+* Pedidos: filtros por transportadora e por pendência, junto do status, num painel só
+* Pedidos: aviso na lista quando o filtro esconde todos os pedidos
+* Pedidos: o filtro escolhido pode ser salvo como padrão da lista
+* Pedidos: corrigida a busca por nome e e-mail em lojas sem o armazenamento novo do WooCommerce
+* Pedidos: pedido sem método de entrega recebe um pela lista de pedidos do plugin
+* Frete: encomenda acima do limite dos Correios dividida em volumes pelo encaixe dos produtos e cotada volume a volume
+* Método de entrega: nova opção "Dividir em volumes" na aba Dimensões, ligada por padrão
+* Pedido: cada volume vira uma linha de frete, com nome da embalagem, etiqueta, pré-postagem e código de rastreio próprios
+* Etiqueta: cada volume mostra "Volume 1/2" e declara só o valor dos produtos dele
+* Etiqueta: nova opção "Embutir DCe" imprime a DACE com QR Code e chave de acesso da DC-e
+* Impressão: DACE também nas pré-postagens feitas antes desta versão
+* Impressão: no celular, as configurações da etiqueta abrem por cima da prévia
+* Pré-postagem: usa a NF-e do pedido emitida por outro plugin, no lugar da DC-e
+* Pedido: NF-e da pré-postagem na tela do pedido
+* Pedidos: a lista mostra a NF-e de cada pedido
+* Pré-postagem: uma pré-postagem por volume, também na criação em lote
+* Pré-postagem: erro e cancelamento de um volume não afetam os outros
+* Pré-postagem: produto perigoso marcado só no volume que o leva
+* Pré-postagem: a tela do pedido no WooCommerce lista a pré-postagem de cada volume
+* Código de faixa: escolha do volume que recebe o código
+* Devolução automática: uma reversa por volume
+* Minha Conta: a devolução mostra o código de cada volume
+* Seguro: valor máximo conferido por volume
+* Calculadora de frete: volumes cotados com seguro na página do produto
+* WhatsApp: o botão de rastreio envia o código de cada volume
+* Extensões: suporte ao Loggi Automático no painel
+* Extensões: cartão do SquidCore ERP, com link para a configuração da nota fiscal
+* Configurações: nova aba Embalagens, disponível no PRO
+* Rastreio: apagar um código de rastreio também apaga o histórico dele
+* Painel: telas não caem mais em erro com o nonce vencido
+* Painel: funciona em servidores que não atendem o endereço /wp-json
+* Painel: histórico de rastreio e listas paginadas carregam em sites com links permanentes simples
+* Pedidos e impressão: erro de carregamento mostrado na tela
+* Pedido: recalcular o frete não coloca mais o prazo de entrega no nome da linha
+* Pedido: dados internos do frete não aparecem mais na tela do pedido
+* Regras do método: trocar o tipo da regra seleciona uma condição válida
+* Frete: contrato sem a lista de serviços liberados não gera mais erro no cálculo
 
 = 1.10.4 2026-09-01 =
 * Marketplace: suporte a Dokan e WCFM — remetente e contrato do vendedor, uma etiqueta por frete do pedido e escolha do que fazer com o vendedor sem contrato

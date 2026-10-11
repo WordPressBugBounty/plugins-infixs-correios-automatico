@@ -5,6 +5,7 @@ namespace Infixs\CorreiosAutomatico\Services;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Entities\Order;
+use Infixs\CorreiosAutomatico\Utils\ShipmentCodesFormatter;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -46,15 +47,36 @@ class ReturnService {
 	/** @var TrackingService */
 	protected $trackingService;
 
+	/** @var ShipmentContextResolver */
+	protected $shipmentContextResolver;
+
 	/**
-	 * @param PrepostService  $prepostService
-	 * @param TrackingService $trackingService
+	 * Whether the notification of each reverse prepost is on hold.
+	 *
+	 * An automatic return in volumes tells the customer every code at once,
+	 * after the last box.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @var bool
 	 */
-	public function __construct( PrepostService $prepostService, TrackingService $trackingService ) {
+	private $holdReverseNotifications = false;
+
+	/**
+	 * Notifies the customer (code) whenever a reverse prepost is created, automatically or by hand.
+	 *
+	 * @since 1.8.0
+	 * @since 1.11.0 Receives the shipment context resolver.
+	 *
+	 * @param PrepostService          $prepostService
+	 * @param TrackingService         $trackingService
+	 * @param ShipmentContextResolver $shipmentContextResolver
+	 */
+	public function __construct( PrepostService $prepostService, TrackingService $trackingService, ShipmentContextResolver $shipmentContextResolver ) {
 		$this->prepostService = $prepostService;
 		$this->trackingService = $trackingService;
+		$this->shipmentContextResolver = $shipmentContextResolver;
 
-		// Notify the customer (code) whenever a reverse prepost is created (auto or manual).
 		add_action( 'infixs_correios_automatico_reverse_prepost_created', [ $this, 'onReverseCreated' ], 10, 2 );
 	}
 
@@ -162,10 +184,11 @@ class ReturnService {
 	 * Handle a customer return request.
 	 *
 	 * Marks the order as returning, and (when auto_return is enabled) creates the
-	 * reverse prepost. The customer notification with the reverse code is sent by
-	 * {@see onReverseCreated()} once a reverse prepost exists.
+	 * reverse preposts. The customer is notified with the reverse codes once they
+	 * exist.
 	 *
 	 * @since 1.8.0
+	 * @since 1.11.0 Creates one reverse prepost per shipment.
 	 *
 	 * @param \WC_Order $order
 	 *
@@ -194,15 +217,7 @@ class ReturnService {
 		$order->update_status( 'returning', __( 'Correios Automático - Devolução solicitada pelo cliente.', 'infixs-correios-automatico' ) );
 
 		if ( Config::boolean( 'return.auto_return' ) ) {
-			$reverse = $this->prepostService->createReversePrepost( $order->get_id() );
-
-			if ( is_wp_error( $reverse ) ) {
-				// Keep the request registered; the store can create the reverse prepost manually.
-				Log::notice( 'Não foi possível criar a pré-postagem reversa automaticamente.', [
-					'order_id' => $order->get_id(),
-					'message' => $reverse->get_error_message(),
-				] );
-			}
+			$this->createReversePreposts( $order );
 		}
 
 		return [
@@ -212,10 +227,61 @@ class ReturnService {
 	}
 
 	/**
+	 * Create the reverse preposts of a return, one per shipment.
+	 *
+	 * An order shipped as a single package gets one reverse prepost for the
+	 * whole order, notified by {@see onReverseCreated()}. An order shipped in
+	 * volumes, or by more than one vendor, gets one per shipping line, since the
+	 * boxes together may exceed what the Correios take in one object; the
+	 * customer is then told once, with the codes that were created. A shipment
+	 * that fails keeps the request registered and its error on its own line, for
+	 * the store to create that reverse prepost by hand.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order $order Order being returned.
+	 *
+	 * @return void
+	 */
+	private function createReversePreposts( $order ) {
+		$order_id = $order->get_id();
+		$contexts = $this->shipmentContextResolver->resolveShipmentContexts( $order_id, [] );
+		$grouped = count( $contexts ) > 1;
+		$created = [];
+
+		$this->holdReverseNotifications = $grouped;
+
+		try {
+			foreach ( $contexts as $context ) {
+				$reverse = $this->prepostService->createReversePrepost( $order_id, $context );
+
+				if ( is_wp_error( $reverse ) ) {
+					Log::notice( 'Não foi possível criar a pré-postagem reversa automaticamente.', [
+						'order_id' => $order_id,
+						'shipping_item_id' => isset( $context['shipping_item_id'] ) ? $context['shipping_item_id'] : 0,
+						'message' => $reverse->get_error_message(),
+					] );
+
+					continue;
+				}
+
+				$created[] = $reverse;
+			}
+		} finally {
+			$this->holdReverseNotifications = false;
+		}
+
+		if ( $grouped && $created ) {
+			$this->notifyReverseCodes( $order_id, $created );
+		}
+	}
+
+	/**
 	 * Send the customer notifications (e-mail + WhatsApp) with the reverse code.
 	 *
 	 * Hooked to `infixs_correios_automatico_reverse_prepost_created`, so it runs
-	 * for both automatic and manual (admin) reverse prepost creation.
+	 * for both automatic and manual (admin) reverse prepost creation. An
+	 * automatic return in volumes holds it and notifies every code at the end.
 	 *
 	 * @since 1.8.0
 	 *
@@ -225,14 +291,77 @@ class ReturnService {
 	 * @return void
 	 */
 	public function onReverseCreated( $order_id, $prepost ) {
-		$reverse_code = is_object( $prepost ) && isset( $prepost->object_code ) ? $prepost->object_code : '';
+		if ( $this->holdReverseNotifications ) {
+			return;
+		}
+
+		$this->notifyReverseCodes( $order_id, [ $prepost ] );
+	}
+
+	/**
+	 * Get the reverse codes of an order, one line per returned shipment.
+	 *
+	 * A code of a volume reads "Volume i/N: CODE". Reverse preposts created
+	 * before 1.11.0 are not listed.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order $order Order returned.
+	 *
+	 * @return string[]
+	 */
+	public function getReturnCodeLines( $order ) {
+		$reverse_preposts = $this->prepostService->getReversePreposts( $order );
+
+		if ( ! $reverse_preposts ) {
+			return [];
+		}
+
+		return ShipmentCodesFormatter::lines( new Order( $order ), $reverse_preposts );
+	}
+
+	/**
+	 * Send a single e-mail and a single WhatsApp with the codes of reverse preposts.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int                                         $order_id Order returned.
+	 * @param \Infixs\CorreiosAutomatico\Models\Prepost[] $preposts Reverse preposts created.
+	 *
+	 * @return void
+	 */
+	private function notifyReverseCodes( $order_id, $preposts ) {
+		$codes = [];
+
+		foreach ( $preposts as $prepost ) {
+			if ( ! is_object( $prepost ) || empty( $prepost->object_code ) ) {
+				continue;
+			}
+
+			$codes[] = [
+				'code' => $prepost->object_code,
+				'shipping_item_id' => (int) $prepost->shipping_item_id,
+			];
+		}
+
+		$code_list = wp_list_pluck( $codes, 'code' );
 
 		if ( Config::boolean( 'return.send_email' ) ) {
-			$this->trackingService->sendReturningNotification( $order_id, $reverse_code, '' );
+			$this->trackingService->sendReturningNotification( $order_id, $code_list, '' );
 		}
 
 		if ( Config::boolean( 'return.send_whatsapp' ) ) {
-			do_action( self::RETURN_TRIGGER_HOOK, $order_id, $reverse_code );
+			/**
+			 * Fires when the customer has to receive the codes of a return.
+			 *
+			 * @since 1.8.0
+			 * @since 1.11.0 Passes the code of every volume returned.
+			 *
+			 * @param int     $order_id     Order returned.
+			 * @param string  $return_code  Reverse codes, separated by commas; may be empty.
+			 * @param array[] $return_codes Reverse codes, each with `code` and `shipping_item_id`.
+			 */
+			do_action( self::RETURN_TRIGGER_HOOK, $order_id, implode( ', ', $code_list ), $codes );
 		}
 	}
 }

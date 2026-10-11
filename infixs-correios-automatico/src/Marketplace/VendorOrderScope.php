@@ -55,7 +55,11 @@ class VendorOrderScope {
 		}
 
 		$scope['vendor_id'] = $vendor_id;
-		$scope['item_ids'] = array_keys( $adapter->getOrderItemsByVendor( $wc_order, $vendor_id ) );
+		$scope['item_ids'] = $this->scopeItems( $scope, array_keys( $adapter->getOrderItemsByVendor( $wc_order, $vendor_id ) ) );
+
+		if ( ! empty( $scope['item_quantities'] ) ) {
+			$scope['item_quantities'] = array_intersect_key( $scope['item_quantities'], array_flip( $scope['item_ids'] ) );
+		}
 
 		if ( empty( $scope['shipping_item_id'] ) ) {
 			$shipping_item = $adapter->getOrderShippingItem( $wc_order, $vendor_id );
@@ -84,6 +88,29 @@ class VendorOrderScope {
 		}
 
 		return $scope;
+	}
+
+	/**
+	 * Get the items of the vendor that are in scope.
+	 *
+	 * A volume of the vendor already names the items packed in its box, so the
+	 * scope keeps only those of them that are the vendor's.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array $scope           Scope built so far.
+	 * @param int[] $vendor_item_ids Order items of the vendor.
+	 *
+	 * @return int[]
+	 */
+	private function scopeItems( $scope, $vendor_item_ids ) {
+		if ( empty( $scope['item_ids'] ) ) {
+			return $vendor_item_ids;
+		}
+
+		$volume_item_ids = array_values( array_intersect( $scope['item_ids'], $vendor_item_ids ) );
+
+		return $volume_item_ids ? $volume_item_ids : $vendor_item_ids;
 	}
 
 	/**

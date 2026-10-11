@@ -11,14 +11,56 @@ use Infixs\CorreiosAutomatico\Utils\Formatter;
  * @global bool $has_prepost
  * @global string $cancel_prepost_url
  * @global bool $is_correios_automatico
- * 
+ * @global array $volume_rows Name, status and link of the prepost of each volume, empty when the order was not split. @since 1.11.0
+ * @global string $dashboard_url Order on the dashboard. @since 1.11.0
+ * @global array|null $invoice NF-e of the order, as the order invoice resolver answers it. @since 1.11.0
+ * @global bool $waiting_invoice Whether the automatic prepost waits for the NF-e. @since 1.11.0
+ *
  * @since   1.0.0
  */
 
 defined( 'ABSPATH' ) || exit;
 ?>
 <?php if ( $is_correios_automatico ) : ?>
-	<?php if ( ! $has_prepost || ( $has_prepost && $prepost->status == PrepostStatusCode::CANCELADO ) ) : ?>
+	<?php if ( $waiting_invoice ) : ?>
+		<div class="notice notice-info inline infixs-correios-automatico-prepost-waiting-invoice" style="margin: 10px 0 0;">
+			<p><?php esc_html_e( 'A pré-postagem automática está aguardando a nota fiscal (NF-e) deste pedido.', 'infixs-correios-automatico' ); ?></p>
+		</div>
+	<?php endif; ?>
+	<?php if ( $volume_rows ) : ?>
+		<ul style="margin: 10px 0;">
+			<?php foreach ( $volume_rows as $volume_row ) : ?>
+				<li style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+					<strong><?php echo esc_html( $volume_row['name'] ); ?></strong>
+					<span>—</span>
+					<span><?php echo esc_html( $volume_row['status'] ); ?></span>
+					<?php if ( $volume_row['url'] ) : ?>
+						<span>—</span>
+						<a target="_blank" href="<?php echo esc_url( $volume_row['url'] ); ?>">Ver</a>
+					<?php endif; ?>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+		<?php if ( $has_prepost && $prepost->status == PrepostStatusCode::PREPOSTADO ) : ?>
+			<input type="hidden" name="infixs_correios_automatico_prepost_id" id="infixs_correios_automatico_prepost_id"
+				value="<?php echo esc_attr( $prepost->id ); ?>" />
+		<?php endif; ?>
+		<p>Este pedido foi dividido em volumes. Crie a pré-postagem de cada volume pelo painel.</p>
+		<a target="_blank" class="button button-primary" style="display: block; text-align: center;"
+			href="<?php echo esc_url( $dashboard_url ); ?>">Abrir no painel</a>
+	<?php elseif ( ! $has_prepost || ( $has_prepost && $prepost->status == PrepostStatusCode::CANCELADO ) ) : ?>
+		<?php if ( $invoice ) : ?>
+			<p class="infixs-correios-automatico-prepost-invoice-hint" style="margin: 10px 0 0;">
+				<?php
+				echo esc_html( sprintf(
+					/* translators: 1: invoice number, 2: where the invoice came from */
+					__( 'NF-e nº %1$s (%2$s)', 'infixs-correios-automatico' ),
+					$invoice['invoice_number'],
+					$invoice['source_label']
+				) );
+				?>
+			</p>
+		<?php endif; ?>
 		<div class="infixs-correios-automatico-prepost-box"
 			style="display: flex; width: 100%; gap: 10px; margin-top: 10px; position: relative;">
 			<button id="infixs-correios-automatico-create-prepost-declaration"
@@ -49,8 +91,10 @@ defined( 'ABSPATH' ) || exit;
 			</button>
 		</div>
 		<div class="infixs-correios-automatico-prepost-invoice-box">
-			<input type="text" id="infixs-correios-automatico-prepost-invoice-number" placeholder="Número da nota fiscal" />
-			<input type="text" id="infixs-correios-automatico-prepost-invoice-key" placeholder="Chave da nota fiscal" />
+			<input type="text" id="infixs-correios-automatico-prepost-invoice-number" placeholder="Número da nota fiscal"
+				value="<?php echo esc_attr( $invoice ? $invoice['invoice_number'] : '' ); ?>" />
+			<input type="text" id="infixs-correios-automatico-prepost-invoice-key" placeholder="Chave da nota fiscal"
+				value="<?php echo esc_attr( $invoice ? $invoice['invoice_key'] : '' ); ?>" />
 			<div style="display: flex; gap: 10px;">
 				<button class="button button-primary infixs-correios-automatico-create-prepost-invoice-create"
 					style="width: 100%">Criar</button>

@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico\Repositories;
 
 use Infixs\CorreiosAutomatico\Core\Support\Repository;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
+use Infixs\CorreiosAutomatico\Models\TrackingCodeEvent;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -37,7 +38,11 @@ class TrackingRepository extends Repository {
 	}
 
 	/**
-	 * Delete a tracking code.
+	 * Delete a tracking code and its events.
+	 * 
+	 * The events table has no foreign key: events left behind would never be
+	 * reached again, and a tracking code that later reuses the ID would show
+	 * them as its own history. They go only once the code itself is gone.
 	 * 
 	 * @since 1.0.0
 	 * 
@@ -46,7 +51,13 @@ class TrackingRepository extends Repository {
 	 * @return int|bool The number of rows affected or false on error.
 	 */
 	public function delete( $id ) {
-		return TrackingCode::where( 'id', $id )->delete();
+		$deleted = TrackingCode::where( 'id', $id )->delete();
+
+		if ( $deleted ) {
+			TrackingCodeEvent::where( 'tracking_code_id', $id )->delete();
+		}
+
+		return $deleted;
 	}
 
 	/**

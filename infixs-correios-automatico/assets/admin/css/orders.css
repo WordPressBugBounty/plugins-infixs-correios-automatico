@@ -145,6 +145,11 @@ td.infixs-correios-automatico-actions-column.column-infixs-correios-automatico-a
 	color: #333;
 }
 
+.order-status.status-out-for-delivery {
+	background-color: #f9d8b0;
+	color: #6b3d00;
+}
+
 td.infixs-correios-automatico-actions-column.column-infixs-correios-automatico-actions-column {
 	cursor: default !important;
 }

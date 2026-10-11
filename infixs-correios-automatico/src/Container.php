@@ -11,6 +11,7 @@ use Infixs\CorreiosAutomatico\Models\Unit;
 use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
+use Infixs\CorreiosAutomatico\Services\OrderInvoiceResolver;
 use Infixs\CorreiosAutomatico\Services\OrderService;
 use Infixs\CorreiosAutomatico\Services\UnitService;
 use Pimple\Container as PimpleContainer;
@@ -35,6 +36,9 @@ use Infixs\CorreiosAutomatico\Services\ReturnService;
 use Infixs\CorreiosAutomatico\Repositories\NotificationRepository;
 use Infixs\CorreiosAutomatico\Services\NotificationService;
 use Infixs\CorreiosAutomatico\Services\VendorContractService;
+use Infixs\CorreiosAutomatico\Services\ShipmentContextResolver;
+use Infixs\CorreiosAutomatico\Services\VolumeLineExpander;
+use Infixs\CorreiosAutomatico\Services\Correios\Packing\VolumePlanner;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -91,14 +95,18 @@ class Container {
 		$this->container['trackingService'] = fn( $c ) => new TrackingService( $c['trackingRepository'], $c['correiosService'], $c['configRepository'] );
 		$this->container['prepostService'] = fn( $c ) => new PrepostService( $c['prepostRepository'], $c['correiosService'] );
 		$this->container['orderService'] = fn() => new OrderService();
+		$this->container['orderInvoiceResolver'] = fn() => new OrderInvoiceResolver();
 		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'] );
 		$this->container['emailService'] = fn() => new EmailService();
-		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'] );
+		$this->container['shipmentContextResolver'] = fn() => new ShipmentContextResolver();
+		$this->container['volumePlanner'] = fn() => new VolumePlanner();
+		$this->container['volumeLineExpander'] = fn() => new VolumeLineExpander();
+		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'], $c['shipmentContextResolver'], $c['prepostService'] );
 		$this->container['invoiceUnitService'] = fn( $c ) => new InvoiceUnitService( $c['invoiceUnitRepository'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
 		$this->container['settingsService'] = fn() => new SettingsService();
 		$this->container['whatsappService'] = fn( $c ) => new WhatsappService( $c['trackingService'] );
-		$this->container['returnService'] = fn( $c ) => new ReturnService( $c['prepostService'], $c['trackingService'] );
+		$this->container['returnService'] = fn( $c ) => new ReturnService( $c['prepostService'], $c['trackingService'], $c['shipmentContextResolver'] );
 		$this->container['notificationRepository'] = fn() => new NotificationRepository( Notification::class);
 		$this->container['notificationService'] = fn( $c ) => new NotificationService( $c['notificationRepository'] );
 		$this->container['vendorContractService'] = fn() => new VendorContractService();
@@ -199,6 +207,36 @@ class Container {
 	}
 
 	/**
+	 * Shipment Context Resolver
+	 *
+	 * @since 1.11.0
+	 * @return ShipmentContextResolver
+	 */
+	public static function shipmentContextResolver() {
+		return self::getInstance()->container['shipmentContextResolver'];
+	}
+
+	/**
+	 * Volume Planner
+	 *
+	 * @since 1.11.0
+	 * @return VolumePlanner
+	 */
+	public static function volumePlanner() {
+		return self::getInstance()->container['volumePlanner'];
+	}
+
+	/**
+	 * Volume Line Expander
+	 *
+	 * @since 1.11.0
+	 * @return VolumeLineExpander
+	 */
+	public static function volumeLineExpander() {
+		return self::getInstance()->container['volumeLineExpander'];
+	}
+
+	/**
 	 * Order Service
 	 * 
 	 * @since 1.0.0
@@ -206,6 +244,16 @@ class Container {
 	 */
 	public static function orderService() {
 		return self::getInstance()->container['orderService'];
+	}
+
+	/**
+	 * Order Invoice Resolver
+	 *
+	 * @since 1.11.0
+	 * @return OrderInvoiceResolver
+	 */
+	public static function orderInvoiceResolver() {
+		return self::getInstance()->container['orderInvoiceResolver'];
 	}
 
 	/**

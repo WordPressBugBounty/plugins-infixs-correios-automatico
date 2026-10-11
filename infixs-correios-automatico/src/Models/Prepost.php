@@ -27,6 +27,9 @@ defined( 'ABSPATH' ) || exit;
  * @property string $dce_number
  * @property string $dce_series
  * @property string $dce_authorization_protocol
+ * @property string $dce_access_key
+ * @property string $dce_issued_at
+ * @property string $dce_checked_at
  * @property string $expire_at
  * @property string $updated_at
  * @property string $created_at

@@ -199,6 +199,132 @@ jQuery( function ( $ ) {
 			);
 		},
 
+		/**
+		 * Send a request to the plugin REST API.
+		 *
+		 * The nonce is written in the page when it is rendered, so a cached copy
+		 * of the page, or a tab left open since the day before, sends a nonce
+		 * WordPress no longer accepts. Such a request gets a fresh nonce and is
+		 * sent once more before the caller hears about the failure.
+		 *
+		 * @param {Object} settings jQuery.ajax settings.
+		 */
+		restAjax( settings ) {
+			const { success, error, complete, ...options } = settings;
+
+			const send = ( nonce ) =>
+				$.ajax( {
+					...options,
+					headers: { ...( options.headers || {} ), 'X-WP-Nonce': nonce },
+				} );
+
+			const succeed = ( data, textStatus, jqXHR ) => {
+				if ( typeof success === 'function' ) {
+					success( data, textStatus, jqXHR );
+				}
+
+				if ( typeof complete === 'function' ) {
+					complete( jqXHR, textStatus );
+				}
+			};
+
+			const fail = ( jqXHR, textStatus, errorThrown ) => {
+				if ( typeof error === 'function' ) {
+					error( jqXHR, textStatus, errorThrown );
+				}
+
+				if ( typeof complete === 'function' ) {
+					complete( jqXHR, textStatus );
+				}
+			};
+
+			send( infixsCorreiosAutomaticoOrdersParams.nonce )
+				.done( succeed )
+				.fail( ( jqXHR, textStatus, errorThrown ) => {
+					if ( ! this.isInvalidNonce( jqXHR ) ) {
+						fail( jqXHR, textStatus, errorThrown );
+						return;
+					}
+
+					this.refreshNonce()
+						.done( ( nonce ) => send( nonce ).done( succeed ).fail( fail ) )
+						.fail( () => {
+							jqXHR.responseJSON.message =
+								'Sua sessão no WordPress expirou. Recarregue a página e, se for preciso, entre novamente.';
+							fail( jqXHR, textStatus, errorThrown );
+						} );
+				} );
+		},
+
+		/**
+		 * Whether WordPress refused the request for a nonce it no longer accepts.
+		 *
+		 * @param {Object} jqXHR Failed request.
+		 */
+		isInvalidNonce( jqXHR ) {
+			return (
+				403 === jqXHR.status &&
+				'rest_cookie_invalid_nonce' === jqXHR.responseJSON?.code
+			);
+		},
+
+		/**
+		 * Message to show for a failed REST request.
+		 *
+		 * A 404 without a JSON body never reached WordPress: the web server
+		 * answered /wp-json/ itself, which is what a site whose rewrite rules
+		 * stopped working does.
+		 *
+		 * @param {Object} jqXHR    Failed request.
+		 * @param {string} fallback Message when WordPress sent none.
+		 * @return {string} Message.
+		 */
+		restErrorMessage(
+			jqXHR,
+			fallback = 'Não foi possível concluir a ação. Tente novamente.'
+		) {
+			if ( jqXHR?.responseJSON?.message ) {
+				return jqXHR.responseJSON.message;
+			}
+
+			if ( 404 === jqXHR?.status ) {
+				return 'O servidor do site não entregou a API REST do WordPress (/wp-json). Um administrador resolve em Configurações > Links permanentes, clicando em Salvar alterações. Se continuar, fale com a hospedagem.';
+			}
+
+			return fallback;
+		},
+
+		/**
+		 * Ask WordPress for a fresh REST nonce for the logged in user.
+		 *
+		 * Requests failing together share the same refresh.
+		 */
+		refreshNonce() {
+			if ( ! this.nonceRequest ) {
+				const params = infixsCorreiosAutomaticoOrdersParams;
+
+				this.nonceRequest = $.ajax( {
+					url: params.ajaxUrl || window.ajaxurl,
+					data: { action: 'rest-nonce' },
+					dataType: 'text',
+				} )
+					.then( ( nonce ) => {
+						if ( '0' === nonce || ! /^[a-z0-9]+$/i.test( nonce ) ) {
+							return $.Deferred().reject();
+						}
+
+						params.nonce = nonce;
+
+						return nonce;
+					} )
+					.always( () => {
+						this.nonceRequest = null;
+					} );
+			}
+
+			return this.nonceRequest;
+		},
+
 		postTrackingCode(
 			code,
 			orderId,
@@ -208,7 +334,6 @@ jQuery( function ( $ ) {
 			completeCallback = null
 		) {
 			const restUrl = infixsCorreiosAutomaticoOrdersParams.restUrl;
-			const nonce = infixsCorreiosAutomaticoOrdersParams.nonce;
 
 			const data = {
 				code: code,
@@ -216,14 +341,11 @@ jQuery( function ( $ ) {
 				sendmail: sendmail,
 			};
 
-			$.ajax( {
+			InfixsCorreiosAutomaticoOrders.restAjax( {
 				url: `${ restUrl }/trackings`,
 				type: 'POST',
 				data: JSON.stringify( data ),
 				contentType: 'application/json',
-				headers: {
-					'X-WP-Nonce': nonce,
-				},
 				success: function ( response ) {
 					if ( typeof successCallback === 'function' ) {
 						successCallback( response );
@@ -310,12 +432,9 @@ jQuery( function ( $ ) {
 				'#infixs-correios-automatico-tracking-code'
 			);
 
-			$.ajax( {
+			InfixsCorreiosAutomaticoOrders.restAjax( {
 				url: `${ restUrl }/trackings/${ trackingCodeId }`,
 				type: 'DELETE',
-				headers: {
-					'X-WP-Nonce': nonce,
-				},
 				success: function () {
 					$(
 						`.infixs-correios-automatico-action-column a[data-id=${ trackingCodeId }]`
@@ -441,13 +560,10 @@ jQuery( function ( $ ) {
 						'#infixs-correios-automatico-prepost'
 					);
 
-					$.ajax( {
+					InfixsCorreiosAutomaticoOrders.restAjax( {
 						url: `${ restUrl }/preposts/${ prepostId }/cancel`,
 						type: 'PATCH',
 						contentType: 'application/json',
-						headers: {
-							'X-WP-Nonce': nonce,
-						},
 						success: function () {
 							window.location.reload();
 						},
@@ -455,7 +571,7 @@ jQuery( function ( $ ) {
 							InfixsCorreiosAutomaticoOrders.unblock(
 								'#infixs-correios-automatico-prepost'
 							);
-							alert( response.responseJSON.message );
+							alert( InfixsCorreiosAutomaticoOrders.restErrorMessage( response ) );
 						},
 					} );
 				}
@@ -491,7 +607,7 @@ jQuery( function ( $ ) {
 				'#infixs-correios-automatico-prepost'
 			);
 
-			$.ajax( {
+			InfixsCorreiosAutomaticoOrders.restAjax( {
 				url: `${ restUrl }/preposts`,
 				type: 'POST',
 				data: JSON.stringify( {
@@ -500,9 +616,6 @@ jQuery( function ( $ ) {
 					invoice_key: invoiceKey,
 				} ),
 				contentType: 'application/json',
-				headers: {
-					'X-WP-Nonce': nonce,
-				},
 				success: function () {
 					window.location.reload();
 				},
@@ -510,7 +623,7 @@ jQuery( function ( $ ) {
 					InfixsCorreiosAutomaticoOrders.unblock(
 						'#infixs-correios-automatico-prepost'
 					);
-					alert( response.responseJSON.message );
+					alert( InfixsCorreiosAutomaticoOrders.restErrorMessage( response ) );
 				},
 			} );
 		},
@@ -539,14 +652,11 @@ jQuery( function ( $ ) {
 						'#infixs-correios-automatico-prepost'
 					);
 
-					$.ajax( {
+					InfixsCorreiosAutomaticoOrders.restAjax( {
 						url: `${ restUrl }/preposts`,
 						type: 'POST',
-						data: JSON.stringify( { order_id: orderId } ),
+						data: JSON.stringify( { order_id: orderId, withDce: true } ),
 						contentType: 'application/json',
-						headers: {
-							'X-WP-Nonce': nonce,
-						},
 						success: function ( response ) {
 							const prepostId = response?.id;
 
@@ -567,7 +677,7 @@ jQuery( function ( $ ) {
 							InfixsCorreiosAutomaticoOrders.unblock(
 								'#infixs-correios-automatico-prepost'
 							);
-							alert( response.responseJSON.message );
+							alert( InfixsCorreiosAutomaticoOrders.restErrorMessage( response ) );
 						},
 					} );
 				}
@@ -611,13 +721,10 @@ jQuery( function ( $ ) {
 					`Tentativa ${ attempt } de ${ maxAttempts }`
 				);
 
-				$.ajax( {
+				InfixsCorreiosAutomaticoOrders.restAjax( {
 					url: `${ restUrl }/preposts/${ prepostId }/sync`,
 					type: 'POST',
 					contentType: 'application/json',
-					headers: {
-						'X-WP-Nonce': nonce,
-					},
 					success: ( response ) => {
 						if ( response?.status_code === canceledStatusCode ) {
 							this.closeSefazSyncLoading( loading );
@@ -771,13 +878,10 @@ jQuery( function ( $ ) {
 
 			if ( ! nonce ) return;
 
-			$.ajax( {
+			InfixsCorreiosAutomaticoOrders.restAjax( {
 				url: `${ restUrl }/preposts/${ prepostId }/print-dce`,
 				type: 'POST',
 				contentType: 'application/json',
-				headers: {
-					'X-WP-Nonce': nonce,
-				},
 				success: function ( response ) {
 					if ( ! response || ! response.dados ) {
 						alert( 'Não foi possível gerar o PDF da DCe.' );
@@ -802,8 +906,10 @@ jQuery( function ( $ ) {
 				},
 				error: function ( response ) {
 					alert(
-						response?.responseJSON?.message ||
+						InfixsCorreiosAutomaticoOrders.restErrorMessage(
+							response,
 							'Ocorreu um erro ao imprimir a DCe.'
+						)
 					);
 				},
 			} );

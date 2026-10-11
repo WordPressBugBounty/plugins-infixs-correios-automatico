@@ -6,6 +6,9 @@ use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Services\OrderService;
+use Infixs\CorreiosAutomatico\Utils\OrderFilterSanitizer;
+use Infixs\CorreiosAutomatico\Utils\ShipmentCodesFormatter;
+use Infixs\CorreiosAutomatico\Utils\ShippingLineName;
 
 defined( 'ABSPATH' ) || exit;
 class OrderController {
@@ -19,6 +22,19 @@ class OrderController {
 	 */
 	private $orderService;
 
+	/**
+	 * Filters of the listing, and the preference each one falls back to.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @var array<string, string>
+	 */
+	private static $filters = [ 
+		'status' => 'statuses',
+		'carrier' => 'carriers',
+		'pending' => 'pending',
+	];
+
 	public function __construct( OrderService $orderService ) {
 		$this->orderService = $orderService;
 	}
@@ -27,6 +43,7 @@ class OrderController {
 	 * List orders.
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.0 Filters by carrier and by pendency, each one falling back to the saved preference.
 	 * 
 	 * @param \WP_REST_Request $request
 	 * 
@@ -36,13 +53,14 @@ class OrderController {
 		$page = $request->get_param( 'page' );
 		$per_page = $request->get_param( 'per_page' );
 		$search = $request->get_param( 'search' );
-		$status = $request->get_param( 'status' );
 
 		$orders = $this->orderService->getOrders( [
 			'page' => $page,
 			'per_page' => $per_page,
 			'search' => $search,
-			'status' => $status
+			'status' => $this->filter( $request, 'status' ),
+			'carrier' => $this->filter( $request, 'carrier' ),
+			'pending' => $this->filter( $request, 'pending' ),
 		] );
 
 		return rest_ensure_response(
@@ -54,17 +72,63 @@ class OrderController {
 		);
 	}
 
+	/**
+	 * Read one filter of the listing.
+	 *
+	 * A filter the request does not carry falls back to the preference saved by
+	 * the operator; a filter that is there is used as it came, empty included —
+	 * which is how the dashboard says "no filter of this kind", instead of
+	 * silently applying an old preference.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WP_REST_Request $request Request being answered.
+	 * @param string           $filter  Filter name.
+	 *
+	 * @return string[]
+	 */
+	private function filter( $request, $filter ) {
+		$sanitizer = [ OrderFilterSanitizer::class, self::$filters[ $filter ] ];
+
+		if ( $request->has_param( $filter ) ) {
+			return call_user_func( $sanitizer, $request->get_param( $filter ) );
+		}
+
+		return call_user_func( $sanitizer, Config::get( "preferences.order.{$filter}", [] ) );
+	}
+
+	/**
+	 * Save the filters the listing opens with.
+	 *
+	 * Only the filters present in the body are saved, so the dashboard can keep
+	 * a preference it is not showing.
+	 *
+	 * @since 1.0.0
+	 * @since 1.11.0 Saves the carrier and the pendency filters too.
+	 *
+	 * @param \WP_REST_Request $request
+	 *
+	 * @return \WP_Error|\WP_REST_Response
+	 */
 	public function save_preferences( $request ) {
 		$preferences = $request->get_json_params();
+		$preferences = is_array( $preferences ) ? $preferences : [];
 
-		$updated_preferences = [];
+		$saved = [];
 
-		if ( isset( $preferences['status'] ) ) {
-			Config::update( 'preferences.order.status', $preferences['status'] );
+		foreach ( self::$filters as $filter => $sanitizer ) {
+			if ( ! isset( $preferences[ $filter ] ) ) {
+				continue;
+			}
+
+			$saved[ $filter ] = call_user_func( [ OrderFilterSanitizer::class, $sanitizer ], $preferences[ $filter ] );
+
+			Config::update( "preferences.order.{$filter}", $saved[ $filter ] );
 		}
 
 		return rest_ensure_response( [
 			"status" => "success",
+			"preferences" => $saved,
 		] );
 	}
 
@@ -164,16 +228,19 @@ class OrderController {
 			return new \WP_Error( 'missing_instance_id', 'Instance ID is required.', [ 'status' => 400 ] );
 		}
 
-		$result = $this->orderService->calculateShipping( $params['instance_id'], $order_id );
+		$shipping_item_id = isset( $params['shipping_item_id'] ) ? absint( $params['shipping_item_id'] ) : 0;
+
+		$result = $this->orderService->calculateShipping( $params['instance_id'], $order_id, $shipping_item_id );
 
 		return rest_ensure_response( $result );
 	}
 
 	/**
 	 * Update Shipping
-	 * 
+	 *
 	 * @since 1.0.0
-	 * 
+	 * @since 1.11.0 A volume keeps saying which volume it is in the name of the line.
+	 *
 	 * @param \WP_REST_Request $request
 	 * 
 	 * @return \WP_Error|\WP_REST_Response
@@ -215,8 +282,17 @@ class OrderController {
 			$shipping_item = reset( $shipping_items );
 		}
 
+		/**
+		 * An order that came in with no delivery at all — placed with another
+		 * plugin, or created by hand — gets the line here, so the store can
+		 * ship it without editing the order in WooCommerce first. The freight
+		 * charged stays zero: the order was closed without it, and changing the
+		 * totals from this screen would part the order from what was paid.
+		 */
 		if ( ! $shipping_item ) {
-			return new \WP_Error( 'shipping_item_not_found', 'This order has no shipping line.', [ 'status' => 400 ] );
+			$shipping_item = new \WC_Order_Item_Shipping();
+			$shipping_item->set_total( 0 );
+			$order->add_item( $shipping_item );
 		}
 
 		$shipping_item->set_instance_id( $params['instance_id'] );
@@ -243,7 +319,7 @@ class OrderController {
 			}
 		}
 
-		$shipping_item->set_name( $method_name );
+		$shipping_item->set_name( ShippingLineName::build( $shipping_item, $method_name ) );
 
 		$shipping_item->update_meta_data( '_length', $params['length'] );
 		$shipping_item->update_meta_data( '_width', $params['width'] );
@@ -265,11 +341,12 @@ class OrderController {
 
 	/**
 	 * Attach range to order
-	 * 
+	 *
 	 * @since 1.3.7
-	 * 
+	 * @since 1.11.0 Binds the code to the shipping line named by `shipping_item_id`.
+	 *
 	 * @param \WP_REST_Request $request
-	 * 
+	 *
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function attach_range( $request ) {
@@ -280,7 +357,13 @@ class OrderController {
 			return new \WP_Error( 'missing_service_code', 'Service code is required.', [ 'status' => 400 ] );
 		}
 
-		$response = Container::labelService()->attachRangeToOrder( $order_id, $params['service_code'] );
+		$shipping_item_id = isset( $params['shipping_item_id'] ) ? absint( $params['shipping_item_id'] ) : 0;
+
+		if ( $shipping_item_id && ! $this->is_order_shipping_item( $order_id, $shipping_item_id ) ) {
+			return new \WP_Error( 'invalid_shipping_item', 'Invalid shipping item for this order.', [ 'status' => 400 ] );
+		}
+
+		$response = Container::labelService()->attachRangeToOrder( $order_id, $params['service_code'], $shipping_item_id );
 
 		if ( is_wp_error( $response ) ) {
 			$response->add_data( [ 'status' => 400 ] );
@@ -290,6 +373,29 @@ class OrderController {
 		return rest_ensure_response( [
 			'success' => true,
 		] );
+	}
+
+	/**
+	 * Whether a shipping line belongs to an order.
+	 *
+	 * An order item is loaded by its id alone, so a line of another order would
+	 * otherwise be accepted and the code would follow a shipment it is not on.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int $order_id         Order ID.
+	 * @param int $shipping_item_id Shipping line ID.
+	 *
+	 * @return bool
+	 */
+	private function is_order_shipping_item( $order_id, $shipping_item_id ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			return false;
+		}
+
+		return array_key_exists( $shipping_item_id, $order->get_items( 'shipping' ) );
 	}
 
 
@@ -373,10 +479,7 @@ class OrderController {
 			return $response;
 		}
 
-		$order->delete_meta_data( '_infixs_correios_automatico_prepost_id' );
-		$order->delete_meta_data( '_infixs_correios_automatico_prepost_created' );
-		$order->save();
-
+		Container::prepostService()->releaseShipmentPrepost( $order, $prepost );
 
 		return rest_ensure_response( [
 			'status' => 'success',
@@ -473,16 +576,7 @@ class OrderController {
 			return new \WP_Error( 'infixs_correios_automatico_missing_phone', __( 'Customer phone not found.', 'infixs-correios-automatico' ), [ 'status' => 400 ] );
 		}
 
-		$tracking_code = $order->getLastTrackingCode();
-
-		$message_text = '';
-		if ( $tracking_code ) {
-			$message_text = "Olá {$customer_name}, segue o código de rastreio do seu pedido #{$order_id}: {$tracking_code}";
-		} else {
-			$message_text = "Olá {$customer_name}, sobre o pedido #{$order_id}.";
-		}
-
-		$message = [ 'text' => $message_text ];
+		$message = [ 'text' => $this->tracking_whatsapp_text( $order, $customer_name ) ];
 		$result = false;
 
 		if ( function_exists( 'pingo_notify_send_message' ) ) {
@@ -497,5 +591,33 @@ class OrderController {
 		} else {
 			return new \WP_Error( 'infixs_correios_automatico_dispatch_failed', __( 'Failed to dispatch message, update a Pingo Notify plugin.', 'infixs-correios-automatico' ), [ 'status' => 500 ] );
 		}
+	}
+
+	/**
+	 * Build the WhatsApp text with the tracking codes of an order.
+	 *
+	 * An order shipped in a single object keeps the message it always had. One
+	 * shipped in volumes lists the code of every box, one per line.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \Infixs\CorreiosAutomatico\Entities\Order $order         Order being notified.
+	 * @param string                                    $customer_name Name the message greets.
+	 *
+	 * @return string
+	 */
+	private function tracking_whatsapp_text( $order, $customer_name ) {
+		$order_id = $order->get_id();
+		$codes = Container::trackingService()->getShipmentCodes( $order_id );
+
+		if ( ! $codes ) {
+			return "Olá {$customer_name}, sobre o pedido #{$order_id}.";
+		}
+
+		if ( count( $codes ) === 1 ) {
+			return "Olá {$customer_name}, segue o código de rastreio do seu pedido #{$order_id}: {$codes[0]['code']}";
+		}
+
+		return "Olá {$customer_name}, seguem os códigos de rastreio do seu pedido #{$order_id}:\n" . implode( "\n", ShipmentCodesFormatter::lines( $order, $codes ) );
 	}
 }

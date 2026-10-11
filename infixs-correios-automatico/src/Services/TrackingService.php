@@ -6,12 +6,15 @@ use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\Tracking;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
+use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
 use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Repositories\TrackingRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\APIServiceCode;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\TrackingEventCode;
 use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\WordpressEloquent\Collection;
 
@@ -187,6 +190,71 @@ class TrackingService {
 	}
 
 	/**
+	 * Send the out for delivery e-mail.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return bool
+	 */
+	public function sendOutForDeliveryNotification( $order_id ) {
+		$success = Tracking::trigger_out_for_delivery_email( $order_id, $this->getOutForDeliveryCodes( $order_id ) );
+
+		if ( $success ) {
+			$order = wc_get_order( $order_id );
+			$order->update_meta_data( '_infixs_correios_automatico_email_out_for_delivery_sent', current_time( 'mysql' ) );
+			$order->add_order_note(
+				__( 'Correios Automático - Email de "Saiu para entrega" enviado para o cliente', 'infixs-correios-automatico' ),
+				false
+			);
+			$order->save();
+		}
+
+		return $success;
+	}
+
+	/**
+	 * Get the codes of the objects of an order that are out for delivery.
+	 *
+	 * An order broken into volumes leaves in one object per box, and they do
+	 * not leave together: only the objects whose last event is the way out
+	 * are named, so the customer is not told a box delivered yesterday is
+	 * arriving today. An order changed by hand, with no such event, names
+	 * every object travelling to the customer.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return string[]
+	 */
+	public function getOutForDeliveryCodes( $order_id ) {
+		$shipment_codes = wp_list_pluck( $this->getShipmentCodes( $order_id ), 'code' );
+		$trackings = $shipment_codes ? $this->getTrackings( $order_id, true ) : false;
+
+		if ( ! $trackings ) {
+			return $shipment_codes;
+		}
+
+		$codes = [];
+
+		foreach ( $trackings as $tracking ) {
+			if ( ! in_array( $tracking->code, $shipment_codes, true ) || ! isset( $tracking->events ) ) {
+				continue;
+			}
+
+			$last_event = $tracking->events->sortByDesc( 'event_date' )->first();
+
+			if ( $last_event && TrackingEventCode::isOutForDelivery( $last_event->code, $last_event->type ) ) {
+				$codes[] = $tracking->code;
+			}
+		}
+
+		return $codes ? array_values( array_unique( $codes ) ) : $shipment_codes;
+	}
+
+	/**
 	 * Send waiting pickup.
 	 * 
 	 * @since 1.4.4
@@ -264,16 +332,18 @@ class TrackingService {
 
 	/**
 	 * Send return notification.
-	 * 
+	 *
 	 * @since 1.4.4
-	 * 
-	 * @param int $order_id Order ID.
-	 * @param string|array $tracking_code Tracking code string or array.
-	 * 
+	 * @since 1.11.0 Sends the codes of every volume returned in a single e-mail.
+	 *
+	 * @param int             $order_id       Order ID.
+	 * @param string|string[] $tracking_codes Reverse code, or the codes of every volume returned.
+	 * @param string          $pickup_address Pickup address.
+	 *
 	 * @return bool
 	 */
-	public function sendReturningNotification( $order_id, $tracking_code, $pickup_address ) {
-		$success = Tracking::trigger_returning_email( $order_id, $tracking_code, $pickup_address );
+	public function sendReturningNotification( $order_id, $tracking_codes, $pickup_address ) {
+		$success = Tracking::trigger_returning_email( $order_id, $tracking_codes, $pickup_address );
 
 		if ( $success ) {
 			$order = wc_get_order( $order_id );
@@ -322,6 +392,91 @@ class TrackingService {
 			$options['with_unit'] = true;
 		}
 		return $this->trackingRepository->findBy( [ 'order_id' => $order_id ], $options );
+	}
+
+	/**
+	 * Get the codes of the objects travelling to the customer.
+	 *
+	 * A shipment broken into volumes travels in one object per box, so the
+	 * customer needs the code of every line and not just the last one added to
+	 * the order. A line whose code was replaced keeps only the newest one per
+	 * carrier. A reverse shipment is left out: the panel records it on the line
+	 * it returns, but it travels the other way. Codes recorded without a line are
+	 * all kept next to the codes of the lines; an order with no code bound to a
+	 * line keeps only its newest code, the one it always sent, since the older
+	 * ones were replaced.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return array<int, array{code: string, shipping_item_id: int, carrier: string}>
+	 */
+	public function getShipmentCodes( $order_id ) {
+		$reverse_codes = $this->getReverseCodes( $order_id );
+		$codes = [];
+
+		$trackings = $this->list( $order_id, [
+			'order' => [
+				'column' => 'id',
+				'order' => 'asc',
+			],
+		] );
+
+		foreach ( $trackings as $tracking ) {
+			if ( in_array( $tracking->code, $reverse_codes, true ) ) {
+				continue;
+			}
+
+			$shipping_item_id = (int) $tracking->shipping_item_id;
+			$carrier = ! empty( $tracking->carrier ) ? $tracking->carrier : 'correios';
+			$key = $shipping_item_id ? "{$shipping_item_id}:{$carrier}" : "tracking:{$tracking->id}";
+
+			$codes[ $key ] = [
+				'code' => $tracking->code,
+				'shipping_item_id' => $shipping_item_id,
+				'carrier' => $carrier,
+			];
+		}
+
+		$codes = array_values( $codes );
+
+		if ( $codes && ! array_filter( wp_list_pluck( $codes, 'shipping_item_id' ) ) ) {
+			return [ end( $codes ) ];
+		}
+
+		return $codes;
+	}
+
+	/**
+	 * Get the object codes of the reverse shipments of an order.
+	 *
+	 * The order meta only remembers the last reverse prepost, so the earlier
+	 * ones are recognised by their reverse service.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int $order_id Order ID.
+	 *
+	 * @return string[]
+	 */
+	public function getReverseCodes( $order_id ) {
+		$codes = [];
+
+		foreach ( Prepost::where( 'order_id', $order_id )->get() as $prepost ) {
+			if ( $prepost->object_code && DeliveryServiceCode::isReverseService( $prepost->service_code ) ) {
+				$codes[] = $prepost->object_code;
+			}
+		}
+
+		$order = wc_get_order( $order_id );
+		$last_reverse_code = $order ? $order->get_meta( '_infixs_correios_automatico_reverse_prepost_code' ) : '';
+
+		if ( $last_reverse_code ) {
+			$codes[] = $last_reverse_code;
+		}
+
+		return $codes;
 	}
 
 	/**
@@ -567,7 +722,18 @@ class TrackingService {
 					'updated_at' => current_time( 'mysql' ),
 				], $event, $tracking ) );
 
-				do_action( 'infixs_correios_automatico_after_add_tracking_event', $createdEvent, $event, $tracking );
+				/**
+				 * Fires after an event of the tracking is stored.
+				 *
+				 * @since 1.2.1
+				 * @since 1.11.0 Carries the object, with every event the carrier answered.
+				 *
+				 * @param \Infixs\CorreiosAutomatico\Models\TrackingCodeEvent $createdEvent Event stored.
+				 * @param array                                                $event        Event as the carrier answered it.
+				 * @param TrackingCode                                         $tracking     Tracking code of the event.
+				 * @param array                                                $object       Object the event belongs to.
+				 */
+				do_action( 'infixs_correios_automatico_after_add_tracking_event', $createdEvent, $event, $tracking, $object );
 
 				$tracking->events->push( $createdEvent );
 			}

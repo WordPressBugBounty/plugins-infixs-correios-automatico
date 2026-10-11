@@ -110,6 +110,10 @@ class SettingsGeneralController {
 			$updated_settings['active_in_transit'] = rest_sanitize_boolean( $data['active_in_transit'] );
 		}
 
+		if ( isset( $data['active_out_for_delivery'] ) ) {
+			$updated_settings['active_out_for_delivery'] = rest_sanitize_boolean( $data['active_out_for_delivery'] );
+		}
+
 		if ( isset( $data['active_waiting_pickup'] ) ) {
 			$updated_settings['active_waiting_pickup'] = rest_sanitize_boolean( $data['active_waiting_pickup'] );
 		}
@@ -128,6 +132,10 @@ class SettingsGeneralController {
 
 		if ( isset( $data['status_in_transit'] ) ) {
 			$updated_settings['status_in_transit'] = sanitize_text_field( $data['status_in_transit'] ) ?: 'Em transporte';
+		}
+
+		if ( isset( $data['status_out_for_delivery'] ) ) {
+			$updated_settings['status_out_for_delivery'] = sanitize_text_field( $data['status_out_for_delivery'] ) ?: 'Saiu para entrega';
 		}
 
 		if ( isset( $data['status_waiting_pickup'] ) ) {
@@ -150,6 +158,10 @@ class SettingsGeneralController {
 			$updated_settings['change_in_transit'] = sanitize_text_field( $data['change_in_transit'] ) === 'manual' ? 'manual' : 'auto';
 		}
 
+		if ( isset( $data['change_out_for_delivery'] ) ) {
+			$updated_settings['change_out_for_delivery'] = sanitize_text_field( $data['change_out_for_delivery'] ) === 'manual' ? 'manual' : 'auto';
+		}
+
 		if ( isset( $data['change_waiting_pickup'] ) ) {
 			$updated_settings['change_waiting_pickup'] = sanitize_text_field( $data['change_waiting_pickup'] ) === 'manual' ? 'manual' : 'auto';
 		}
@@ -168,6 +180,10 @@ class SettingsGeneralController {
 
 		if ( isset( $data['email_in_transit'] ) ) {
 			$updated_settings['email_in_transit'] = rest_sanitize_boolean( $data['email_in_transit'] );
+		}
+
+		if ( isset( $data['email_out_for_delivery'] ) ) {
+			$updated_settings['email_out_for_delivery'] = rest_sanitize_boolean( $data['email_out_for_delivery'] );
 		}
 
 		if ( isset( $data['email_waiting_pickup'] ) ) {
@@ -418,21 +434,25 @@ class SettingsGeneralController {
 			'enable_order_status' => Config::boolean( 'general.enable_order_status' ),
 			'active_preparing_to_ship' => Config::boolean( 'general.active_preparing_to_ship' ),
 			'active_in_transit' => Config::boolean( 'general.active_in_transit' ),
+			'active_out_for_delivery' => Config::boolean( 'general.active_out_for_delivery' ),
 			'active_waiting_pickup' => Config::boolean( 'general.active_waiting_pickup' ),
 			'active_returning' => Config::boolean( 'general.active_returning' ),
 			'active_delivered' => Config::boolean( 'general.active_delivered' ),
 			'status_preparing_to_ship' => Config::string( 'general.status_preparing_to_ship' ),
 			'status_in_transit' => Config::string( 'general.status_in_transit' ),
+			'status_out_for_delivery' => Config::string( 'general.status_out_for_delivery' ),
 			'status_waiting_pickup' => Config::string( 'general.status_waiting_pickup' ),
 			'status_returning' => Config::string( 'general.status_returning' ),
 			'status_delivered' => Config::string( 'general.status_delivered' ),
 			'change_preparing_to_ship' => Config::string( 'general.change_preparing_to_ship' ),
 			'change_in_transit' => Config::string( 'general.change_in_transit' ),
+			'change_out_for_delivery' => Config::string( 'general.change_out_for_delivery' ),
 			'change_waiting_pickup' => Config::string( 'general.change_waiting_pickup' ),
 			'change_returning' => Config::string( 'general.change_returning' ),
 			'change_delivered' => Config::string( 'general.change_delivered' ),
 			'email_preparing_to_ship' => Config::boolean( 'general.email_preparing_to_ship' ),
 			'email_in_transit' => Config::boolean( 'general.email_in_transit' ),
+			'email_out_for_delivery' => Config::boolean( 'general.email_out_for_delivery' ),
 			'email_waiting_pickup' => Config::boolean( 'general.email_waiting_pickup' ),
 			'email_returning' => Config::boolean( 'general.email_returning' ),
 			'email_delivered' => Config::boolean( 'general.email_delivered' ),

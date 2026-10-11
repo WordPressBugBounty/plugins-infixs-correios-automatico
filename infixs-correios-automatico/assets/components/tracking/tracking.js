@@ -65,12 +65,20 @@ jQuery(function ($) {
     /**
      * Confirm the return request.
      *
+     * Sent through wp.apiFetch, which renews a nonce WordPress no longer
+     * accepts — the one written in a cached copy of the page, or in a tab
+     * left open since the day before — and sends the request again.
+     *
      * @param {Event} event
      */
     confirmReturn(event) {
       event.preventDefault();
 
-      if (typeof infixsCorreiosAutomaticoTracking === "undefined") {
+      if (
+        typeof infixsCorreiosAutomaticoTracking === "undefined" ||
+        !window.wp ||
+        !window.wp.apiFetch
+      ) {
         return;
       }
 
@@ -83,24 +91,13 @@ jQuery(function ($) {
       $confirm.prop("disabled", true).text("Enviando...");
       $message.removeClass("error success").text("");
 
-      fetch(infixsCorreiosAutomaticoTracking.restUrl + "customer-returns", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-WP-Nonce": infixsCorreiosAutomaticoTracking.nonce,
-        },
-        body: JSON.stringify({ order_id: orderId, order_key: orderKey }),
-      })
-        .then((response) =>
-          response.json().then((data) => ({ ok: response.ok, data }))
-        )
-        .then(({ ok, data }) => {
-          if (!ok) {
-            throw new Error(
-              (data && data.message) || "Erro ao solicitar a devolução."
-            );
-          }
-
+      window.wp
+        .apiFetch({
+          url: infixsCorreiosAutomaticoTracking.restUrl + "customer-returns",
+          method: "POST",
+          data: { order_id: orderId, order_key: orderKey },
+        })
+        .then((data) => {
           $message
             .addClass("success")
             .text((data && data.message) || "Devolução solicitada com sucesso.");
@@ -111,7 +108,12 @@ jQuery(function ($) {
           }, 2500);
         })
         .catch((error) => {
-          $message.addClass("error").text(error.message);
+          const message =
+            error && error.code !== "invalid_json" ? error.message : "";
+
+          $message
+            .addClass("error")
+            .text(message || "Erro ao solicitar a devolução.");
           $confirm.prop("disabled", false).text("Confirmar Devolução");
         });
     },

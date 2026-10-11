@@ -12,6 +12,9 @@ use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Package;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\ShippingCost;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\ShippingTime;
+use Infixs\CorreiosAutomatico\Services\Correios\Packing\PackedPackage;
+use Infixs\CorreiosAutomatico\Services\Correios\Packing\ServiceLimits;
+use Infixs\CorreiosAutomatico\Services\Correios\Packing\VolumeFiller;
 use Infixs\CorreiosAutomatico\Utils\Currency;
 use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
@@ -34,6 +37,48 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @since 1.8.0
 	 */
 	const CALCULATION_FAILED_HOOK = 'infixs_correios_automatico_shipping_calculation_failed';
+
+	/**
+	 * Rate meta describing the volumes a shipment was quoted in.
+	 *
+	 * @var string
+	 */
+	const VOLUMES_META_KEY = '_volumes';
+
+	/**
+	 * Shipping line meta with the position of the volume in the shipment.
+	 *
+	 * @var string
+	 */
+	const VOLUME_INDEX_META_KEY = '_infixs_volume_index';
+
+	/**
+	 * Shipping line meta with how many volumes the shipment has.
+	 *
+	 * @var string
+	 */
+	const VOLUME_TOTAL_META_KEY = '_infixs_volume_total';
+
+	/**
+	 * Shipping line meta with the products travelling in the volume.
+	 *
+	 * @var string
+	 */
+	const VOLUME_ITEMS_META_KEY = '_infixs_volume_items';
+
+	/**
+	 * Shipping line meta with the id of the packaging the volume travels in.
+	 *
+	 * @var string
+	 */
+	const PACKAGING_ID_META_KEY = '_infixs_packaging_id';
+
+	/**
+	 * Shipping line meta with the name of the packaging the volume travels in.
+	 *
+	 * @var string
+	 */
+	const PACKAGING_NAME_META_KEY = 'infixs_packaging_name';
 
 	/**
 	 * Advanced mode
@@ -257,6 +302,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	protected $hide_exceed = false;
 
 	/**
+	 * Split the shipment into volumes when it exceeds the service limits
+	 *
+	 * @var bool
+	 */
+	protected $split_exceed = true;
+
+	/**
 	 * Extra weight type
 	 *
 	 * @var string "product"|"order"
@@ -355,6 +407,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		$this->extra_weight_type = $this->get_option( 'extra_weight_type' );
 		$this->init_discount_options();
 		$this->hide_exceed = Sanitizer::boolean( $this->get_option( 'hide_exceed' ) );
+		$this->split_exceed = Sanitizer::boolean( $this->get_option( 'split_exceed' ) );
 		$this->enable_import_tax = Sanitizer::boolean( $this->get_option( 'enable_import_tax' ) );
 		$this->enable_icms_tax = Sanitizer::boolean( $this->get_option( 'enable_icms_tax' ) );
 		$this->when_less_minimum = $this->get_option( 'when_less_minimum' );
@@ -688,6 +741,13 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 				'desc_tip' => true,
 				'default' => 'no',
 			],
+			'split_exceed' => [
+				'title' => __( 'Split Into Volumes', 'infixs-correios-automatico' ),
+				'type' => 'checkbox',
+				'description' => __( 'Split the shipment into more volumes when it exceeds the limits of the service, quoting each one.', 'infixs-correios-automatico' ),
+				'desc_tip' => true,
+				'default' => 'yes',
+			],
 			'enable_import_tax' => [
 				'title' => __( 'Enable Import Tax', 'infixs-correios-automatico' ),
 				'type' => 'checkbox',
@@ -744,7 +804,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 
 			if ( $value[ $key ]['type'] === 'cart_shipping_class' ) {
 				$value[ $key ]['value'] = Sanitizer::multiselect( $rule['value'], 'intval' );
-			} elseif ( $value[ $key ]['type'] === 'cart_weight' ) {
+			} elseif ( in_array( $value[ $key ]['type'], [ 'cart_weight', 'volume_weight' ], true ) ) {
 				$value[ $key ]['value'] = floatval( $rule['value'] );
 			} else {
 				$value[ $key ]['value'] = sanitize_text_field( $rule['value'] );
@@ -898,7 +958,7 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 					$map[ $key ]['value'][ $rule_key ]['condition'] = sanitize_text_field( $rule['condition'] );
 					if ( $map[ $key ]['value'][ $rule_key ]['type'] === 'cart_shipping_class' ) {
 						$map[ $key ]['value'][ $rule_key ]['value'] = Sanitizer::multiselect( $rule['value'] );
-					} elseif ( $map[ $key ]['value'][ $rule_key ]['type'] === 'cart_weight' ) {
+					} elseif ( in_array( $map[ $key ]['value'][ $rule_key ]['type'], [ 'cart_weight', 'volume_weight' ], true ) ) {
 						$map[ $key ]['value'][ $rule_key ]['value'] = floatval( $rule['value'] ?? 0 );
 					} else {
 						$map[ $key ]['value'][ $rule_key ]['value'] = sanitize_text_field( $rule['value'] );
@@ -1053,23 +1113,475 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 	 * @param float $height
 	 * @param float $weight
 	 * @param string $product_code
-	 * 
+	 *
 	 *
 	 * @return bool
 	 */
 	public function are_dimensions_within_limits( $length, $width, $height, $weight, $product_code ) {
-		$limits = DeliveryServiceCode::getDimensionLimits( $product_code );
+		return ServiceLimits::accepts( DeliveryServiceCode::getDimensionLimits( $product_code ), [
+			'length' => $length,
+			'width' => $width,
+			'height' => $height,
+			'weight' => $weight,
+		] );
+	}
 
-		if ( ! $limits ) {
+	/**
+	 * Describe how a package ships, volume by volume, without quoting it.
+	 *
+	 * It follows the same plan as the quote, so a native method linked to a
+	 * Correios service, or an order written by another system, hands the carrier
+	 * the very boxes this method would have priced.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array       $package      Cart package.
+	 * @param string|null $product_code Correios service, the method's own when null.
+	 *
+	 * @return array{
+	 *     data: array{weight: float, length: float, width: float, height: float},
+	 *     packaging: array{id: string, name: string}|null,
+	 *     volumes: array{package: Package, data: array{weight: float, length: float, width: float, height: float}, packaging: array{id: string, name: string}|null}[],
+	 *     within_limits: bool
+	 * } `data` and `packaging` belong to the shipping line: those of the only volume,
+	 *   or the measures of the whole shipment when it travels in several volumes.
+	 */
+	public function describe_shipment( $package, $product_code = null ) {
+		$product_code = $product_code ? $product_code : $this->get_product_code();
+		$whole = $this->get_package( $package );
+		$data = $whole->get_data();
+		$plan = $this->plan_shipment( $package, $product_code, $data, false );
+		$volumes = [];
+
+		foreach ( $plan['volumes'] ? $plan['volumes'] : [ $whole ] as $volume_package ) {
+			$volumes[] = [
+				'package' => $volume_package,
+				'data' => $volume_package === $whole ? $data : $volume_package->get_data(),
+				'packaging' => $this->get_volume_packaging( $volume_package ),
+			];
+		}
+
+		$single = count( $volumes ) === 1;
+
+		return [
+			'data' => $single ? $volumes[0]['data'] : $data,
+			'packaging' => $single ? $volumes[0]['packaging'] : null,
+			'volumes' => $volumes,
+			'within_limits' => $plan['within_limits'],
+		];
+	}
+
+	/**
+	 * Describe the volumes of a shipment that is not priced by this method.
+	 *
+	 * A native method linked to a Correios service charges its own price — free
+	 * shipping, a flat rate — but the store still hands the carrier one box per
+	 * volume, so the order has to be split all the same.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array  $package      Cart package.
+	 * @param string $product_code Correios service the method is linked to.
+	 *
+	 * @return string|false
+	 */
+	public function linked_volumes_meta( $package, $product_code = null ) {
+		$shipment = $this->describe_shipment( $package, $product_code );
+
+		if ( count( $shipment['volumes'] ) < 2 ) {
+			return false;
+		}
+
+		$quotes = [];
+
+		foreach ( $shipment['volumes'] as $volume ) {
+			$quotes[] = [
+				'shipping_cost' => null,
+				'cost' => 0,
+				'package' => $volume['package'],
+				'data' => $volume['data'],
+			];
+		}
+
+		return $this->volumes_meta( $quotes );
+	}
+
+	/**
+	 * Plan the volumes a package ships in.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array  $package      Cart package.
+	 * @param string $product_code Correios service.
+	 * @param array  $measure      Length, width, height and weight the whole package is quoted with.
+	 * @param bool   $overridden   Whether those measures were informed instead of taken from the products.
+	 *
+	 * @return array{volumes: Package[]|null, within_limits: bool}
+	 */
+	private function plan_shipment( $package, $product_code, $measure, $overridden ) {
+		$limits = DeliveryServiceCode::getDimensionLimits( $product_code );
+		$filler = null;
+		$factory = function ($contents, $index) use ($package) {
+			return $this->get_volume_package( $package, $contents, $index );
+		};
+
+		if ( $limits ) {
+			/**
+			 * Filters the filler that packs the volumes of a shipment.
+			 *
+			 * A filler returned here packs every shipment of the service, not only
+			 * the ones over its limits, and each volume ships with the measures and
+			 * the packaging the filler describes. When it cannot pack the shipment,
+			 * the units are stacked in the largest box the service takes, as they
+			 * are without a filler. Plans are kept for the rest of the request by
+			 * the contents, the service, the settings of the method and the class
+			 * of the filler.
+			 *
+			 * @since 1.11.0
+			 *
+			 * @param VolumeFiller|null      $filler  Filler, null to stack the units in the largest box the service takes.
+			 * @param array                  $limits  Limits of the service.
+			 * @param array                  $package Cart package.
+			 * @param CorreiosShippingMethod $method  Shipping method.
+			 * @param callable               $factory Receives the contents of a volume and its index, returns the Package
+			 *                                        the volume is weighed with: products and the extra weight of the method.
+			 */
+			$filler = apply_filters( 'infixs_correios_automatico_volume_filler', null, $limits, $package, $this, $factory );
+		}
+
+		/**
+		 * Filters how many units a shipment may have to be stacked unit by unit.
+		 *
+		 * Above it, the cubage estimate decides whether the shipment is over the
+		 * limits and how it is split.
+		 *
+		 * @since 1.11.0
+		 *
+		 * @param int                    $max_units Largest number of units.
+		 * @param array                  $package   Cart package.
+		 * @param CorreiosShippingMethod $method    Shipping method.
+		 */
+		$max_units = (int) apply_filters( 'infixs_correios_automatico_packing_max_units', 200, $package, $this );
+
+		return Container::volumePlanner()->plan( $package, $limits, $factory, [
+			'measure' => $measure,
+			'overridden' => $overridden,
+			'split' => $this->split_exceed,
+			'max_volumes' => $this->get_max_volumes( $package ),
+			'max_units' => $max_units,
+			'filler' => $filler instanceof VolumeFiller ? $filler : null,
+			'settings' => [
+				$product_code,
+				$this->extra_weight,
+				$this->extra_weight_type,
+				$this->when_less_minimum,
+				$this->minimum_weight,
+				$this->minimum_length,
+				$this->minimum_width,
+				$this->minimum_height,
+			],
+		] );
+	}
+
+	/**
+	 * Get how many volumes one shipment may be broken into.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array $package Cart package.
+	 *
+	 * @return int
+	 */
+	private function get_max_volumes( $package ) {
+		/**
+		 * Filters how many volumes one shipment may be broken into.
+		 *
+		 * @since 1.11.0
+		 *
+		 * @param int                    $max_volumes Largest number of volumes.
+		 * @param array                  $package     Cart package.
+		 * @param CorreiosShippingMethod $method      Shipping method.
+		 */
+		return (int) apply_filters( 'infixs_correios_automatico_max_volumes', 10, $package, $this );
+	}
+
+	/**
+	 * Build the quote of each volume of the shipment.
+	 *
+	 * A shipment that travels in a single volume keeps the value it declares
+	 * whole; each volume of a split shipment declares what is inside it.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param Package[]    $packages      Package of each volume.
+	 * @param ShippingCost $shipping_cost Quote of the whole shipment.
+	 * @param string       $product_code  Correios service being quoted.
+	 *
+	 * @return ShippingCost[]
+	 */
+	private function volume_costs( $packages, $shipping_cost, $product_code ) {
+		$volumes = [];
+
+		foreach ( $packages as $volume_package ) {
+			$volume = new ShippingCost(
+				$product_code,
+				$shipping_cost->getOriginPostcode(),
+				$shipping_cost->getDestinationPostcode(),
+				$shipping_cost->getDestinationCountry()
+			);
+
+			$volume->setPackage( $volume_package );
+			$volume->setOwnHands( $shipping_cost->getOwnHands() );
+			$volume->setReceiptNotice( $shipping_cost->getReceiptNotice() );
+			$volume->setReceiptNoticeElectronic( $shipping_cost->getReceiptNoticeElectronic() );
+			$volume->setModico( $shipping_cost->getModico() );
+
+			if ( $shipping_cost->getInsuranceDeclarationValue() ) {
+				$volume->setInsuranceDeclarationValue( count( $packages ) === 1
+					? $shipping_cost->getInsuranceDeclarationValue()
+					: $this->get_contents_cost( $volume_package->get_contents() ) );
+			}
+
+			$volumes[] = $volume;
+		}
+
+		if ( count( $volumes ) > 1 ) {
+			Log::debug( "Encomenda dividida em " . count( $volumes ) . " volumes.", [
+				'product_code' => $product_code,
+			] );
+		}
+
+		return $volumes;
+	}
+
+	/**
+	 * Get the measures a quote is made with.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param ShippingCost $shipping_cost Quote.
+	 *
+	 * @return array{length: float, width: float, height: float, weight: float}
+	 */
+	private function get_cost_measure( $shipping_cost ) {
+		return [
+			'length' => $shipping_cost->getLength(),
+			'width' => $shipping_cost->getWidth(),
+			'height' => $shipping_cost->getHeight(),
+			'weight' => $shipping_cost->getWeight(),
+		];
+	}
+
+	/**
+	 * Get the packaging a volume travels in.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param Package|null $volume_package Package of the volume.
+	 *
+	 * @return array{id: string, name: string}|null
+	 */
+	private function get_volume_packaging( $volume_package ) {
+		return $volume_package instanceof PackedPackage ? $volume_package->get_packaging() : null;
+	}
+
+	/**
+	 * Build the package of a single volume.
+	 *
+	 * The weight the store adds to every order rides on the first volume only,
+	 * otherwise a shipment broken in three would be charged for it three times.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array $package  Cart package.
+	 * @param array $contents Contents of the volume.
+	 * @param int   $index    Position of the volume in the shipment.
+	 *
+	 * @return Package
+	 */
+	private function get_volume_package( $package, $contents, $index ) {
+		$volume_package = $package;
+		$volume_package['contents'] = $contents;
+		$volume_package['contents_cost'] = $this->get_contents_cost( $contents );
+		$volume_package['cart_subtotal'] = $this->get_contents_cost( $contents, 'line_subtotal' );
+
+		unset( $volume_package['rates'] );
+
+		$shipping_package = $this->get_package( $volume_package );
+
+		if ( $index > 0 && $this->extra_weight_type === 'order' ) {
+			$shipping_package->setExtraWeight( 0 );
+		}
+
+		return $shipping_package;
+	}
+
+	/**
+	 * Sum a money field of the contents.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array  $contents Cart contents.
+	 * @param string $field    Field being summed.
+	 *
+	 * @return float
+	 */
+	private function get_contents_cost( $contents, $field = 'line_total' ) {
+		$total = 0;
+
+		foreach ( $contents as $values ) {
+			if ( isset( $values[ $field ] ) && is_numeric( $values[ $field ] ) ) {
+				$total += (float) $values[ $field ];
+			}
+		}
+
+		return $total;
+	}
+
+	/**
+	 * Ask the carrier for the price of one volume.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param ShippingCost $shipping_cost       Volume being quoted.
+	 * @param array        $package             Cart package.
+	 * @param string       $destination_country Destination country.
+	 *
+	 * @return array{cost: float, delivery_time: int|false, insurance_cost: float|false}|false
+	 */
+	private function quote_volume( $shipping_cost, $package, $destination_country ) {
+		$transient_key = $this->transient_key( 'shipping_cost', [
+			'data' => $shipping_cost->getData(),
+			'country' => $destination_country,
+			'product' => $shipping_cost->getProductCode()
+		], $package );
+
+		$cached_data = get_transient( $transient_key );
+
+		if ( $cached_data === false ) {
+			$cost_response = Container::shippingService()->calculateShippingCost( $shipping_cost );
+			if ( $cost_response !== false && isset( $cost_response['shipping_cost'] ) && $cost_response['shipping_cost'] !== false ) {
+				set_transient( $transient_key, $cost_response, MINUTE_IN_SECONDS );
+			}
+		} else {
+			Log::debug( "Dados de frete recuperados do cache.", [
+				'transient_key' => $transient_key,
+				'cached_data' => $cached_data,
+			] );
+			$cost_response = $cached_data;
+		}
+
+		$cost = is_array( $cost_response ) && isset( $cost_response['shipping_cost'] ) ? $cost_response['shipping_cost'] : false;
+
+		if ( $cost === false ) {
+			return false;
+		}
+
+		return [
+			'cost' => $cost,
+			'delivery_time' => is_array( $cost_response ) && isset( $cost_response['delivery_time'] ) ? $cost_response['delivery_time'] : false,
+			'insurance_cost' => is_array( $cost_response ) && isset( $cost_response['insurance_cost'] ) ? $cost_response['insurance_cost'] : false,
+		];
+	}
+
+	/**
+	 * Describe the volumes for the order that comes out of this quote.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array $quotes Volumes and what the carrier charged for each.
+	 *
+	 * @return string
+	 */
+	private function volumes_meta( $quotes ) {
+		$volumes = [];
+
+		foreach ( $quotes as $quote ) {
+			/** @var ShippingCost|null $shipping_cost */
+			$shipping_cost = $quote['shipping_cost'];
+			$volume_package = $shipping_cost ? $shipping_cost->getPackage() : $quote['package'];
+			$data = $shipping_cost
+				? [ 'weight' => $shipping_cost->getWeight(), 'length' => $shipping_cost->getLength(), 'width' => $shipping_cost->getWidth(), 'height' => $shipping_cost->getHeight() ]
+				: $quote['data'];
+			$items = [];
+
+			foreach ( $volume_package->get_contents() as $values ) {
+				$product = isset( $values['data'] ) ? $values['data'] : null;
+
+				if ( ! $product ) {
+					continue;
+				}
+
+				$items[] = [
+					'id' => $product->get_id(),
+					'qty' => isset( $values['quantity'] ) ? (int) $values['quantity'] : 0,
+				];
+			}
+
+			$volume = [
+				'weight' => $data['weight'],
+				'length' => $data['length'],
+				'width' => $data['width'],
+				'height' => $data['height'],
+				'cost' => (float) $quote['cost'],
+				'items' => $items,
+			];
+
+			$packaging = $this->get_volume_packaging( $volume_package );
+
+			if ( $packaging ) {
+				$volume['packaging_id'] = $packaging['id'];
+				$volume['packaging_name'] = $packaging['name'];
+			}
+
+			$volumes[] = $volume;
+		}
+
+		return wp_json_encode( $volumes );
+	}
+
+	/**
+	 * Whether every volume declares a value the service can insure.
+	 *
+	 * The insurance limit of the carrier applies to each box, so a shipment
+	 * split into volumes is only hidden when one of its boxes declares more than
+	 * the service insures. A volume that declares nothing, because the cart did
+	 * not reach the minimum insurance value, is not over any limit.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param ShippingCost[] $volumes Volumes of the shipment.
+	 * @param array          $package Shipping package.
+	 *
+	 * @return bool
+	 */
+	private function are_volumes_within_insurance_limit( $volumes, $package ) {
+		if ( ! $this->insurance || $this->when_exceed_maximum_insurance !== 'hide_method' ) {
 			return true;
 		}
 
-		return $length <= $limits['max']['length'] &&
-			$width <= $limits['max']['width'] &&
-			$height <= $limits['max']['height'] &&
-			round( $weight, 3 ) <= round( $limits['max']['weight'], 3 );
-	}
+		foreach ( $volumes as $volume ) {
+			if ( $volume->getInsuranceDeclarationValue() === null || $volume->areDeclarationWithinLimits( 'max' ) ) {
+				continue;
+			}
 
+			Log::info( "Frete não calculado, valor da declaração de seguro excede o máximo permitido.", [
+				'product_code' => $volume->getProductCode(),
+				'origin_postcode' => $volume->getOriginPostcode(),
+				'destination_postcode' => $volume->getDestinationPostcode(),
+				'insurance_value' => $volume->getInsuranceDeclarationValue(),
+			] );
+			$this->calculation_failed(
+				'insurance_limit',
+				__( 'O valor declarado do seguro está fora do limite deste serviço e o método está configurado para ser ocultado nesse caso. Nas configurações do método, mude "Ao exceder o seguro máximo" para "Ignorar seguro" ou revise o valor mínimo do seguro.', 'infixs-correios-automatico' ),
+				$package
+			);
+
+			return false;
+		}
+
+		return true;
+	}
 
 	/**
 	 * Calculate Shipping
@@ -1138,6 +1650,8 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			$shipping_cost->setModico( true );
 		}
 
+		$calculated = $this->get_cost_measure( $shipping_cost );
+
 		/**
 		 * Allows overriding the package data used in the quote, keeping the dimensions and the
 		 * weight informed manually (in an order, for example) instead of the ones calculated
@@ -1157,21 +1671,6 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			if ( (int) $this->min_insurance_value / 100 <= $content_cost ) {
 				$shipping_cost->setInsuranceDeclarationValue( $content_cost );
 			}
-
-			if ( $this->when_exceed_maximum_insurance == 'hide_method' && ! $shipping_cost->areDeclarationWithinLimits( 'max' ) ) {
-				Log::info( "Frete não calculado, valor da declaração de seguro excede o máximo permitido.", [
-					'product_code' => $product_code,
-					'origin_postcode' => $origin_postcode,
-					'destination_postcode' => $destination_postcode,
-					'insurance_value' => $content_cost,
-				] );
-				$this->calculation_failed(
-					'insurance_limit',
-					__( 'O valor declarado do seguro está fora do limite deste serviço e o método está configurado para ser ocultado nesse caso. Nas configurações do método, mude "Ao exceder o seguro máximo" para "Ignorar seguro" ou revise o valor mínimo do seguro.', 'infixs-correios-automatico' ),
-					$package
-				);
-				return;
-			}
 		}
 
 		$passed = apply_filters( 'infixs_correios_automatico_calculate_shipping_cost_passed', true, $shipping_cost, $package, $this );
@@ -1186,13 +1685,55 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		}
 
 
-		if ( $this->hide_exceed && ! $this->are_dimensions_within_limits(
-			$shipping_cost->getLength(),
-			$shipping_cost->getWidth(),
-			$shipping_cost->getHeight(),
-			$shipping_cost->getWeight(),
-			$product_code
-		) ) {
+		$measure = $this->get_cost_measure( $shipping_cost );
+		$plan = $this->plan_shipment( $package, $product_code, $measure, $measure !== $calculated );
+		$within_limits = $plan['within_limits'];
+		$volumes = $plan['volumes'] ? $this->volume_costs( $plan['volumes'], $shipping_cost, $product_code ) : [ $shipping_cost ];
+
+		if ( ! $within_limits && $this->split_exceed ) {
+			Log::info( "Não foi possível dividir a encomenda em volumes dentro dos limites do serviço.", [
+				'product_code' => $product_code,
+				'weight' => $shipping_cost->getWeight(),
+				'length' => $shipping_cost->getLength(),
+				'width' => $shipping_cost->getWidth(),
+				'height' => $shipping_cost->getHeight(),
+			] );
+		}
+
+		if ( count( $volumes ) === 1 ) {
+			$shipping_cost = $volumes[0];
+		}
+
+		if ( ! $this->are_volumes_within_insurance_limit( $volumes, $package ) ) {
+			return;
+		}
+
+		/**
+		 * Filters whether the volumes of the shipment may be quoted.
+		 *
+		 * Runs after the shipment was split, so a rule can look at each box the
+		 * carrier receives instead of at the cart as a whole. A shipment that was
+		 * not split has a single volume.
+		 *
+		 * @since 1.11.0
+		 *
+		 * @param bool                   $passed  Whether the volumes may be quoted.
+		 * @param ShippingCost[]         $volumes Volumes of the shipment.
+		 * @param array                  $package Shipping package.
+		 * @param CorreiosShippingMethod $method  Shipping method.
+		 */
+		$volumes_passed = apply_filters( 'infixs_correios_automatico_calculate_shipping_volumes_passed', true, $volumes, $package, $this );
+
+		if ( ! $volumes_passed ) {
+			$this->calculation_failed(
+				'volume_rule_blocked',
+				__( 'O cálculo foi bloqueado por uma regra aplicada aos volumes da encomenda (filtro "infixs_correios_automatico_calculate_shipping_volumes_passed"). Revise as regras avançadas do método, como "Peso do volume", ou snippets e plugins de terceiros que alterem o frete.', 'infixs-correios-automatico' ),
+				$package
+			);
+			return;
+		}
+
+		if ( ! $within_limits && $this->hide_exceed ) {
 			Log::info( "Frete não calculado, dimensões excedidas." );
 			$this->calculation_failed(
 				'dimensions_exceeded',
@@ -1230,42 +1771,38 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			return;
 		}
 
-		$transient_key = $this->transient_key( 'shipping_cost', [
-			'data' => $shipping_cost->getData(),
-			'country' => $destination_country,
-			'product' => $shipping_cost->getProductCode()
-		], $package );
+		$cost = 0;
+		$times = [];
+		$insurance_cost = false;
+		$quotes = [];
 
-		$cached_data = get_transient( $transient_key );
+		foreach ( $volumes as $volume ) {
+			$quote = $this->quote_volume( $volume, $package, $destination_country );
 
-		if ( $cached_data === false ) {
-			$cost_response = Container::shippingService()->calculateShippingCost( $shipping_cost );
-			if ( $cost_response !== false && isset( $cost_response['shipping_cost'] ) && $cost_response['shipping_cost'] !== false ) {
-				set_transient( $transient_key, $cost_response, MINUTE_IN_SECONDS );
+			if ( $quote === false ) {
+				Log::info( "Não foi possível calcular o custo do frete." );
+				$this->calculation_failed(
+					'api_error',
+					__( 'Os Correios não retornaram o preço deste serviço. Verifique se os CEPs de origem e destino são válidos e se o contrato dos Correios está conectado em Correios Automático > Configurações.', 'infixs-correios-automatico' ),
+					$package
+				);
+				return;
 			}
-		} else {
-			Log::debug( "Dados de frete recuperados do cache.", [
-				'transient_key' => $transient_key,
-				'cached_data' => $cached_data,
-			] );
-			$cost_response = $cached_data;
+
+			$cost += (float) $quote['cost'];
+			$quotes[] = [ 'shipping_cost' => $volume, 'cost' => $quote['cost'] ];
+
+			if ( $quote['delivery_time'] !== false ) {
+				$times[] = (int) $quote['delivery_time'];
+			}
+
+			if ( $quote['insurance_cost'] !== false ) {
+				$insurance_cost = (float) $insurance_cost + (float) $quote['insurance_cost'];
+			}
 		}
 
-		$cost = is_array( $cost_response ) && isset( $cost_response['shipping_cost'] ) ? $cost_response['shipping_cost'] : false;
-		$time = is_array( $cost_response ) && isset( $cost_response['delivery_time'] ) ? $cost_response['delivery_time'] : false;
-		$insurance_cost = is_array( $cost_response ) && isset( $cost_response['insurance_cost'] ) ? $cost_response['insurance_cost'] : false;
-
+		$time = $times ? max( $times ) : false;
 		$original_cost = $cost;
-
-		if ( $cost === false ) {
-			Log::info( "Não foi possível calcular o custo do frete." );
-			$this->calculation_failed(
-				'api_error',
-				__( 'Os Correios não retornaram o preço deste serviço. Verifique se os CEPs de origem e destino são válidos e se o contrato dos Correios está conectado em Correios Automático > Configurações.', 'infixs-correios-automatico' ),
-				$package
-			);
-			return;
-		}
 
 		if ( $this->insurance && $insurance_cost !== false && ! $this->insurance_customer_cost ) {
 			$cost -= $insurance_cost;
@@ -1286,6 +1823,17 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 			"_height" => $shipping_cost->getHeight(),
 			"shipping_product_code" => $product_code
 		];
+
+		if ( count( $quotes ) > 1 ) {
+			$meta_data[ self::VOLUMES_META_KEY ] = $this->volumes_meta( $quotes );
+		}
+
+		$packaging = count( $quotes ) === 1 ? $this->get_volume_packaging( $shipping_cost->getPackage() ) : null;
+
+		if ( $packaging ) {
+			$meta_data[ self::PACKAGING_ID_META_KEY ] = $packaging['id'];
+			$meta_data[ self::PACKAGING_NAME_META_KEY ] = $packaging['name'];
+		}
 
 		$matched_rule_method_title = null;
 

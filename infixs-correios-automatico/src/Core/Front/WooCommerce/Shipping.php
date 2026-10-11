@@ -1,6 +1,7 @@
 <?php
 
 namespace Infixs\CorreiosAutomatico\Core\Front\WooCommerce;
+use Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Shipping\LinkedShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
@@ -212,6 +213,8 @@ class Shipping {
 					'variation_id' => $variation_id,
 					'data' => $product,
 					'quantity' => $quantity,
+					'line_total' => $package_cost,
+					'line_subtotal' => $package_cost,
 					'formatted_data' => (object) [
 						'id' => $product->get_id(),
 						'name' => $product->get_name(),
@@ -374,7 +377,8 @@ class Shipping {
 				continue;
 			}
 
-			$package_data = $linked_method->get_package( $package )->get_data();
+			$shipment = $linked_method->describe_shipment( $package );
+			$package_data = $shipment['data'];
 
 			$rate->add_meta_data( '_weight', $package_data['weight'] );
 			$rate->add_meta_data( '_length', $package_data['length'] );
@@ -382,6 +386,17 @@ class Shipping {
 			$rate->add_meta_data( '_height', $package_data['height'] );
 			$rate->add_meta_data( 'shipping_product_code', $linked_method->get_product_code() );
 			$rate->add_meta_data( LinkedShippingMethod::ITEM_META_KEY, $linked_method->get_instance_id() );
+
+			if ( $shipment['packaging'] ) {
+				$rate->add_meta_data( CorreiosShippingMethod::PACKAGING_ID_META_KEY, $shipment['packaging']['id'] );
+				$rate->add_meta_data( CorreiosShippingMethod::PACKAGING_NAME_META_KEY, $shipment['packaging']['name'] );
+			}
+
+			$volumes = $linked_method->linked_volumes_meta( $package );
+
+			if ( $volumes ) {
+				$rate->add_meta_data( CorreiosShippingMethod::VOLUMES_META_KEY, $volumes );
+			}
 
 			$rates[ $rate_id ] = $rate;
 
@@ -459,7 +474,7 @@ class Shipping {
 		if ( $rate instanceof \WC_Shipping_Rate ) {
 			$metas = $rate->get_meta_data();
 
-			foreach ( [ '_weight', '_length', '_width', '_height', 'shipping_product_code' ] as $meta_key ) {
+			foreach ( [ '_weight', '_length', '_width', '_height', 'shipping_product_code', CorreiosShippingMethod::VOLUMES_META_KEY, CorreiosShippingMethod::PACKAGING_ID_META_KEY, CorreiosShippingMethod::PACKAGING_NAME_META_KEY ] as $meta_key ) {
 				if ( isset( $metas[ $meta_key ] ) ) {
 					$item->update_meta_data( $meta_key, $metas[ $meta_key ] );
 				}
@@ -482,7 +497,8 @@ class Shipping {
 			// The linked method produced no rate (unavailable / no price). Keep at least the
 			// dimensions and the service, computed locally, so the pré-postagem still works —
 			// only the freight cost is missing.
-			$package_data = $linked_method->get_package( $package )->get_data();
+			$shipment = $linked_method->describe_shipment( $package );
+			$package_data = $shipment['data'];
 
 			$item->update_meta_data( '_weight', $package_data['weight'] );
 			$item->update_meta_data( '_length', $package_data['length'] );
@@ -490,6 +506,11 @@ class Shipping {
 			$item->update_meta_data( '_height', $package_data['height'] );
 			$item->update_meta_data( 'shipping_product_code', $linked_method->get_product_code() );
 			$item->update_meta_data( LinkedShippingMethod::ITEM_META_KEY, $linked_method->get_instance_id() );
+
+			if ( $shipment['packaging'] ) {
+				$item->update_meta_data( CorreiosShippingMethod::PACKAGING_ID_META_KEY, $shipment['packaging']['id'] );
+				$item->update_meta_data( CorreiosShippingMethod::PACKAGING_NAME_META_KEY, $shipment['packaging']['name'] );
+			}
 		}
 
 		Log::debug( 'Linked shipping item converted to Correios', [

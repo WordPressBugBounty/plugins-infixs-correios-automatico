@@ -6,12 +6,14 @@ use Infixs\CorreiosAutomatico\Core\Admin\Dokan\Dokan;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\OrderScreenReplacement;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\OrderTrackingColumn;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\WCIntegration;
+use Infixs\CorreiosAutomatico\Core\Shipping\CarrierRegistry;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Plugin;
 use Infixs\CorreiosAutomatico\Core\Support\Template;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\CeintCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
+use Infixs\CorreiosAutomatico\Utils\OrderFilterSanitizer;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -194,7 +196,8 @@ class Admin {
 					[
 						'restUrl' => Container::routes()->get_rest_url(),
 						'nonce' => wp_create_nonce( 'wp_rest' ),
-						'adminUrl' => admin_url( 'admin.php?page=infixs-correios-automatico' )
+						'adminUrl' => admin_url( 'admin.php?page=infixs-correios-automatico' ),
+						'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 					]
 				)
 			);
@@ -230,14 +233,18 @@ class Admin {
 	 * Order data needed by the dashboard order screen.
 	 *
 	 * @since 1.9.0
+	 * @since 1.11.0 Carries the carriers and the saved filters of the listing.
 	 *
 	 * @return array
 	 */
 	private function get_order_script_data() {
 		return [
 			'statuses' => function_exists( 'wc_get_order_statuses' ) ? wc_get_order_statuses() : [],
+			'carriers' => CarrierRegistry::options(),
 			'preferences' => [
-				'status' => Config::get( 'preferences.order.status' ),
+				'status' => OrderFilterSanitizer::statuses( Config::get( 'preferences.order.status', [] ) ),
+				'carrier' => OrderFilterSanitizer::carriers( Config::get( 'preferences.order.carrier', [] ) ),
+				'pending' => OrderFilterSanitizer::pending( Config::get( 'preferences.order.pending', [] ) ),
 			],
 		];
 	}
@@ -271,6 +278,10 @@ class Admin {
 			$params['activePlugins'][] = 'infixs-checkout-fields';
 		}
 
+		if ( defined( 'INFIXS_SQUIDCORE_FILE_NAME' ) ) {
+			$params['activePlugins'][] = 'infixs-squidcore';
+		}
+
 		if ( class_exists( 'Infixs\PingoNotify\Services\NotificationService' ) ) {
 			$params['activePlugins'][] = 'infixs-pingo-notify';
 
@@ -293,7 +304,7 @@ class Admin {
 		 * @param string[] $active_plugins
 		 */
 		$active_plugins = apply_filters( 'infixs_correios_automatico_active_plugins', $params['activePlugins'] );
-		$params['activePlugins'] = is_array( $active_plugins ) ? $active_plugins : $params['activePlugins'];
+		$params['activePlugins'] = array_values( array_unique( is_array( $active_plugins ) ? $active_plugins : $params['activePlugins'] ) );
 
 		$scriptData = array_merge( $params, [
 			'adminEmail' => get_option( 'admin_email' ),
@@ -303,6 +314,8 @@ class Admin {
 			'activePlugins' => $params['activePlugins'],
 			'adminPath' => $relative_path,
 			'restUrl' => Container::routes()->get_rest_url(),
+			'restRouteUrl' => Container::routes()->get_rest_route_url(),
+			'permalinksUrl' => current_user_can( 'manage_options' ) ? admin_url( 'options-permalink.php' ) : '',
 			'resourcesUrl' => \INFIXS_CORREIOS_AUTOMATICO_PLUGIN_URL . 'assets/dashboard',
 			'nonce' => wp_create_nonce( 'wp_rest' ),
 			'ceints' => CeintCode::getCeintsOptions(),
@@ -311,6 +324,7 @@ class Admin {
 			'checkLicense' => self::should_check_license(),
 			'canDownloadPdf' => false,
 			'canAutoPrint' => false,
+			'canPackaging' => false,
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {

@@ -2,7 +2,8 @@
 
 namespace Infixs\CorreiosAutomatico\Core\Emails;
 
-use Infixs\CorreiosAutomatico\Core\Support\Config;
+use Infixs\CorreiosAutomatico\Core\Emails\Concerns\LinksTrackingPage;
+use Infixs\CorreiosAutomatico\Core\Emails\Concerns\ListsTrackingCodes;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -13,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
  * @since   1.0.0
  */
 class TrackingCodeEmail extends \WC_Email {
+	use ListsTrackingCodes, LinksTrackingPage;
 
 	/**
 	 * Message.
@@ -144,50 +146,6 @@ class TrackingCodeEmail extends \WC_Email {
 	}
 
 	/**
-	 * Get tracking code url.
-	 *
-	 * @param  string $tracking_code Tracking code.
-	 *
-	 * @return string
-	 */
-	public function get_tracking_code_url( $tracking_code ) {
-		$html = sprintf( '<a href="%s#wc-correios-tracking">%s</a>', $this->object->get_view_order_url(), $tracking_code );
-
-		$tracking_page_id = Config::integer( 'general.tracking_page' );
-
-		if ( $tracking_page_id && get_post_status( $tracking_page_id ) === 'publish' ) {
-			$tracking_page_url = get_permalink( $tracking_page_id );
-
-			$tracking_page_url = add_query_arg( 'code', $tracking_code, $tracking_page_url );
-
-			$html = sprintf( '<a href="%s">%s</a>', $tracking_page_url, $tracking_code, $tracking_code );
-		}
-
-		return apply_filters( 'infixs_correios_automatico_email_tracking_code_url', $html, $tracking_code, $this->object );
-	}
-
-	/**
-	 * Get tracking codes HTML.
-	 *
-	 * @param  array $tracking_codes Tracking codes.
-	 *
-	 * @return string
-	 */
-	public function get_tracking_codes( $tracking_codes ) {
-		if ( 1 < count( $tracking_codes ) ) {
-			$html = '<ul>';
-			foreach ( $tracking_codes as $tracking_code ) {
-				$html .= '<li>' . $this->get_tracking_code_url( $tracking_code ) . '</li>';
-			}
-			$html .= '</ul>';
-
-			return $html;
-		}
-
-		return $this->get_tracking_code_url( $tracking_codes[0] );
-	}
-
-	/**
 	 * Trigger email.
 	 *
 	 * @param  int      $order_id      Order ID.
@@ -267,11 +225,7 @@ class TrackingCodeEmail extends \WC_Email {
 	public function get_content_plain() {
 		ob_start();
 
-		// Format list.
-		$message = $this->get_tracking_message();
-		$message = str_replace( '<ul>', "\n", $message );
-		$message = str_replace( '<li>', "\n - ", $message );
-		$message = str_replace( [ '</ul>', '</li>' ], '', $message );
+		$message = $this->format_plain_tracking_codes( $this->get_tracking_message() );
 
 		wc_get_template(
 			$this->template_plain,

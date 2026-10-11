@@ -18,6 +18,8 @@ use Infixs\CorreiosAutomatico\Controllers\Rest\SettingsSenderController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\ShippingController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\TrackingController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\UnitController;
+use Infixs\CorreiosAutomatico\Services\PrepostService;
+use Infixs\CorreiosAutomatico\Utils\OrderFilterSanitizer;
 
 defined( 'ABSPATH' ) || exit;
 class RestRoutes {
@@ -388,6 +390,51 @@ class RestRoutes {
 			}
 		] );
 
+		/**
+		 * Read the DC-e of preposts that have none stored.
+		 *
+		 * @since 1.11.0
+		 */
+		register_rest_route( $this->namespace, '/preposts/dce/refresh', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $prepost_controller, 'refreshDce' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			},
+			'args' => [
+				'prepost_ids' => [
+					'required' => true,
+					'type' => 'array',
+					'items' => [ 'type' => 'integer' ],
+					'validate_callback' => function ( $param ) {
+						if ( ! is_array( $param ) || empty( $param ) ) {
+							return new \WP_Error( 'missing_prepost_ids', 'Informe as pré-postagens a consultar.', [ 'status' => 400 ] );
+						}
+
+						/**
+						 * Each prepost costs one call to the Correios, and
+						 * that call waits up to twenty seconds, so the screen
+						 * asks in batches instead of handing over the whole
+						 * list and having the request die on the execution
+						 * time before a single answer is written.
+						 */
+						if ( count( $param ) > PrepostService::DCE_REFRESH_BATCH_LIMIT ) {
+							return new \WP_Error(
+								'too_many_prepost_ids',
+								sprintf( 'Consulte no máximo %d pré-postagens por vez.', PrepostService::DCE_REFRESH_BATCH_LIMIT ),
+								[ 'status' => 400 ]
+							);
+						}
+
+						return true;
+					},
+					'sanitize_callback' => function ( $param ) {
+						return array_values( array_unique( array_filter( array_map( 'absint', (array) $param ) ) ) );
+					},
+				],
+			],
+		] );
+
 		register_rest_route( $this->namespace, '/preposts/reverse', [
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => [ $prepost_controller, 'createReverseFromOrder' ],
@@ -607,6 +654,15 @@ class RestRoutes {
 				'search' => [
 					'sanitize_callback' => 'sanitize_text_field',
 				],
+				'status' => [
+					'sanitize_callback' => [ OrderFilterSanitizer::class, 'statuses' ],
+				],
+				'carrier' => [
+					'sanitize_callback' => [ OrderFilterSanitizer::class, 'carriers' ],
+				],
+				'pending' => [
+					'sanitize_callback' => [ OrderFilterSanitizer::class, 'pending' ],
+				],
 			],
 		] );
 
@@ -695,5 +751,21 @@ class RestRoutes {
 	 */
 	public function get_rest_url() {
 		return get_rest_url( null, $this->namespace );
+	}
+
+	/**
+	 * Get the rest url in the ?rest_route= form.
+	 *
+	 * The dashboard switches to it when the web server answers /wp-json/ itself,
+	 * which happens when the rewrite rules of the site stop working.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @return string
+	 */
+	public function get_rest_route_url() {
+		$url = add_query_arg( 'rest_route', '/' . $this->namespace, trailingslashit( get_home_url() ) . 'index.php' );
+
+		return set_url_scheme( $url, wp_parse_url( $this->get_rest_url(), PHP_URL_SCHEME ) );
 	}
 }

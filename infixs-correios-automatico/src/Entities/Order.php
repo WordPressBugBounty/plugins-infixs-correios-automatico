@@ -9,6 +9,7 @@ use Infixs\CorreiosAutomatico\Marketplace\MarketplaceRegistry;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Services\OrderInvoiceResolver;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Package;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
@@ -64,6 +65,7 @@ class Order {
 		'vendor_id' => 0,
 		'shipping_item_id' => 0,
 		'item_ids' => [],
+		'item_quantities' => [],
 		'contract_number' => null,
 		'postcard' => null,
 	];
@@ -98,9 +100,14 @@ class Order {
 			'vendor_id' => isset( $context['vendor_id'] ) ? (int) $context['vendor_id'] : 0,
 			'shipping_item_id' => isset( $context['shipping_item_id'] ) ? absint( $context['shipping_item_id'] ) : 0,
 			'item_ids' => [],
+			'item_quantities' => [],
 			'contract_number' => null,
 			'postcard' => null,
 		];
+
+		if ( $scope['shipping_item_id'] ) {
+			$scope = self::scopeVolumeItems( $order, $scope );
+		}
 
 		/**
 		 * Filters the portion of an order a label or prepost is built from.
@@ -124,6 +131,68 @@ class Order {
 	}
 
 	/**
+	 * Fill the scope with the products travelling in a volume.
+	 *
+	 * A shipment broken into volumes writes on each shipping line which
+	 * products went into that box, so the label and the prepost of a volume
+	 * declare what is inside it instead of the whole order. Only the products
+	 * are recorded, never the order item ids: the line is written before the
+	 * order is saved, when no item has an id yet.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param Order $order Order being scoped.
+	 * @param array $scope Scope built so far.
+	 *
+	 * @return array
+	 */
+	private static function scopeVolumeItems( $order, $scope ) {
+		$shipping_item = $order->getOrder()->get_item( $scope['shipping_item_id'] );
+
+		if ( ! $shipping_item ) {
+			return $scope;
+		}
+
+		$volume_items = $shipping_item->get_meta( CorreiosShippingMethod::VOLUME_ITEMS_META_KEY );
+
+		if ( is_string( $volume_items ) ) {
+			$volume_items = json_decode( $volume_items, true );
+		}
+
+		if ( ! is_array( $volume_items ) || ! $volume_items ) {
+			return $scope;
+		}
+
+		$wanted = [];
+
+		foreach ( $volume_items as $volume_item ) {
+			if ( ! isset( $volume_item['id'] ) ) {
+				continue;
+			}
+
+			$product_id = absint( $volume_item['id'] );
+			$quantity = isset( $volume_item['qty'] ) ? absint( $volume_item['qty'] ) : 0;
+			$wanted[ $product_id ] = isset( $wanted[ $product_id ] ) ? $wanted[ $product_id ] + $quantity : $quantity;
+		}
+
+		foreach ( $order->getOrder()->get_items() as $item_id => $item ) {
+			$product_id = $item->get_variation_id() ? $item->get_variation_id() : $item->get_product_id();
+
+			if ( empty( $wanted[ $product_id ] ) ) {
+				continue;
+			}
+
+			$quantity = min( (int) $item->get_quantity(), $wanted[ $product_id ] );
+			$wanted[ $product_id ] -= $quantity;
+
+			$scope['item_ids'][] = $item_id;
+			$scope['item_quantities'][ $item_id ] = $quantity;
+		}
+
+		return $scope;
+	}
+
+	/**
 	 * Narrow this instance down to a portion of the order.
 	 *
 	 * @since 1.8.2
@@ -137,6 +206,7 @@ class Order {
 			'vendor_id' => isset( $scope['vendor_id'] ) ? (int) $scope['vendor_id'] : 0,
 			'shipping_item_id' => isset( $scope['shipping_item_id'] ) ? (int) $scope['shipping_item_id'] : 0,
 			'item_ids' => isset( $scope['item_ids'] ) && is_array( $scope['item_ids'] ) ? array_map( 'absint', $scope['item_ids'] ) : [],
+			'item_quantities' => isset( $scope['item_quantities'] ) && is_array( $scope['item_quantities'] ) ? array_map( 'absint', $scope['item_quantities'] ) : [],
 			'contract_number' => isset( $scope['contract_number'] ) ? $scope['contract_number'] : null,
 			'postcard' => isset( $scope['postcard'] ) ? $scope['postcard'] : null,
 		];
@@ -238,6 +308,9 @@ class Order {
 					'original_cost' => null,
 					'insurance_cost' => 0,
 					'shipping_product_code' => null,
+					'volume_index' => 0,
+					'volume_total' => 0,
+					'packaging_name' => '',
 				];
 				continue;
 			}
@@ -258,6 +331,9 @@ class Order {
 				'original_cost' => $item->get_meta( '_original_cost' ) ?: null,
 				'insurance_cost' => $item->get_meta( '_insurance_cost' ) ?: 0,
 				'shipping_product_code' => $item->get_meta( 'shipping_product_code' ) ?: null,
+				'volume_index' => (int) $item->get_meta( CorreiosShippingMethod::VOLUME_INDEX_META_KEY ),
+				'volume_total' => (int) $item->get_meta( CorreiosShippingMethod::VOLUME_TOTAL_META_KEY ),
+				'packaging_name' => (string) $item->get_meta( CorreiosShippingMethod::PACKAGING_NAME_META_KEY ),
 			];
 		}
 	}
@@ -303,14 +379,17 @@ class Order {
 	 * every line separately here.
 	 *
 	 * @since 1.8.3
+	 * @since 1.11.0 Tells whether each shipment carries a dangerous product and the packaging it ships in.
 	 *
 	 * @return array<int, array>
 	 */
 	public function getShippingItemsPayload() {
 		$items = [];
+		$has_dangerous_product = $this->hasDangerousProduct();
 
 		foreach ( $this->getShippingItemsData() as $shipping_item ) {
 			$product_code = $shipping_item['shipping_product_code'];
+			$volume_total = isset( $shipping_item['volume_total'] ) ? (int) $shipping_item['volume_total'] : 0;
 
 			$items[] = [
 				'item_id' => (int) $shipping_item['item_id'],
@@ -326,13 +405,40 @@ class Order {
 				'weight' => $shipping_item['weight'],
 				'shipping_product_code' => $product_code,
 				'shipping_product_title' => $product_code ? DeliveryServiceCode::getDescription( $product_code ) : null,
+				'volume_index' => isset( $shipping_item['volume_index'] ) ? (int) $shipping_item['volume_index'] : 0,
+				'volume_total' => $volume_total,
 				'vendor_id' => $shipping_item['vendor_id'],
 				'is_correios' => (bool) $shipping_item['is_correios'],
 				'carrier' => $shipping_item['carrier'] ?? ( $shipping_item['is_correios'] ? 'correios' : null ),
+				'dangerous_product' => $volume_total > 1 ? $this->hasDangerousProductInShipment( (int) $shipping_item['item_id'] ) : $has_dangerous_product,
+				'packaging_name' => isset( $shipping_item['packaging_name'] ) ? (string) $shipping_item['packaging_name'] : '',
 			];
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Whether a product packed in one shipment of the order is dangerous.
+	 *
+	 * The shipment is scoped the way its prepost is, so the default the
+	 * dashboard offers is the one the prepost takes when it is not told.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param int $shipping_item_id Shipping line of the shipment.
+	 *
+	 * @return bool
+	 */
+	private function hasDangerousProductInShipment( $shipping_item_id ) {
+		$shipment = new self( $this->order );
+
+		$shipment->applyScope( self::resolveScope( $shipment, [
+			'for' => 'prepost',
+			'shipping_item_id' => $shipping_item_id,
+		] ) );
+
+		return $shipment->hasDangerousProduct();
 	}
 
 	/**
@@ -390,17 +496,28 @@ class Order {
 
 	/**
 	 * Get last tracking code.
-	 * 
+	 *
 	 * @since 1.0.0
-	 * 
+	 * @since 1.11.0 Leaves the reverse shipments out: the panel records a manual return on the line of the box it takes back.
+	 *
 	 * @return string|null
 	 */
 	public function getLastTrackingCode() {
-		$model = TrackingCode::where( 'order_id', $this->order->get_id() )->orderBy( 'id', 'desc' )->first();
-		if ( ! $model ) {
-			return null;
+		$query = TrackingCode::where( 'order_id', $this->order->get_id() );
+
+		if ( $this->scope['shipping_item_id'] ) {
+			$query = $query->where( 'shipping_item_id', $this->scope['shipping_item_id'] );
 		}
-		return $model->code;
+
+		$reverse_codes = Container::trackingService()->getReverseCodes( $this->order->get_id() );
+
+		foreach ( $query->orderBy( 'id', 'desc' )->get() as $model ) {
+			if ( ! in_array( $model->code, $reverse_codes, true ) ) {
+				return $model->code;
+			}
+		}
+
+		return null;
 	}
 
 	//TODO: use getTrackings in TrackingService
@@ -545,6 +662,30 @@ class Order {
 		return array_intersect_key( $items, array_flip( $this->scope['item_ids'] ) );
 	}
 
+	/**
+	 * Whether a product in scope has to travel as a dangerous article.
+	 *
+	 * A volume or a vendor answers only for the products it carries, so the
+	 * dangerous goods service is declared only on the objects that need it.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @return bool
+	 */
+	public function hasDangerousProduct() {
+		foreach ( $this->getItems() as $item ) {
+			if ( ! $item instanceof \WC_Order_Item_Product ) {
+				continue;
+			}
+
+			if ( 'yes' === get_post_meta( $item->get_product_id(), '_infixs_correios_automatico_dangerous_product', true ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	public function getContents() {
 		$contents = [];
 		foreach ( $this->getItems() as $item ) {
@@ -552,22 +693,92 @@ class Order {
 				continue;
 
 			$item_id = $item->get_id();
+			$quantity = $this->getScopedQuantity( $item );
+
 			if ( empty( $item_id ) ) {
 				$contents[] = [
-					'quantity' => $item->get_quantity(),
+					'quantity' => $quantity,
 					'data' => $item->get_product(),
-					'line_total' => $item->get_total(),
+					'line_total' => $this->getScopedLineTotal( $item, $quantity ),
 				];
 			} else {
 				$contents[ $item_id ] = [
-					'quantity' => $item->get_quantity(),
+					'quantity' => $quantity,
 					'data' => $item->get_product(),
-					'line_total' => $item->get_total(),
+					'line_total' => $this->getScopedLineTotal( $item, $quantity ),
 				];
 			}
 		}
 
 		return $contents;
+	}
+
+	/**
+	 * Units of an item that belong to the scope in force.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order_Item_Product $item Order item.
+	 *
+	 * @return int
+	 */
+	public function getScopedQuantity( $item ) {
+		$item_id = $item->get_id();
+
+		if ( $item_id && isset( $this->scope['item_quantities'][ $item_id ] ) ) {
+			return (int) $this->scope['item_quantities'][ $item_id ];
+		}
+
+		return (int) $item->get_quantity();
+	}
+
+	/**
+	 * Share of the line total that belongs to the units in scope.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order_Item_Product $item     Order item.
+	 * @param int|null               $quantity Units in scope, resolved from the scope when null.
+	 *
+	 * @return float
+	 */
+	public function getScopedLineTotal( $item, $quantity = null ) {
+		$quantity = $quantity === null ? $this->getScopedQuantity( $item ) : $quantity;
+
+		$total = (float) $item->get_total();
+		$item_quantity = (int) $item->get_quantity();
+
+		if ( $item_quantity < 1 || $quantity === $item_quantity ) {
+			return $total;
+		}
+
+		return ( $total / $item_quantity ) * $quantity;
+	}
+
+	/**
+	 * Share of the line subtotal that belongs to the units in scope.
+	 *
+	 * The subtotal is the value before discounts, which is what the content
+	 * declaration states for the whole order.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order_Item_Product $item     Order item.
+	 * @param int|null               $quantity Units in scope, resolved from the scope when null.
+	 *
+	 * @return float
+	 */
+	public function getScopedLineSubtotal( $item, $quantity = null ) {
+		$quantity = $quantity === null ? $this->getScopedQuantity( $item ) : $quantity;
+
+		$subtotal = (float) $item->get_subtotal();
+		$item_quantity = (int) $item->get_quantity();
+
+		if ( $item_quantity < 1 || $quantity === $item_quantity ) {
+			return $subtotal;
+		}
+
+		return ( $subtotal / $item_quantity ) * $quantity;
 	}
 
 	/**
@@ -662,8 +873,31 @@ class Order {
 		return array_intersect_key( $shipping_methods, [ $this->scope['shipping_item_id'] => true ] );
 	}
 
+	/**
+	 * Subtotal of the products in scope.
+	 *
+	 * A scope that names the items — a vendor of a marketplace order, or a
+	 * volume of a split shipment — declares only the value of those units, so
+	 * the declarations of the boxes add up to the order instead of repeating
+	 * it on each one.
+	 *
+	 * @since 1.0.0
+	 * @since 1.11.0 Sums only the items in scope.
+	 *
+	 * @return float
+	 */
 	public function getSubtotal() {
-		return $this->order->get_subtotal();
+		if ( ! $this->scope['item_ids'] ) {
+			return $this->order->get_subtotal();
+		}
+
+		$subtotal = 0;
+
+		foreach ( $this->getItems() as $item ) {
+			$subtotal += $this->getScopedLineSubtotal( $item );
+		}
+
+		return $subtotal;
 	}
 
 	public function getTotal() {
@@ -722,7 +956,10 @@ class Order {
 	 * 		lenght: float,
 	 * 		weight: float,
 	 * 		delivery_time: int,
-	 * 		shipping_product_code: string|null
+	 * 		shipping_product_code: string|null,
+	 * 		volume_index: int,
+	 * 		volume_total: int,
+	 * 		packaging_name: string
 	 * }|null
 	 */
 	public function getFirstShippingItemData() {
@@ -736,6 +973,9 @@ class Order {
 			'original_cost' => null,
 			'shipping_product_code' => null,
 			'carrier' => null,
+			'volume_index' => 0,
+			'volume_total' => 0,
+			'packaging_name' => '',
 		];
 	}
 
@@ -811,6 +1051,70 @@ class Order {
 		];
 	}
 
+	/**
+	 * Weight and measurements of the shipment as a whole.
+	 *
+	 * A shipment broken into volumes has the weight spread over its boxes, so
+	 * anything that answers for the whole order — a return, for instance —
+	 * would understate it by reading a single line. The boxes add up in weight
+	 * and the largest one answers for the measurements.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @return array{ width: float, height: float, lenght: float, weight: float }
+	 */
+	public function getShipmentDimensions() {
+		$dimensions = [ 'width' => 0, 'height' => 0, 'lenght' => 0, 'weight' => 0 ];
+		$lines = 0;
+
+		foreach ( $this->shipping_items as $shipping_item ) {
+			if ( ! $shipping_item['is_correios'] ) {
+				continue;
+			}
+
+			$lines++;
+			$dimensions['weight'] += (float) $shipping_item['weight'];
+			$dimensions['width'] = max( $dimensions['width'], (float) $shipping_item['width'] );
+			$dimensions['height'] = max( $dimensions['height'], (float) $shipping_item['height'] );
+			$dimensions['lenght'] = max( $dimensions['lenght'], (float) $shipping_item['lenght'] );
+		}
+
+		if ( $lines < 2 || $dimensions['weight'] <= 0 ) {
+			return $this->getShippingPackageDimensions();
+		}
+
+		return $dimensions;
+	}
+
+	/**
+	 * Build the invoice metas the dashboard fills the prepost form with.
+	 *
+	 * The NF-e of the order, when there is one, takes the place of the metas,
+	 * under the same keys; without it the metas go as they were stored.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param array|null $invoice NF-e of the order, as the order invoice resolver answers it.
+	 *
+	 * @return array<int, array{key: string, value: string}>
+	 */
+	private function getInvoiceMetaData( $invoice ) {
+		$values = [
+			OrderInvoiceResolver::NUMBER_META_KEY => $invoice ? $invoice['invoice_number'] : $this->order->get_meta( OrderInvoiceResolver::NUMBER_META_KEY, true ),
+			OrderInvoiceResolver::KEY_META_KEY => $invoice ? $invoice['invoice_key'] : $this->order->get_meta( OrderInvoiceResolver::KEY_META_KEY, true ),
+		];
+
+		$meta_data = [];
+
+		foreach ( $values as $key => $value ) {
+			if ( '' !== $value && false !== $value && null !== $value ) {
+				$meta_data[] = [ 'key' => $key, 'value' => $value ];
+			}
+		}
+
+		return $meta_data;
+	}
+
 	public function toArray() {
 		$address = $this->getAddress()->toArray();
 		$customer = $this->getCustomer()->toArray();
@@ -831,22 +1135,15 @@ class Order {
 		$shipping_product_code = $this->getShippingProductCode();
 		$shipping_method = $this->getShippingMethod();
 
-		$has_dangerous_product = false;
-		foreach ( $this->order->get_items() as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Product ) {
-				continue;
-			}
-
-			if ( 'yes' === get_post_meta( $item->get_product_id(), '_infixs_correios_automatico_dangerous_product', true ) ) {
-				$has_dangerous_product = true;
-				break;
-			}
-		}
-
 		$shipping_metadata = $this->getFirstShippingItemData();
 
 		$prepost_errors = $this->order->get_meta( PrepostService::PREPOST_ERRORS_META_KEY );
 		$prepost_errors = is_array( $prepost_errors ) ? array_values( $prepost_errors ) : [];
+
+		$invoice = Container::orderInvoiceResolver()->resolve( $this->order, [
+			'for' => 'display',
+			'vendor_id' => $this->getScopedVendorId(),
+		] );
 
 		$data = [
 			'id' => $this->order->get_id(),
@@ -873,7 +1170,7 @@ class Order {
 					'own_hands' => $shipping_method ? $shipping_method->is_own_hands() : false,
 					'receipt_notice' => $shipping_method ? $shipping_method->is_receipt_notice() : false,
 					'receipt_notice_electronic' => $shipping_method ? $shipping_method->is_receipt_notice_electronic() : false,
-					'dangerous_product' => $has_dangerous_product,
+					'dangerous_product' => $this->hasDangerousProduct(),
 				],
 			],
 			'printed' => $this->order->get_meta( '_infixs_correios_automatico_printed', true ) ?: null,
@@ -881,10 +1178,9 @@ class Order {
 			'email_preparing_sent' => $this->order->get_meta( '_infixs_correios_automatico_email_preparing_sent', true ) ?: null,
 			'customer' => $customer,
 			'created_at' => $this->order->get_date_created()->date( 'Y-m-d H:i:s' ),
-			'meta_data' => array_values( array_filter( [
-				( $invoice_number = $this->order->get_meta( '_infixs_correios_automatico_invoice_number', true ) ) !== '' && $invoice_number !== false ? [ 'key' => '_infixs_correios_automatico_invoice_number', 'value' => $invoice_number ] : null,
-				( $invoice_key = $this->order->get_meta( '_infixs_correios_automatico_invoice_key', true ) ) !== '' && $invoice_key !== false ? [ 'key' => '_infixs_correios_automatico_invoice_key', 'value' => $invoice_key ] : null,
-			] ) ),
+			'meta_data' => $this->getInvoiceMetaData( $invoice ),
+			'invoice' => $invoice,
+			'waiting_invoice' => Container::orderInvoiceResolver()->isWaiting( $this->order ),
 			'shipping_items' => $this->getShippingItemsPayload(),
 			'prepost_errors' => $prepost_errors,
 			'preposts' => []

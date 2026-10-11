@@ -3,7 +3,8 @@
 namespace Infixs\CorreiosAutomatico\Core\Admin\WooCommerce;
 
 use Infixs\CorreiosAutomatico\Core\Support\Log;
-use Infixs\CorreiosAutomatico\Utils\TextHelper;
+use Infixs\CorreiosAutomatico\Services\VolumeLineExpander;
+use Infixs\CorreiosAutomatico\Utils\ShippingLineName;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -14,10 +15,24 @@ defined( 'ABSPATH' ) || exit;
  * @since   1.5.1
  */
 class Checkout {
-	public function __construct() {
+
+	/**
+	 * Gives each volume of a shipment its own shipping line.
+	 *
+	 * @var VolumeLineExpander
+	 */
+	private $volumeLineExpander;
+
+	/**
+	 * @param VolumeLineExpander $volumeLineExpander Gives each volume of a shipment its own shipping line.
+	 */
+	public function __construct( VolumeLineExpander $volumeLineExpander ) {
+		$this->volumeLineExpander = $volumeLineExpander;
+
 		add_action( 'woocommerce_checkout_create_order', [ $this, 'woocommerce_checkout_create_order' ], 100 );
 		add_action( 'woocommerce_checkout_order_created', [ $this, 'verify_shipping_line_persisted' ] );
 		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'verify_shipping_line_persisted' ] );
+		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'expand_volumes_and_save' ] );
 	}
 
 	/**
@@ -32,17 +47,88 @@ class Checkout {
 	 * items right after this hook, in the same save as the product lines.
 	 *
 	 * @param \WC_Order $order
-	 * 
+	 *
 	 * @return void
 	 */
 	public function woocommerce_checkout_create_order( $order ) {
+		$this->remove_delivery_time( $order );
+		$this->expand_volumes( $order );
+	}
+
+	/**
+	 * Drop the delivery time from the name of the Correios shipping lines.
+	 *
+	 * The time belongs to the quote the customer saw, not to the order: it is
+	 * already stale by the time anyone reads the line again.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order $order Order being created.
+	 *
+	 * @return bool Whether any line was renamed.
+	 */
+	private function remove_delivery_time( $order ) {
+		$renamed = false;
+
 		/** @var \WC_Order_Item_Shipping $line_item */
 		foreach ( $order->get_items( 'shipping' ) as $line_item ) {
-			if ( $line_item->get_method_id() === 'infixs-correios-automatico' ) {
-				$current_name = $line_item->get_name();
-				$line_item->set_name( TextHelper::removeShippingTime( $current_name ) );
+			if ( $line_item->get_method_id() !== 'infixs-correios-automatico' ) {
+				continue;
 			}
+
+			$current_name = $line_item->get_name();
+			$name = ShippingLineName::build( $line_item, $current_name );
+
+			if ( $name === $current_name ) {
+				continue;
+			}
+
+			$line_item->set_name( $name );
+			$renamed = true;
 		}
+
+		return $renamed;
+	}
+
+	/**
+	 * Finish an order the block checkout already saved.
+	 *
+	 * The block checkout builds its own order and never fires
+	 * `woocommerce_checkout_create_order`, so the shipping lines are tidied up
+	 * and expanded here instead.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order|int $order Order created by the checkout.
+	 *
+	 * @return void
+	 */
+	public function expand_volumes_and_save( $order ) {
+		$order = $order instanceof \WC_Order ? $order : wc_get_order( $order );
+
+		if ( ! $order instanceof \WC_Order ) {
+			return;
+		}
+
+		$renamed = $this->remove_delivery_time( $order );
+		$expanded = $this->expand_volumes( $order );
+
+		if ( $renamed || $expanded ) {
+			$order->save();
+		}
+	}
+
+	/**
+	 * Give each volume of a shipment its own shipping line.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order $order Order being created.
+	 *
+	 * @return bool Whether any line was expanded.
+	 */
+	public function expand_volumes( $order ) {
+		return $this->volumeLineExpander->expand( $order );
 	}
 
 	/**

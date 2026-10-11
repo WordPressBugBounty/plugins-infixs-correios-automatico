@@ -9,7 +9,10 @@ use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Core\Support\Template;
 use Infixs\CorreiosAutomatico\Entities\Order as OrderEntity;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Services\TrackingService;
+use Infixs\CorreiosAutomatico\Services\VolumeLineExpander;
+use Infixs\CorreiosAutomatico\Utils\ShippingLineName;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -29,14 +32,26 @@ class Order {
 	protected $trackingService;
 
 	/**
+	 * Tells whether the volumes of a shipment still hold the products of the order.
+	 *
+	 * @var VolumeLineExpander
+	 */
+	protected $volumeLineExpander;
+
+	/**
 	 * Notices collected while recalculating the shipping lines, rendered in the items box.
 	 *
 	 * @var array<int, array{title: string, message: string}>
 	 */
 	protected $recalculate_notices = [];
 
-	public function __construct( TrackingService $trackingService ) {
+	/**
+	 * @param TrackingService    $trackingService    Tracking codes of the orders.
+	 * @param VolumeLineExpander $volumeLineExpander Tells whether the volumes still hold the products of the order.
+	 */
+	public function __construct( TrackingService $trackingService, VolumeLineExpander $volumeLineExpander ) {
 		$this->trackingService = $trackingService;
+		$this->volumeLineExpander = $volumeLineExpander;
 
 		add_action( 'woocommerce_before_order_itemmeta', [ $this, 'before_order_itemmeta' ], 10, 2 );
 		add_action( 'woocommerce_before_save_order_items', [ $this, 'before_save_order_items' ], 10, 2 );
@@ -107,9 +122,11 @@ class Order {
 
 	/**
 	 * Hidden order item meta
-	 * 
+	 *
+	 * @since 1.11.0 Hides the internal metas of the shipping lines that have no label.
+	 *
 	 * @param array $hidden_order_itemmeta
-	 * 
+	 *
 	 * @return array
 	 */
 	public function hidden_order_itemmeta( $hidden_order_itemmeta ) {
@@ -122,6 +139,15 @@ class Order {
 			LinkedShippingMethod::ITEM_META_KEY,
 			'_infixs_original_method_id',
 			'_infixs_original_method_title',
+			CorreiosShippingMethod::VOLUMES_META_KEY,
+			CorreiosShippingMethod::VOLUME_INDEX_META_KEY,
+			CorreiosShippingMethod::VOLUME_TOTAL_META_KEY,
+			CorreiosShippingMethod::VOLUME_ITEMS_META_KEY,
+			CorreiosShippingMethod::PACKAGING_ID_META_KEY,
+			'_final_cost',
+			'_show_original_shipping_discount_price',
+			'_hide_others_rates',
+			PrepostService::PREPOST_ITEM_META_KEY,
 		] );
 		return $hidden_order_itemmeta;
 	}
@@ -154,6 +180,7 @@ class Order {
 			'_insurance_cost' => __( 'Custo do Seguro', 'infixs-correios-automatico' ),
 			'delivery_time' => __( 'Prazo de Entrega', 'infixs-correios-automatico' ),
 			'shipping_product_code' => __( 'Serviço dos Correios', 'infixs-correios-automatico' ),
+			CorreiosShippingMethod::PACKAGING_NAME_META_KEY => __( 'Embalagem', 'infixs-correios-automatico' ),
 		];
 
 		if ( array_key_exists( $display_key, $display_keys ) ) {
@@ -245,12 +272,17 @@ class Order {
 		$this->recalculate_notices = [];
 
 		$correios_items = [];
+		$linked_volumes = [];
 
 		/** @var \WC_Order_Item_Shipping $item */
 		foreach ( $shipping_items as $item ) {
 			if ( 'infixs-correios-automatico' === $item->get_method_id() ) {
 				$correios_items[] = $item;
 			} elseif ( LinkedShippingMethod::resolve_from_item( $item ) ) {
+				if ( $item->meta_exists( CorreiosShippingMethod::VOLUME_INDEX_META_KEY ) ) {
+					$linked_volumes[] = $item;
+				}
+
 				$this->add_recalculate_notice(
 					$this->get_item_title( $item ),
 					__( 'Esta linha usa um método nativo do WooCommerce vinculado a um serviço dos Correios, então o valor cobrado é o do método nativo e não é recalculado.', 'infixs-correios-automatico' ),
@@ -259,7 +291,10 @@ class Order {
 			}
 		}
 
-		if ( count( $correios_items ) > 1 ) {
+		$shipment = array_merge( $correios_items, $linked_volumes );
+		$volumes = $this->volumeLineExpander->describesOrder( $order, $shipment );
+
+		if ( count( $shipment ) > 1 && ! $volumes ) {
 			$this->add_recalculate_notice(
 				__( 'Entrega', 'infixs-correios-automatico' ),
 				__( 'O pedido tem mais de uma linha de entrega dos Correios. Como não é possível saber quais itens vão em cada volume, os valores não foram recalculados — informe o valor de cada linha manualmente.', 'infixs-correios-automatico' )
@@ -269,6 +304,14 @@ class Order {
 
 		foreach ( $correios_items as $item ) {
 			$item_title = $this->get_item_title( $item );
+
+			if ( $volumes ) {
+				$package = $this->get_recalculate_package( $order, $args, $item->get_id() );
+
+				if ( empty( $package ) ) {
+					continue;
+				}
+			}
 
 			$method = \WC_Shipping_Zones::get_shipping_method( $item->get_instance_id() );
 
@@ -314,7 +357,22 @@ class Order {
 				continue;
 			}
 
-			$this->apply_rate_to_shipping_item( $item, reset( $result['rates'] ) );
+			$rate = reset( $result['rates'] );
+			$rate_volumes = $this->count_rate_volumes( $rate );
+
+			$this->apply_rate_to_shipping_item( $item, $rate, (bool) $linked_volumes );
+
+			if ( $rate_volumes > 1 ) {
+				$this->add_recalculate_notice(
+					$item_title,
+					sprintf(
+						/* translators: %d: number of volumes */
+						__( 'O peso e as dimensões desta linha só cabem em %d volumes, e o valor recalculado é a soma deles. A linha continua sendo uma só: para separar os volumes, refaça o pedido pelo checkout.', 'infixs-correios-automatico' ),
+						$rate_volumes
+					),
+					'info'
+				);
+			}
 
 			if ( $item->get_meta( '_infixs_original_method_id' ) ) {
 				$this->add_recalculate_notice(
@@ -322,8 +380,34 @@ class Order {
 					__( 'Peso, dimensões e prazo foram atualizados, mas o valor foi mantido porque esta linha veio de um método nativo do WooCommerce (Frete Grátis ou Preço Fixo).', 'infixs-correios-automatico' ),
 					'info'
 				);
+			} elseif ( $linked_volumes ) {
+				$this->add_recalculate_notice(
+					$item_title,
+					__( 'Peso, dimensões e prazo deste volume foram atualizados, mas o valor foi mantido porque o frete do envio é cobrado na linha de outro método vinculado aos Correios.', 'infixs-correios-automatico' ),
+					'info'
+				);
 			}
 		}
+	}
+
+	/**
+	 * How many volumes a calculated rate was quoted in.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Shipping_Rate $rate Rate returned by the shipping method.
+	 *
+	 * @return int
+	 */
+	protected function count_rate_volumes( $rate ) {
+		$meta = $rate->get_meta_data();
+		$volumes = isset( $meta[ CorreiosShippingMethod::VOLUMES_META_KEY ] ) ? $meta[ CorreiosShippingMethod::VOLUMES_META_KEY ] : '';
+
+		if ( is_string( $volumes ) ) {
+			$volumes = json_decode( $volumes, true );
+		}
+
+		return is_array( $volumes ) ? count( $volumes ) : 0;
 	}
 
 	/**
@@ -552,11 +636,18 @@ class Order {
 	 *
 	 * @return array
 	 */
-	protected function get_recalculate_package( $order, $args ) {
+	protected function get_recalculate_package( $order, $args, $shipping_item_id = 0 ) {
 		$order_entity = OrderEntity::fromId( $order );
 
 		if ( ! $order_entity ) {
 			return [];
+		}
+
+		if ( $shipping_item_id ) {
+			$order_entity->applyScope( OrderEntity::resolveScope( $order_entity, [ 
+				'for' => 'recalculate',
+				'shipping_item_id' => $shipping_item_id,
+			] ) );
 		}
 
 		$package = $order_entity->getPackageData();
@@ -600,20 +691,26 @@ class Order {
 	 * Apply a calculated rate to a shipping order item.
 	 *
 	 * @since 1.8.0
+	 * @since 1.11.0 A volume keeps saying which volume it is, and the delivery time stays out of the name.
+	 * @since 1.11.0 A volume of a shipment charged on a line of another method keeps its total.
 	 *
 	 * Orders converted from a native method (Frete Grátis / Preço Fixo linked to a Correios
 	 * method) keep their original cost and combined title: only the package data, the service
 	 * and the delivery time are refreshed, so recalculating does not charge shipping that the
-	 * customer was not charged for.
+	 * customer was not charged for. The same goes for the total of a volume whose shipment
+	 * is charged on the line another system wrote, which keeps the whole freight.
 	 *
-	 * @param \WC_Order_Item_Shipping $item Shipping item.
-	 * @param \WC_Shipping_Rate       $rate Calculated rate.
+	 * @param \WC_Order_Item_Shipping $item       Shipping item.
+	 * @param \WC_Shipping_Rate       $rate       Calculated rate.
+	 * @param bool                    $keep_total Whether the line keeps its total, the shipment being
+	 *                                            charged on a line of another method.
 	 *
 	 * @return void
 	 */
-	protected function apply_rate_to_shipping_item( $item, $rate ) {
+	protected function apply_rate_to_shipping_item( $item, $rate, $keep_total = false ) {
 		$original_method_id = $item->get_meta( '_infixs_original_method_id' );
 		$is_converted = ! empty( $original_method_id );
+		$rate_meta = $rate->get_meta_data();
 		$stale_meta_keys = [
 			'_original_cost',
 			'_final_cost',
@@ -626,22 +723,65 @@ class Order {
 			'_width',
 			'_height',
 			'shipping_product_code',
+			CorreiosShippingMethod::VOLUMES_META_KEY,
 		];
+
+		if ( ! $this->keeps_packaging( $item, $rate_meta ) ) {
+			$stale_meta_keys[] = CorreiosShippingMethod::PACKAGING_ID_META_KEY;
+			$stale_meta_keys[] = CorreiosShippingMethod::PACKAGING_NAME_META_KEY;
+		}
 
 		foreach ( $stale_meta_keys as $meta_key ) {
 			$item->delete_meta_data( $meta_key );
 		}
 
-		foreach ( $rate->get_meta_data() as $meta_key => $meta_value ) {
+		foreach ( $rate_meta as $meta_key => $meta_value ) {
 			$item->update_meta_data( $meta_key, $meta_value );
 		}
 
 		if ( ! $is_converted ) {
-			$item->set_name( $rate->get_label() );
+			$item->set_name( ShippingLineName::build( $item, $rate->get_label() ) );
+		}
+
+		if ( ! $is_converted && ! $keep_total ) {
 			$item->set_total( wc_format_decimal( $rate->get_cost() ) );
 		}
 
 		$item->save();
+	}
+
+	/**
+	 * Whether a recalculated shipping line keeps the packaging it was quoted in.
+	 *
+	 * The measures of a line are those of its box, and a quote made with them
+	 * names no packaging. The box stays while the rate keeps those measures and
+	 * neither names another box nor splits the line into volumes.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param \WC_Order_Item_Shipping $item      Shipping item, before the rate is applied.
+	 * @param array                   $rate_meta Meta data of the calculated rate.
+	 *
+	 * @return bool
+	 */
+	protected function keeps_packaging( $item, $rate_meta ) {
+		if ( isset( $rate_meta[ CorreiosShippingMethod::PACKAGING_ID_META_KEY ] ) || isset( $rate_meta[ CorreiosShippingMethod::VOLUMES_META_KEY ] ) ) {
+			return false;
+		}
+
+		foreach ( [ '_weight', '_length', '_width', '_height' ] as $meta_key ) {
+			$value = $item->get_meta( $meta_key );
+
+			if ( ! isset( $rate_meta[ $meta_key ] ) || ! is_scalar( $value ) || '' === $value ) {
+				return false;
+			}
+
+			if ( round( (float) str_replace( ',', '.', (string) $value ), 3 ) !== round( (float) $rate_meta[ $meta_key ], 3 ) ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -787,6 +927,19 @@ class Order {
 			] );
 		}
 
+		if ( Config::boolean( 'general.active_out_for_delivery' ) ) {
+			$out_for_delivery_label = Config::string( 'general.status_out_for_delivery', 'Saiu para entrega' );
+			register_post_status( 'wc-out-for-delivery', [
+				'label' => $out_for_delivery_label,
+				'public' => true,
+				'exclude_from_search' => false,
+				'show_in_admin_all_list' => true,
+				'show_in_admin_status_list' => true,
+				/* translators: %s: count of items */
+				'label_count' => _n_noop( "Saiu para entrega (%s)", "Saiu para entrega (%s)", "infixs-correios-automatico" ),
+			] );
+		}
+
 		if ( Config::boolean( 'general.active_waiting_pickup' ) ) {
 			$waiting_pickup_label = Config::string( 'general.status_waiting_pickup', 'Aguardando retirada' );
 			register_post_status( 'wc-waiting-pickup', [
@@ -838,6 +991,11 @@ class Order {
 			$order_statuses['wc-in-transit'] = $in_transit_label;
 		}
 
+		if ( Config::boolean( 'general.active_out_for_delivery' ) ) {
+			$out_for_delivery_label = Config::string( 'general.status_out_for_delivery', 'Saiu para entrega' );
+			$order_statuses['wc-out-for-delivery'] = $out_for_delivery_label;
+		}
+
 		if ( Config::boolean( 'general.active_waiting_pickup' ) ) {
 			$waiting_pickup_label = Config::string( 'general.status_waiting_pickup', 'Aguardando retirada' );
 			$order_statuses['wc-waiting-pickup'] = $waiting_pickup_label;
@@ -871,6 +1029,12 @@ class Order {
 			if ( ! empty( $codes ) ) {
 				$this->trackingService->sendTrackingNotification( $order_id, $codes );
 			}
+		}
+
+		if ( 'out-for-delivery' === $new_status &&
+			Config::boolean( 'general.active_out_for_delivery' ) &&
+			Config::boolean( 'general.email_out_for_delivery' ) ) {
+			$this->trackingService->sendOutForDeliveryNotification( $order_id );
 		}
 
 		if ( 'waiting-pickup' === $new_status &&

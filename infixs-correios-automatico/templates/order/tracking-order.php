@@ -21,10 +21,18 @@ $return_service = \Infixs\CorreiosAutomatico\Container::returnService();
 
 if ( $order instanceof \WC_Order ) :
 	if ( $return_service->isAlreadyRequested( $order ) ) :
+		$return_code_lines = $return_service->getReturnCodeLines( $order );
 		?>
 		<div class="infixs-caref-return-wrap">
 			<p class="infixs-caref-return-requested">
-				<?php esc_html_e( 'Devolução solicitada. Em breve você receberá o código de postagem.', 'infixs-correios-automatico' ); ?>
+				<?php if ( $return_code_lines ) : ?>
+					<?php echo esc_html( _n( 'Devolução solicitada. Leve o pedido a uma agência dos Correios com este código de postagem:', 'Devolução solicitada. Leve cada volume a uma agência dos Correios com o código de postagem dele:', count( $return_code_lines ), 'infixs-correios-automatico' ) ); ?>
+					<?php foreach ( $return_code_lines as $return_code_line ) : ?>
+						<br /><strong><?php echo esc_html( $return_code_line ); ?></strong>
+					<?php endforeach; ?>
+				<?php else : ?>
+					<?php esc_html_e( 'Devolução solicitada. Em breve você receberá o código de postagem.', 'infixs-correios-automatico' ); ?>
+				<?php endif; ?>
 			</p>
 		</div>
 		<?php

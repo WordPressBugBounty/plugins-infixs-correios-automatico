@@ -7,6 +7,7 @@ use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Admin\Admin;
 use Infixs\CorreiosAutomatico\Core\Front\Front;
 use Infixs\CorreiosAutomatico\Core\Front\WooCommerce\AutofillAddress;
+use Infixs\CorreiosAutomatico\Core\Shipping\CarrierRegistry;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Log;
 use Infixs\CorreiosAutomatico\Database\Migration;
@@ -17,6 +18,7 @@ use Infixs\CorreiosAutomatico\Marketplace\VendorPrepostService;
 use Infixs\CorreiosAutomatico\Marketplace\VendorRateGuard;
 use Infixs\CorreiosAutomatico\Marketplace\VendorTrackingService;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Utils\OrderQuery;
 
 defined( 'ABSPATH' ) || exit;
 /**
@@ -33,6 +35,10 @@ class Core {
 	 */
 	public function init() {
 		add_action( 'init', [ $this, 'check_update' ] );
+
+		OrderQuery::register();
+
+		add_action( 'infixs_correios_automatico_after_add_tracking_code', [ CarrierRegistry::class, 'flushTrackedSlugs' ] );
 
 		VendorSettings::register();
 

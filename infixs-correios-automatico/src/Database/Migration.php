@@ -89,6 +89,9 @@ class Migration {
 			'dce_number' => 'varchar(50) DEFAULT NULL', //@since 1.7.5
 			'dce_series' => 'varchar(20) DEFAULT NULL', //@since 1.7.5
 			'dce_authorization_protocol' => 'varchar(50) DEFAULT NULL', //@since 1.7.5
+			'dce_access_key' => 'varchar(44) DEFAULT NULL', //@since 1.11.0
+			'dce_issued_at' => 'datetime DEFAULT NULL', //@since 1.11.0
+			'dce_checked_at' => 'datetime DEFAULT NULL', //@since 1.11.0
 			"expire_at" => "datetime DEFAULT NULL",
 			'updated_at' => 'datetime NOT NULL',
 			'created_at' => 'datetime NOT NULL',
@@ -206,5 +209,7 @@ class Migration {
 			'created_at' => 'datetime NOT NULL',
 			'updated_at' => 'datetime NOT NULL',
 		] );
+
+		Indexes::run();
 	}
 }

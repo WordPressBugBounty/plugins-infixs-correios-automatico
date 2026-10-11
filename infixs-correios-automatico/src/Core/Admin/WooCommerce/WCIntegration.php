@@ -51,9 +51,9 @@ class WCIntegration {
 
 		$this->tracking = new Tracking( $trackingService );
 		$this->shipping = new Shipping();
-		$this->order = new Order( $trackingService );
-		$this->prepost = new Prepost( Container::prepostService() );
-		$this->label = new Label( Container::labelService() );
+		$this->order = new Order( $trackingService, Container::volumeLineExpander() );
+		$this->prepost = new Prepost( Container::prepostService(), Container::shipmentContextResolver(), Container::orderInvoiceResolver() );
+		$this->label = new Label( Container::labelService(), Container::prepostService() );
 		$this->product = new Product();
 
 		new ShippingClass();
@@ -62,7 +62,7 @@ class WCIntegration {
 		new Email();
 		new Rest( $trackingService );
 		new OrderTrackingColumn( $trackingService );
-		new Checkout();
+		new Checkout( Container::volumeLineExpander() );
 		new OrderScreenReplacement();
 
 		$this->actions();
@@ -92,6 +92,7 @@ class WCIntegration {
 	public function add_order_statuses_to_reports( $statuses ) {
 		$statuses[] = 'preparing-to-ship';
 		$statuses[] = 'in-transit';
+		$statuses[] = 'out-for-delivery';
 		$statuses[] = 'waiting-pickup';
 		$statuses[] = 'returning';
 		$statuses[] = 'delivered';
@@ -143,6 +144,11 @@ class WCIntegration {
 			$bulk_actions['infixs_correios_automatico_mark_in_transit'] = "Mudar para $in_transit";
 		}
 
+		if ( Config::boolean( 'general.active_out_for_delivery' ) ) {
+			$out_for_delivery = strtolower( Config::get( 'general.status_out_for_delivery' ) );
+			$bulk_actions['infixs_correios_automatico_mark_out_for_delivery'] = "Mudar para $out_for_delivery";
+		}
+
 		if ( Config::boolean( 'general.active_waiting_pickup' ) ) {
 			$waiting_pickup = strtolower( Config::get( 'general.status_waiting_pickup' ) );
 			$bulk_actions['infixs_correios_automatico_mark_waiting_pickup'] = "Mudar para $waiting_pickup";
@@ -177,6 +183,7 @@ class WCIntegration {
 		$status_actions = [
 			'infixs_correios_automatico_mark_preparing_to_ship' => 'wc-preparing-to-ship',
 			'infixs_correios_automatico_mark_in_transit' => 'wc-in-transit',
+			'infixs_correios_automatico_mark_out_for_delivery' => 'wc-out-for-delivery',
 			'infixs_correios_automatico_mark_waiting_pickup' => 'wc-waiting-pickup',
 			'infixs_correios_automatico_mark_returning' => 'wc-returning',
 			'infixs_correios_automatico_mark_delivered' => 'wc-delivered',

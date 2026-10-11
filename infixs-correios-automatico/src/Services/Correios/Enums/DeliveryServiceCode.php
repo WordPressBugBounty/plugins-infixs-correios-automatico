@@ -481,4 +481,17 @@ class DeliveryServiceCode {
 		return $services;
 	}
 
+	/**
+	 * Whether a service code is a reverse logistics service.
+	 *
+	 * @since 1.11.0
+	 *
+	 * @param string $product_code Service code.
+	 *
+	 * @return bool
+	 */
+	public static function isReverseService( $product_code ) {
+		return array_key_exists( (string) $product_code, self::getReverseServices() );
+	}
+
 }
