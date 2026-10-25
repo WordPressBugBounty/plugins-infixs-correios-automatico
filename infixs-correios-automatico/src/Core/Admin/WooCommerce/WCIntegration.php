@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico\Core\Admin\WooCommerce;
 
 use Automattic\WooCommerce\Utilities\FeaturesUtil;
 use Infixs\CorreiosAutomatico\Container;
+use Infixs\CorreiosAutomatico\Core\Admin\PrintUrl;
 use Infixs\CorreiosAutomatico\Core\Admin\WooCommerce\Blocks\Blocks;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Core\Support\Template;
@@ -177,7 +178,7 @@ class WCIntegration {
 	 */
 	public function handle_bulk_actions( $redirect_to, $action, $post_ids ) {
 		if ( $action === 'infixs_correios_automatico_print_labels' ) {
-			$redirect_to = admin_url( sprintf( 'admin.php?page=infixs-correios-automatico&path=/print&orders=%s', implode( ',', $post_ids ) ) );
+			$redirect_to = PrintUrl::orders( (array) $post_ids );
 		}
 
 		$status_actions = [

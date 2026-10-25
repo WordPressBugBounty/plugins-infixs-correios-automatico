@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.11.0
+Stable tag: 1.13.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -140,6 +140,27 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.13.0 2026-10-24 =
+* Integrações: aba Bling para a pré-postagem sair com a NF-e emitida no Bling (PRO)
+* Integrações: aba SquidCore ERP para emitir a NF-e e pré-postar com ela automaticamente
+* Pedidos: pendência "Aguardando NF-e" no filtro da lista, para as lojas com o Bling no PRO
+* Pré-postagem: aviso para informar a NF-e quando a loja emite nota, com a origem da nota já preenchida
+* Pré-postagem: janela com rolagem em telas pequenas e serviços adicionais recolhidos
+* Pedidos: coluna de ações fixa à direita quando a tabela rola
+* Painel: menu do topo compacto em telas estreitas
+* Painel: botão "Ver vídeo" com os tutoriais de conexão do contrato e do Bling
+* Extensões: SquidCore ERP e Pingo Notify em destaque
+* Impressão: DANFE simplificada nas etiquetas dos pedidos com NF-e, separada ou embutida na etiqueta
+* Impressão: só as DANFEs simplificadas dos pedidos, pelo menu do pedido
+* Pedidos: estado da NF-e de cada pedido, inclusive "Sem NF-e"
+* Pedidos: "Imprimir DANFE simplificada" e "DANFE completa (PDF)" no menu do pedido, também em massa
+* Loggi: conexão pelo Identificador da Integração do Loggi Envios, com o ID da empresa preenchido automaticamente
+* JadLog: campos com os nomes que a JadLog entrega, "CNPJ (Usuário)" e "Conta corrente (Código Cliente)"
+* JadLog: a tela mostra o que falta para cotar e enviar, e a última falha registrada
+* JadLog: aviso no campo obrigatório e motivo do erro ao salvar
+* Frete: salvar o Remetente, o contrato ou o frete forçado atualiza o frete do carrinho
+* Pré-postagem: CPF, número e bairro do checkout em blocos lidos no pedido
 
 = 1.11.0 2026-10-08 =
 * Status: novo status de pedido "Saiu para entrega", com e-mail para o cliente e aviso por WhatsApp pelo Pingo Notify

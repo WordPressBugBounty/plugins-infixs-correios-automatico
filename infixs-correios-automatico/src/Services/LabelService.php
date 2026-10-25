@@ -55,12 +55,33 @@ class LabelService {
 	 */
 	protected $prepostService;
 
-	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository, ShipmentContextResolver $shipmentContextResolver, PrepostService $prepostService ) {
+	/**
+	 * Resolver of the NF-e of the order and of the data of its simplified DANFE.
+	 *
+	 * @since 1.12.0
+	 * @var OrderDanfeResolver
+	 */
+	protected $orderDanfeResolver;
+
+	/**
+	 * Constructor.
+	 *
+	 * @since 1.12.0 Receives the resolver of the simplified DANFE.
+	 *
+	 * @param TrackingService         $trackingService         Tracking service.
+	 * @param ShippingService         $shippingService         Shipping service.
+	 * @param RangeCodeRepository     $rangeCodeRepository     Range code repository.
+	 * @param ShipmentContextResolver $shipmentContextResolver Shipment context resolver.
+	 * @param PrepostService          $prepostService          Prepost service.
+	 * @param OrderDanfeResolver      $orderDanfeResolver      Resolver of the NF-e and its simplified DANFE.
+	 */
+	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository, ShipmentContextResolver $shipmentContextResolver, PrepostService $prepostService, OrderDanfeResolver $orderDanfeResolver ) {
 		$this->trackingService = $trackingService;
 		$this->shippingService = $shippingService;
 		$this->rangeCodeRepository = $rangeCodeRepository;
 		$this->shipmentContextResolver = $shipmentContextResolver;
 		$this->prepostService = $prepostService;
+		$this->orderDanfeResolver = $orderDanfeResolver;
 	}
 
 	/**
@@ -214,6 +235,17 @@ class LabelService {
 			];
 		}
 
+		/**
+		 * The NF-e goes with every label of the order, and with it the data of
+		 * the simplified DANFE, so the print page, the PDF and the automatic
+		 * printing of the PRO all print the same document from this payload.
+		 */
+		$nfe = $this->orderDanfeResolver->resolve( $order->getOrder(), [
+			'for' => 'label',
+			'shipping_item_id' => $scope['shipping_item_id'],
+			'vendor_id' => $scope['vendor_id'],
+		] );
+
 		$data = [
 			'name' => $order->getCustomerFullName(),
 			'document' => $order->getCustomerDocument(),
@@ -251,6 +283,9 @@ class LabelService {
 			'shipping_item_id' => $scope['shipping_item_id'] ? $scope['shipping_item_id'] : null,
 			'volume_index' => $is_volume_label ? (int) $shipping_metadata['volume_index'] : 1,
 			'volume_total' => $is_volume_label ? (int) $shipping_metadata['volume_total'] : 1,
+			'invoice' => $nfe['invoice'], //@since 1.12.0
+			'danfe' => $nfe['danfe'], //@since 1.12.0
+			'danfe_status' => $nfe['status'], //@since 1.12.0
 			/**
 			 * Filters the return address printed on this label.
 			 *

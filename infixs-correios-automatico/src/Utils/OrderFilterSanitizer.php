@@ -30,6 +30,13 @@ final class OrderFilterSanitizer {
 	const PENDING_PREPOST = 'prepost';
 
 	/**
+	 * Pendency of an order whose automatic prepost waits for the NF-e.
+	 *
+	 * @since 1.13.0
+	 */
+	const PENDING_INVOICE = 'invoice';
+
+	/**
 	 * Sanitize the order statuses of a filter.
 	 *
 	 * The `wc-` prefix is added back when it is missing, so a status works
@@ -96,13 +103,14 @@ final class OrderFilterSanitizer {
 	 * Sanitize the pendencies of a filter.
 	 *
 	 * @since 1.11.0
+	 * @since 1.13.0 Knows the orders waiting for the NF-e.
 	 *
 	 * @param mixed $value Pendencies as they arrived.
 	 *
 	 * @return string[]
 	 */
 	public static function pending( $value ) {
-		return self::known( $value, [ self::PENDING_TRACKING, self::PENDING_PREPOST ] );
+		return self::known( $value, [ self::PENDING_TRACKING, self::PENDING_PREPOST, self::PENDING_INVOICE ] );
 	}
 
 	/**

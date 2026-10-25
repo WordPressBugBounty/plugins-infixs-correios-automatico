@@ -12,6 +12,7 @@ use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\OrderInvoiceResolver;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Services\Correios\Includes\Package;
+use Infixs\CorreiosAutomatico\Utils\CheckoutBlockFields;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
 use Infixs\CorreiosAutomatico\Utils\TextHelper;
@@ -19,6 +20,15 @@ use Infixs\CorreiosAutomatico\Utils\TextHelper;
 defined( 'ABSPATH' ) || exit;
 
 class Order {
+	/**
+	 * Checkout block groups that hold the fields of the customer, such as the CPF.
+	 *
+	 * @since 1.11.2
+	 *
+	 * @var string[]
+	 */
+	const CUSTOMER_FIELD_GROUPS = [ 'other', 'billing' ];
+
 	/**
 	 * Order instance.
 	 * 
@@ -445,6 +455,7 @@ class Order {
 	 * Extract address from order.
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.2 Reads the number and the neighborhood also from the fields of the checkout block.
 	 * 
 	 * @param \WC_Order $order
 	 * 
@@ -453,7 +464,7 @@ class Order {
 	public function getAddress() {
 		if ( $this->order->has_shipping_address() ) {
 			$address = $this->order->get_shipping_address_1();
-			$address_number = $this->order->get_meta( '_shipping_number' );
+			$address_number = $this->getCheckoutField( 'shipping', 'number', [ 'shipping' ] );
 			$hasNumberField = strlen( $address_number ) > 0;
 
 			if ( ! $hasNumberField ) {
@@ -464,14 +475,14 @@ class Order {
 				Sanitizer::numeric_text( $this->order->get_shipping_postcode() ),
 				$hasNumberField ? $address : TextHelper::removeAddressNumber( $address ),
 				$address_number,
-				$this->order->get_meta( '_shipping_neighborhood' ),
+				$this->getCheckoutField( 'shipping', 'neighborhood', [ 'shipping' ] ),
 				$this->order->get_shipping_city(),
 				$this->order->get_shipping_state(),
 				$this->order->get_shipping_address_2(),
 			);
 		} else {
 			$address = $this->order->get_billing_address_1();
-			$address_number = $this->order->get_meta( '_billing_number' );
+			$address_number = $this->getCheckoutField( 'billing', 'number', [ 'billing' ] );
 			$hasNumberField = strlen( $address_number ) > 0;
 
 			if ( ! $hasNumberField ) {
@@ -482,12 +493,37 @@ class Order {
 				Sanitizer::numeric_text( $this->order->get_billing_postcode() ),
 				$hasNumberField ? $address : TextHelper::removeAddressNumber( $address ),
 				$address_number,
-				$this->order->get_meta( '_billing_neighborhood' ),
+				$this->getCheckoutField( 'billing', 'neighborhood', [ 'billing' ] ),
 				$this->order->get_billing_city(),
 				$this->order->get_billing_state(),
 				$this->order->get_billing_address_2()
 			);
 		}
+	}
+
+	/**
+	 * Brazilian field of the checkout, such as the CPF or the address number.
+	 *
+	 * The meta of the classic checkout ("_billing_cpf", "_shipping_number")
+	 * comes first, as it always did. An order placed in the checkout block
+	 * without it answers with the additional field the block saved.
+	 *
+	 * @since 1.11.2
+	 *
+	 * @param string   $type   billing or shipping, the prefix of the classic meta.
+	 * @param string   $name   Field name, e.g. "cpf" or "number".
+	 * @param string[] $groups Checkout block groups to look in, in order.
+	 *
+	 * @return string
+	 */
+	private function getCheckoutField( $type, $name, $groups ) {
+		$value = (string) $this->order->get_meta( "_{$type}_{$name}" );
+
+		if ( '' !== $value ) {
+			return $value;
+		}
+
+		return CheckoutBlockFields::get( $this->order, $groups, $name );
 	}
 
 	public function get_id() {
@@ -570,7 +606,9 @@ class Order {
 	}
 
 	public function getCellphone() {
-		return Sanitizer::celphone( empty( $this->order->get_meta( '_billing_cellphone' ) ) ? $this->order->get_billing_phone() : $this->order->get_meta( '_billing_cellphone' ) );
+		$cellphone = $this->getCheckoutField( 'billing', 'cellphone', self::CUSTOMER_FIELD_GROUPS );
+
+		return Sanitizer::celphone( empty( $cellphone ) ? $this->order->get_billing_phone() : $cellphone );
 	}
 
 	public function getPhone() {
@@ -597,6 +635,7 @@ class Order {
 	 * This method is responsible for getting billing customer info.
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.2 Reads the CNPJ and the CPF also from the fields of the checkout block.
 	 * 
 	 * @param \WC_Order $order Order.
 	 * 
@@ -606,7 +645,8 @@ class Order {
 	 * }
 	 */
 	public function getBillingCustomerInfo() {
-		$document = Sanitizer::numeric_text( empty( $this->order->get_meta( '_billing_cnpj' ) ) ? $this->order->get_meta( '_billing_cpf' ) : $this->order->get_meta( '_billing_cnpj' ) );
+		$cnpj = $this->getCheckoutField( 'billing', 'cnpj', self::CUSTOMER_FIELD_GROUPS );
+		$document = Sanitizer::numeric_text( empty( $cnpj ) ? $this->getCheckoutField( 'billing', 'cpf', self::CUSTOMER_FIELD_GROUPS ) : $cnpj );
 		$name = empty( $this->order->get_shipping_company() ) ? $this->order->get_billing_company() : $this->order->get_shipping_company();
 		return [
 			'document' => $document,
@@ -620,6 +660,7 @@ class Order {
 	 * This method is responsible for getting shipping customer info.
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.2 Reads the CPF also from the fields of the checkout block.
 	 * 
 	 * @param \WC_Order $order Order.
 	 * 
@@ -629,7 +670,7 @@ class Order {
 	 * }
 	 */
 	public function getShippingCustomerInfo() {
-		$cpf = $this->order->get_meta( '_billing_cpf' );
+		$cpf = $this->getCheckoutField( 'billing', 'cpf', self::CUSTOMER_FIELD_GROUPS );
 		$document = empty( $cpf ) ? '' : Sanitizer::numeric_text( $cpf );
 
 		if ( ! empty( $this->order->get_shipping_first_name() ) ) {
@@ -648,8 +689,16 @@ class Order {
 	}
 
 
+	/**
+	 * Whether the customer bought as a company (person type 2 of the Brazilian checkout fields).
+	 *
+	 * @since 1.0.0
+	 * @since 1.11.2 Reads the person type also from the fields of the checkout block.
+	 *
+	 * @return bool
+	 */
 	public function isBusinessCustomer() {
-		return $this->order->meta_exists( '_billing_persontype' ) && $this->order->get_meta( '_billing_persontype' ) == '2';
+		return $this->getCheckoutField( 'billing', 'persontype', self::CUSTOMER_FIELD_GROUPS ) == '2';
 	}
 
 	public function getItems() {
@@ -1140,10 +1189,12 @@ class Order {
 		$prepost_errors = $this->order->get_meta( PrepostService::PREPOST_ERRORS_META_KEY );
 		$prepost_errors = is_array( $prepost_errors ) ? array_values( $prepost_errors ) : [];
 
-		$invoice = Container::orderInvoiceResolver()->resolve( $this->order, [
+		$nfe = Container::orderDanfeResolver()->resolve( $this->order, [
 			'for' => 'display',
 			'vendor_id' => $this->getScopedVendorId(),
 		] );
+		$invoice = $nfe['invoice'];
+		$waiting_invoice = Container::orderInvoiceResolver()->isWaiting( $this->order );
 
 		$data = [
 			'id' => $this->order->get_id(),
@@ -1180,7 +1231,13 @@ class Order {
 			'created_at' => $this->order->get_date_created()->date( 'Y-m-d H:i:s' ),
 			'meta_data' => $this->getInvoiceMetaData( $invoice ),
 			'invoice' => $invoice,
-			'waiting_invoice' => Container::orderInvoiceResolver()->isWaiting( $this->order ),
+			'waiting_invoice' => $waiting_invoice,
+			'invoice_status' => Container::orderInvoiceStatus()->resolve( $this->order, [
+				'vendor_id' => $this->getScopedVendorId(),
+				'invoice' => $invoice,
+				'waiting' => $waiting_invoice,
+				'danfe' => $nfe['status'],
+			] ), //@since 1.12.0
 			'shipping_items' => $this->getShippingItemsPayload(),
 			'prepost_errors' => $prepost_errors,
 			'preposts' => []

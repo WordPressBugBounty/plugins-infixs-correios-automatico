@@ -155,4 +155,71 @@ class AccessKey {
 
 		return null === $digits ? null : substr( $digits, 22, 3 );
 	}
+
+	/**
+	 * Document of the issuer, printed on digits 7 to 20 of the key.
+	 *
+	 * A CNPJ, or the CPF of an issuer without one, padded with zeros on the
+	 * left up to the fourteen digits of the field.
+	 *
+	 * @since 1.12.0
+	 *
+	 * @param string|null $key Access key.
+	 *
+	 * @return string|null Fourteen digits, null when the value is not a key.
+	 */
+	public static function issuerDocument( $key ) {
+		$digits = self::normalize( $key );
+
+		return null === $digits ? null : substr( $digits, 6, 14 );
+	}
+
+	/**
+	 * Check digit of a key, computed from its first forty three digits.
+	 *
+	 * Modulo 11 with the weights 2 to 9 from the right; a remainder of 0 or 1
+	 * gives the digit 0. The renderers of the simplified DANFE check it with the
+	 * same rule, in danfeFormat.ts::accessKeyCheckDigit.
+	 *
+	 * @since 1.12.0
+	 *
+	 * @param string $body The first forty three digits of the key.
+	 *
+	 * @return int
+	 */
+	public static function checkDigit( $body ) {
+		$sum = 0;
+		$weight = 2;
+
+		for ( $index = strlen( $body ) - 1; $index >= 0; $index-- ) {
+			$sum += (int) $body[ $index ] * $weight;
+			$weight = 9 === $weight ? 2 : $weight + 1;
+		}
+
+		$rest = $sum % 11;
+
+		return $rest < 2 ? 0 : 11 - $rest;
+	}
+
+	/**
+	 * Whether the last digit of the key is the one its other digits give.
+	 *
+	 * A key typed or copied with one digit wrong still has forty four digits;
+	 * only the check digit tells it from the key of the document.
+	 *
+	 * @since 1.12.0
+	 *
+	 * @param string|null $key Access key.
+	 *
+	 * @return bool
+	 */
+	public static function hasValidCheckDigit( $key ) {
+		$digits = self::normalize( $key );
+
+		if ( null === $digits ) {
+			return false;
+		}
+
+		return self::checkDigit( substr( $digits, 0, 43 ) ) === (int) $digits[43];
+	}
 }

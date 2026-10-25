@@ -325,6 +325,36 @@ class Admin {
 			'canDownloadPdf' => false,
 			'canAutoPrint' => false,
 			'canPackaging' => false,
+			/**
+			 * Whether the PRO can connect the Bling, to receive the NF-e of the orders.
+			 *
+			 * @since 1.13.0
+			 */
+			'canBling' => false,
+			/**
+			 * Whether the store issues an NF-e for every order, so the manual
+			 * prepost asks for its key instead of offering the DC-e first.
+			 * Answered by the PRO.
+			 *
+			 * @since 1.13.0
+			 */
+			'invoiceRequired' => false,
+			/**
+			 * The options of the simplified DANFE show only when an invoice
+			 * provider answers `infixs_correios_automatico_order_danfe`.
+			 *
+			 * @since 1.12.0
+			 */
+			'danfe' => [
+				'available' => (bool) has_filter( 'infixs_correios_automatico_order_danfe' ),
+			],
+			/**
+			 * The SquidCore plugin, which issues the NF-e of the orders:
+			 * installed, active and the address that activates it.
+			 *
+			 * @since 1.13.0
+			 */
+			'squidcore' => SquidCorePlugin::status(),
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {

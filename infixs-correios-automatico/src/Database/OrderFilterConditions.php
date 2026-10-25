@@ -7,6 +7,7 @@ use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\PrepostStatusCode;
+use Infixs\CorreiosAutomatico\Services\OrderInvoiceResolver;
 use Infixs\CorreiosAutomatico\Utils\OrderFilterSanitizer;
 use Infixs\CorreiosAutomatico\Utils\OrderQuery;
 
@@ -83,6 +84,7 @@ final class OrderFilterConditions {
 	 * Two pendencies asked at once match the orders carrying either of them.
 	 *
 	 * @since 1.11.0
+	 * @since 1.13.0 Matches the orders waiting for the NF-e.
 	 *
 	 * @param string[] $kinds Pendency keys, already sanitized.
 	 *
@@ -100,6 +102,10 @@ final class OrderFilterConditions {
 
 			if ( OrderFilterSanitizer::PENDING_PREPOST === $kind ) {
 				$condition = self::withoutPrepost();
+			}
+
+			if ( OrderFilterSanitizer::PENDING_INVOICE === $kind ) {
+				$condition = self::waitingInvoice();
 			}
 
 			if ( $condition ) {
@@ -439,6 +445,53 @@ final class OrderFilterConditions {
 		$values = array_merge( $order_wide['values'], $line['values'], $of_line['values'] );
 
 		return $wpdb->prepare( $sql, $values ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+	}
+
+	/**
+	 * Condition matching the orders whose automatic prepost waits for the NF-e.
+	 *
+	 * The same orders OrderInvoiceResolver::isWaiting() tells: only while the
+	 * PRO that waits is active, and the order is still a sale. Whatever invoice
+	 * provider the order waits for, it is pending here.
+	 *
+	 * @since 1.13.0
+	 *
+	 * @return string Matches no order when the PRO that waits is not active.
+	 */
+	private static function waitingInvoice() {
+		global $wpdb;
+
+		if ( ! class_exists( OrderInvoiceResolver::WAITING_SERVICE_CLASS ) ) {
+			return '1 = 0';
+		}
+
+		$token = OrderQuery::ORDER_ID_TOKEN;
+		$gone = array_map( function ( $status ) {
+			return 'trash' === $status ? $status : 'wc-' . $status;
+		}, OrderInvoiceResolver::NO_LONGER_SOLD_STATUSES );
+
+		if ( OrderQuery::usesOrdersTable() ) {
+			$orders = \Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore::get_orders_table_name();
+			$meta = \Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore::get_meta_table_name();
+			$meta_order = 'order_id';
+			$status = "SELECT 1 FROM {$orders} AS ca_waiting_order WHERE ca_waiting_order.id = {$token} AND ca_waiting_order.status IN ( " . self::placeholders( $gone ) . ' )';
+		} else {
+			$meta = $wpdb->postmeta;
+			$meta_order = 'post_id';
+			$status = "SELECT 1 FROM {$wpdb->posts} AS ca_waiting_order WHERE ca_waiting_order.ID = {$token} AND ca_waiting_order.post_status IN ( " . self::placeholders( $gone ) . ' )';
+		}
+
+		$sql = "(
+			EXISTS (
+				SELECT 1 FROM {$meta} AS ca_waiting_invoice
+				WHERE ca_waiting_invoice.{$meta_order} = {$token}
+					AND ca_waiting_invoice.meta_key = %s
+					AND ca_waiting_invoice.meta_value NOT IN ( '', 'a:0:{}' )
+			)
+			AND NOT EXISTS ( {$status} )
+		)";
+
+		return $wpdb->prepare( $sql, array_merge( [ OrderInvoiceResolver::WAITING_META_KEY ], $gone ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	/**

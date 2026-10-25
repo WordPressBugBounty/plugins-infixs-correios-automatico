@@ -11,7 +11,9 @@ use Infixs\CorreiosAutomatico\Models\Unit;
 use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
+use Infixs\CorreiosAutomatico\Services\OrderDanfeResolver;
 use Infixs\CorreiosAutomatico\Services\OrderInvoiceResolver;
+use Infixs\CorreiosAutomatico\Services\OrderInvoiceStatus;
 use Infixs\CorreiosAutomatico\Services\OrderService;
 use Infixs\CorreiosAutomatico\Services\UnitService;
 use Pimple\Container as PimpleContainer;
@@ -96,12 +98,14 @@ class Container {
 		$this->container['prepostService'] = fn( $c ) => new PrepostService( $c['prepostRepository'], $c['correiosService'] );
 		$this->container['orderService'] = fn() => new OrderService();
 		$this->container['orderInvoiceResolver'] = fn() => new OrderInvoiceResolver();
+		$this->container['orderDanfeResolver'] = fn( $c ) => new OrderDanfeResolver( $c['orderInvoiceResolver'] );
+		$this->container['orderInvoiceStatus'] = fn() => new OrderInvoiceStatus();
 		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'] );
 		$this->container['emailService'] = fn() => new EmailService();
 		$this->container['shipmentContextResolver'] = fn() => new ShipmentContextResolver();
 		$this->container['volumePlanner'] = fn() => new VolumePlanner();
 		$this->container['volumeLineExpander'] = fn() => new VolumeLineExpander();
-		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'], $c['shipmentContextResolver'], $c['prepostService'] );
+		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'], $c['shipmentContextResolver'], $c['prepostService'], $c['orderDanfeResolver'] );
 		$this->container['invoiceUnitService'] = fn( $c ) => new InvoiceUnitService( $c['invoiceUnitRepository'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
 		$this->container['settingsService'] = fn() => new SettingsService();
@@ -254,6 +258,26 @@ class Container {
 	 */
 	public static function orderInvoiceResolver() {
 		return self::getInstance()->container['orderInvoiceResolver'];
+	}
+
+	/**
+	 * Order DANFE Resolver
+	 *
+	 * @since 1.12.0
+	 * @return OrderDanfeResolver
+	 */
+	public static function orderDanfeResolver() {
+		return self::getInstance()->container['orderDanfeResolver'];
+	}
+
+	/**
+	 * Order Invoice Status
+	 *
+	 * @since 1.12.0
+	 * @return OrderInvoiceStatus
+	 */
+	public static function orderInvoiceStatus() {
+		return self::getInstance()->container['orderInvoiceStatus'];
 	}
 
 	/**

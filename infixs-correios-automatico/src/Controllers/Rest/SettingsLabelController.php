@@ -21,6 +21,16 @@ defined( 'ABSPATH' ) || exit;
 class SettingsLabelController {
 
 	/**
+	 * Where the simplified DANFE prints: its own piece after the label, or
+	 * inside the label. The first one is the default.
+	 *
+	 * @since 1.12.0
+	 *
+	 * @var string[]
+	 */
+	const DANFE_MODES = [ 'separate', 'embedded' ];
+
+	/**
 	 * Label service
 	 * 
 	 * @var LabelService
@@ -46,6 +56,10 @@ class SettingsLabelController {
 		}
 
 		$profile_id = $data['id'];
+
+		if ( isset( $data['danfe'] ) ) {
+			$data['danfe'] = $this->sanitize_danfe( $data['danfe'] );
+		}
 
 		if ( ! empty( $data ) ) {
 			Config::update( "label.profiles.$profile_id", $data );
@@ -241,11 +255,16 @@ class SettingsLabelController {
 	 * Prepare the data
 	 *
 	 * @since 1.0.0
+	 * @since 1.12.0 Always carries the simplified DANFE option, on by default.
 	 * @param array $profile
 	 * 
 	 * @return array
 	 */
 	public function prepare_data( $profile ) {
+		if ( is_array( $profile ) ) {
+			$profile['danfe'] = $this->sanitize_danfe( isset( $profile['danfe'] ) ? $profile['danfe'] : null );
+		}
+
 		if ( isset( $profile['withDeclaration'] ) ) {
 			$profile['withDeclaration'] = Sanitizer::boolean( $profile['withDeclaration'] );
 		}
@@ -278,5 +297,28 @@ class SettingsLabelController {
 		}
 
 		return $profile;
+	}
+
+	/**
+	 * Sanitize the simplified DANFE option of a print profile.
+	 *
+	 * It is an object on purpose: the config repository turns the booleans of
+	 * the first level of a profile into `yes`/`no`, and a nested one survives.
+	 * The flag is still read in every form it may have been saved in, and a
+	 * profile that never saved it prints the DANFE, in its own piece.
+	 *
+	 * @since 1.12.0
+	 *
+	 * @param mixed $danfe Option as saved or sent by the print page.
+	 *
+	 * @return array{enabled: bool, mode: string}
+	 */
+	private function sanitize_danfe( $danfe ) {
+		$danfe = is_array( $danfe ) ? $danfe : [];
+
+		return [
+			'enabled' => array_key_exists( 'enabled', $danfe ) ? Sanitizer::boolean( $danfe['enabled'] ) : true,
+			'mode' => isset( $danfe['mode'] ) && in_array( $danfe['mode'], self::DANFE_MODES, true ) ? $danfe['mode'] : self::DANFE_MODES[0],
+		];
 	}
 }

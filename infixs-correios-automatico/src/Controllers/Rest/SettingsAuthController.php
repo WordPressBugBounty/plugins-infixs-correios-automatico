@@ -16,6 +16,7 @@ class SettingsAuthController {
 	 * Auth settings save
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.2 Drops the shipping rates the carts keep, since the contract changes the Correios services quoted.
 	 * @param \WP_REST_Request $request
 	 * @return \WP_Error|\WP_REST_Response
 	 */
@@ -84,6 +85,8 @@ class SettingsAuthController {
 		] );
 
 		Config::update( 'auth', $updated_settings );
+
+		\WC_Cache_Helper::get_transient_version( 'shipping', true );
 
 		$response_data = $this->prepare_data();
 

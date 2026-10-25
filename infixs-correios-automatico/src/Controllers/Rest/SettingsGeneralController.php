@@ -14,6 +14,7 @@ class SettingsGeneralController {
 	 * Auth settings save
 	 * 
 	 * @since 1.0.0
+	 * @since 1.11.2 Drops the shipping rates the carts keep when forcing the shipping cost is turned on or off.
 	 * 
 	 * @param \WP_REST_Request $request
 	 * 
@@ -277,7 +278,14 @@ class SettingsGeneralController {
 		$updated_settings = apply_filters( 'infixs_correios_automatico_save_general_settings', $updated_settings, $data );
 
 		if ( ! empty( $updated_settings ) ) {
+			$changes_cart_rates = $this->changes_cart_rates( $updated_settings );
+
 			Config::update( 'general', $updated_settings );
+
+			if ( $changes_cart_rates ) {
+				\WC_Cache_Helper::get_transient_version( 'shipping', true );
+			}
+
 			Log::debug( 'Configurações gerais salvas' );
 		}
 
@@ -293,6 +301,26 @@ class SettingsGeneralController {
 			'data' => $response_data,
 		];
 		return rest_ensure_response( $response );
+	}
+
+	/**
+	 * Whether saving these general settings changes the rates the carts show.
+	 *
+	 * Forcing the shipping cost filters the rates, and WooCommerce keeps the
+	 * filtered rates of a cart until the cart or the shipping cache changes.
+	 *
+	 * @since 1.11.2
+	 *
+	 * @param array $updated_settings General settings about to be saved.
+	 *
+	 * @return bool
+	 */
+	private function changes_cart_rates( $updated_settings ) {
+		if ( ! isset( $updated_settings['force_shipping_cost'] ) ) {
+			return false;
+		}
+
+		return wc_string_to_bool( $updated_settings['force_shipping_cost'] ) !== Config::boolean( 'general.force_shipping_cost' );
 	}
 
 	public function retrieve() {
