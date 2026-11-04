@@ -3,6 +3,7 @@
 namespace Infixs\CorreiosAutomatico\Core\Admin;
 
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\BuyProNotice;
+use Infixs\CorreiosAutomatico\Core\Admin\Notices\InvoiceRequiredNotice;
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\PingoNotifyNotice;
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\PluginDeactivation;
 use Infixs\CorreiosAutomatico\Core\Admin\Notices\RequiredPluginNotice;
@@ -62,6 +63,7 @@ class Dashboard {
 	 * @since 1.0.5
 	 */
 	public function add_notices( $notices ) {
+		$notices[] = new InvoiceRequiredNotice();
 		$notices[] = new ShippingMethod();
 		$notices[] = new RequiredPluginNotice();
 		$notices[] = new BuyProNotice();

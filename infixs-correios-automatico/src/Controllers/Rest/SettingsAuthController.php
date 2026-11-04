@@ -4,6 +4,7 @@ namespace Infixs\CorreiosAutomatico\Controllers\Rest;
 
 use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
+use Infixs\CorreiosAutomatico\Prepaid\ContractMode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\ContractType;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\APIServiceCode;
 use Infixs\CorreiosAutomatico\Utils\Formatter;
@@ -17,13 +18,20 @@ class SettingsAuthController {
 	 * 
 	 * @since 1.0.0
 	 * @since 1.11.2 Drops the shipping rates the carts keep, since the contract changes the Correios services quoted.
+	 * @since 1.14.0 Takes `mode`: `prepaid` turns the own contract off, keeping its credentials, and
+	 *               `own` turns it on. Without `mode`, `active` decides, as before.
 	 * @param \WP_REST_Request $request
 	 * @return \WP_Error|\WP_REST_Response
 	 */
 	public function save( $request ) {
 		$data = $request->get_json_params();
+		$data = is_array( $data ) ? $data : [];
 
-		$is_active = rest_sanitize_boolean( $data['active'] );
+		$mode = isset( $data['mode'] ) && in_array( $data['mode'], [ ContractMode::OWN, ContractMode::PREPAID ], true )
+			? $data['mode']
+			: ( rest_sanitize_boolean( $data['active'] ?? false ) ? ContractMode::OWN : ContractMode::PREPAID );
+
+		$is_active = ContractMode::OWN === $mode;
 		$allowed_services = [];
 
 		$contract_settings = [ 
@@ -81,7 +89,8 @@ class SettingsAuthController {
 		}
 
 		$updated_settings = array_merge( $contract_settings, [ 
-			'active' => rest_sanitize_boolean( $data['active'] ),
+			'mode' => $mode,
+			'active' => $is_active,
 		] );
 
 		Config::update( 'auth', $updated_settings );
@@ -114,6 +123,7 @@ class SettingsAuthController {
 	 */
 	public function prepare_data() {
 		$sanitized_settings = [ 
+			'mode' => Container::contractMode()->mode(),
 			'active' => Config::boolean( 'auth.active' ),
 			'environment' => sanitize_text_field( Config::get( 'auth.environment' ) ),
 			'user_name' => sanitize_text_field( Config::get( 'auth.user_name' ) ),

@@ -35,6 +35,7 @@ defined( 'ABSPATH' ) || exit;
  * @property string $created_at
  * @property string $cancelled_at
  * @property bool $dce
+ * @property string|null $cancel_reason Why the Correios cancelled it, as they wrote it (since 1.14.0).
  * 
  */
 class Prepost extends Model {

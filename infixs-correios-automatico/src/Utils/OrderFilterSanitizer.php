@@ -37,6 +37,17 @@ final class OrderFilterSanitizer {
 	const PENDING_INVOICE = 'invoice';
 
 	/**
+	 * Pendencies the plugin answers by itself; the others come from the
+	 * extensions, through the `infixs_correios_automatico_order_pending_kinds`
+	 * filter.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @var string[]
+	 */
+	const NATIVE_PENDING = [ self::PENDING_TRACKING, self::PENDING_PREPOST, self::PENDING_INVOICE ];
+
+	/**
 	 * Sanitize the order statuses of a filter.
 	 *
 	 * The `wc-` prefix is added back when it is missing, so a status works
@@ -102,15 +113,59 @@ final class OrderFilterSanitizer {
 	/**
 	 * Sanitize the pendencies of a filter.
 	 *
+	 * Besides the pendencies of the plugin, the ones an extension registered
+	 * are kept: the condition that matches their orders is asked from the
+	 * extension by `OrderFilterConditions::pending()`.
+	 *
 	 * @since 1.11.0
 	 * @since 1.13.0 Knows the orders waiting for the NF-e.
+	 * @since 1.14.0 Knows the pendencies an extension registers.
 	 *
 	 * @param mixed $value Pendencies as they arrived.
 	 *
 	 * @return string[]
 	 */
 	public static function pending( $value ) {
-		return self::known( $value, [ self::PENDING_TRACKING, self::PENDING_PREPOST, self::PENDING_INVOICE ] );
+		return self::known( $value, array_merge( self::NATIVE_PENDING, self::registeredPending() ) );
+	}
+
+	/**
+	 * Pendencies the extensions add to the filter.
+	 *
+	 * Only a key written as `[a-z_]+` is taken: it travels in the URL of the
+	 * dashboard and is saved as a preference, the same way the native ones are.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @return string[]
+	 */
+	private static function registeredPending() {
+		/**
+		 * Filters the pendencies an extension adds to the filter of the order list.
+		 *
+		 * Each key is a pendency the dashboard can ask for in the `pending`
+		 * filter, next to `tracking`, `prepost` and `invoice`. The SQL condition
+		 * that matches the orders carrying it is asked, for each key, through
+		 * the `infixs_correios_automatico_order_pending_condition` filter.
+		 *
+		 * @since 1.14.0
+		 *
+		 * @param string[] $kinds Keys of the pendencies, each one `[a-z_]+`. Empty by default.
+		 */
+		$kinds = apply_filters( 'infixs_correios_automatico_order_pending_kinds', [] );
+		$registered = [];
+
+		foreach ( is_array( $kinds ) ? $kinds : [] as $kind ) {
+			if ( ! is_string( $kind ) || ! preg_match( '/^[a-z_]+$/', $kind ) ) {
+				continue;
+			}
+
+			if ( ! in_array( $kind, self::NATIVE_PENDING, true ) && ! in_array( $kind, $registered, true ) ) {
+				$registered[] = $kind;
+			}
+		}
+
+		return $registered;
 	}
 
 	/**

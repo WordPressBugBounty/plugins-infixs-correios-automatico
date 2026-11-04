@@ -97,6 +97,8 @@ class Migration {
 			'created_at' => 'datetime NOT NULL',
 			'cancelled_at' => 'datetime DEFAULT NULL', //@since 1.1.3
 			'dce' => "tinyint(1) unsigned DEFAULT 0", //@since 1.7.4
+			'contract_source' => "varchar(10) NOT NULL DEFAULT 'own'", //@since 1.14.0
+			'cancel_reason' => 'varchar(500) DEFAULT NULL', //@since 1.14.0
 		] );
 
 		/**

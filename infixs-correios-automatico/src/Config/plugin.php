@@ -142,6 +142,7 @@ return apply_filters( 'infixs_correios_automatico_settings',
 			'phone' => '',
 			'celphone' => '',
 			'document' => '',
+			'person_type' => '', // @since 1.14.0 `company` or `person`; empty is read from the document.
 			'address_postalcode' => '',
 			'address_street' => '',
 			'address_complement' => '',

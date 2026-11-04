@@ -18,6 +18,8 @@ use Infixs\CorreiosAutomatico\Controllers\Rest\SettingsSenderController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\ShippingController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\TrackingController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\UnitController;
+use Infixs\CorreiosAutomatico\Prepaid\Rest\PrepaidCallbackPage;
+use Infixs\CorreiosAutomatico\Prepaid\Rest\PrepaidController;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Utils\OrderFilterSanitizer;
 
@@ -334,7 +336,7 @@ class RestRoutes {
 			}
 		] );
 
-		$prepost_controller = new PrepostController( Container::prepostService() );
+		$prepost_controller = new PrepostController( Container::prepostService(), Container::contractMode() );
 
 		register_rest_route( $this->namespace, '/preposts', [
 			'methods' => \WP_REST_Server::READABLE,
@@ -438,6 +440,14 @@ class RestRoutes {
 		register_rest_route( $this->namespace, '/preposts/reverse', [
 			'methods' => \WP_REST_Server::CREATABLE,
 			'callback' => [ $prepost_controller, 'createReverseFromOrder' ],
+			'permission_callback' => function () {
+				return current_user_can( 'manage_woocommerce' );
+			}
+		] );
+
+		register_rest_route( $this->namespace, '/preposts/reverse/document', [
+			'methods' => \WP_REST_Server::READABLE,
+			'callback' => [ $prepost_controller, 'reverseDocument' ],
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}
@@ -727,6 +737,8 @@ class RestRoutes {
 				return current_user_can( 'manage_woocommerce' );
 			}
 		] );
+
+		( new PrepaidController( Container::prepaidConnector(), new PrepaidCallbackPage() ) )->register_routes( $this->namespace );
 
 		do_action( 'infixs_correios_automatico_register_routes', $this->get_namespace() );
 	}

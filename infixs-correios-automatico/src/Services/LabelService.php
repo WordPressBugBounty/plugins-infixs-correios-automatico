@@ -8,8 +8,11 @@ use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingRange;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
+use Infixs\CorreiosAutomatico\Prepaid\ContractMode;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidConnector;
 use Infixs\CorreiosAutomatico\Repositories\RangeCodeRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
+use Infixs\CorreiosAutomatico\Services\Correios\Enums\PrepostStatusCode;
 use Infixs\CorreiosAutomatico\Utils\Helper;
 use Infixs\CorreiosAutomatico\Utils\NumberHelper;
 use Infixs\CorreiosAutomatico\Utils\Sanitizer;
@@ -64,9 +67,18 @@ class LabelService {
 	protected $orderDanfeResolver;
 
 	/**
+	 * Connection to the Infixs Ship, which knows the contract the prepaid preposts print.
+	 *
+	 * @since 1.14.0
+	 * @var PrepaidConnector
+	 */
+	protected $prepaidConnector;
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 1.12.0 Receives the resolver of the simplified DANFE.
+	 * @since 1.14.0 Receives the connection to the Infixs Ship.
 	 *
 	 * @param TrackingService         $trackingService         Tracking service.
 	 * @param ShippingService         $shippingService         Shipping service.
@@ -74,14 +86,16 @@ class LabelService {
 	 * @param ShipmentContextResolver $shipmentContextResolver Shipment context resolver.
 	 * @param PrepostService          $prepostService          Prepost service.
 	 * @param OrderDanfeResolver      $orderDanfeResolver      Resolver of the NF-e and its simplified DANFE.
+	 * @param PrepaidConnector        $prepaidConnector        Connection to the Infixs Ship.
 	 */
-	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository, ShipmentContextResolver $shipmentContextResolver, PrepostService $prepostService, OrderDanfeResolver $orderDanfeResolver ) {
+	public function __construct( TrackingService $trackingService, ShippingService $shippingService, RangeCodeRepository $rangeCodeRepository, ShipmentContextResolver $shipmentContextResolver, PrepostService $prepostService, OrderDanfeResolver $orderDanfeResolver, PrepaidConnector $prepaidConnector ) {
 		$this->trackingService = $trackingService;
 		$this->shippingService = $shippingService;
 		$this->rangeCodeRepository = $rangeCodeRepository;
 		$this->shipmentContextResolver = $shipmentContextResolver;
 		$this->prepostService = $prepostService;
 		$this->orderDanfeResolver = $orderDanfeResolver;
+		$this->prepaidConnector = $prepaidConnector;
 	}
 
 	/**
@@ -187,6 +201,7 @@ class LabelService {
 		$is_volume_label = $scope['shipping_item_id'] && (int) $shipping_metadata['volume_total'] > 1;
 
 		$preposts = [];
+		$scoped_preposts = [];
 
 		/** @var \Infixs\CorreiosAutomatico\Models\Prepost $prepost */
 		foreach ( Prepost::where( 'order_id', $order->get_id() )->orderBy( 'created_at', 'desc' )->get() as $prepost ) {
@@ -203,6 +218,7 @@ class LabelService {
 				continue;
 			}
 
+			$scoped_preposts[] = $prepost;
 			$prepost_data = $prepost->toArray();
 
 			/**
@@ -232,8 +248,12 @@ class LabelService {
 				'created_at' => $prepost->created_at,
 				'expire_at' => $prepost->expire_at,
 				'dce' => $dce['dce'],
+				'contract_source' => isset( $prepost_data['contract_source'] ) && ContractMode::PREPAID === $prepost_data['contract_source'] ? ContractMode::PREPAID : ContractMode::OWN, //@since 1.14.0
 			];
 		}
+
+		$tracking_code = $order->getLastTrackingCode() ?: '';
+		$contract = $this->labelContract( $scoped_preposts, $tracking_code );
 
 		/**
 		 * The NF-e goes with every label of the order, and with it the data of
@@ -266,9 +286,9 @@ class LabelService {
 			'subtotal_amount' => NumberHelper::numericToCents( $order->getSubtotal() ),
 			'total_amount' => NumberHelper::numericToCents( $order->getTotal() ),
 			'items_count' => $package->get_items_count(),
-			'contract_number' => $scope['contract_number'] !== null ? $scope['contract_number'] : Config::string( 'auth.contract_number' ),
-			'postcard' => $scope['postcard'] !== null ? $scope['postcard'] : Config::string( 'auth.postcard' ),
-			'tracking_code' => $order->getLastTrackingCode() ?: '',
+			'contract_number' => $scope['contract_number'] !== null ? $scope['contract_number'] : $contract['number'],
+			'postcard' => $scope['postcard'] !== null ? $scope['postcard'] : $contract['postcard'],
+			'tracking_code' => $tracking_code,
 			'website' => site_url(),
 			'order_id' => $order->get_id(),
 			'shipping_cost' => NumberHelper::numericToCents( $order->getShippingTotal() ),
@@ -321,6 +341,47 @@ class LabelService {
 		 * @param array $context Caller context.
 		 */
 		return apply_filters( 'infixs_correios_automatico_label_data', $data, $order, $context );
+	}
+
+	/**
+	 * Contract the label prints: the one of the prepost it carries.
+	 *
+	 * The prepost is the one of the tracking code on the label, or else the
+	 * newest one still open. One paid from the Contrato pré-pago prints the
+	 * contract and the card of the Infixs; any other, or a label without a
+	 * prepost, prints the store's own, as always.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param Prepost[] $preposts      Preposts of the shipment, newest first.
+	 * @param string    $tracking_code Tracking code on the label.
+	 *
+	 * @return array{number: string, postcard: string}
+	 */
+	private function labelContract( array $preposts, $tracking_code ) {
+		$own = [
+			'number' => Config::string( 'auth.contract_number' ),
+			'postcard' => Config::string( 'auth.postcard' ),
+		];
+
+		$printed = null;
+
+		foreach ( $preposts as $prepost ) {
+			if ( '' !== $tracking_code && $prepost->object_code === $tracking_code ) {
+				$printed = $prepost;
+				break;
+			}
+
+			if ( ! $printed && (int) $prepost->status !== PrepostStatusCode::CANCELADO && empty( $prepost->reverse_logistic ) ) {
+				$printed = $prepost;
+			}
+		}
+
+		if ( ! $printed || ! isset( $printed->contract_source ) || ContractMode::PREPAID !== $printed->contract_source ) {
+			return $own;
+		}
+
+		return $this->prepaidConnector->contract();
 	}
 
 	/**

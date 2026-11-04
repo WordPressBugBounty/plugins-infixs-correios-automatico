@@ -1044,8 +1044,18 @@ class CorreiosShippingMethod extends \WC_Shipping_Method {
 		return true;
 	}
 
+	/**
+	 * Correios service code of a basic service.
+	 *
+	 * @since 1.0.0
+	 * @since 1.14.0 The Contrato pré-pago with an account connected quotes the services of a contract too.
+	 *
+	 * @param string $service Basic service, such as `pac` or `sedex`.
+	 *
+	 * @return string
+	 */
 	public function resolve_basic_service( $service ) {
-		$is_contract_enabled = Config::boolean( 'auth.active' );
+		$is_contract_enabled = Container::contractMode()->quotesWithContract();
 
 		switch ( $service ) {
 			case 'pac':

@@ -90,11 +90,23 @@ class InfixsApi {
 		return $data;
 	}
 
-	public function calculateShipping( $data ) {
+	/**
+	 * Quote a freight of the Correios.
+	 *
+	 * @since 1.0.0
+	 * @since 1.14.0 Takes the token of the Infixs Ship account, which prices the quote with the
+	 *               contract of the Infixs and the margin of the account.
+	 *
+	 * @param array  $data  Quote.
+	 * @param string $token Token of the Infixs Ship account, empty for the retail price.
+	 *
+	 * @return array|\WP_Error
+	 */
+	public function calculateShipping( $data, $token = '' ) {
 		return $this->post(
 			'https://api.infixs.io/v1/shipping/calculate/correios',
 			$data,
-			[],
+			'' !== (string) $token ? [ 'Authorization' => 'Bearer ' . $token ] : [],
 		);
 	}
 

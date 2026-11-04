@@ -503,6 +503,11 @@ class Prepost {
 			$data['numeroNotaFiscal'] = $this->invoice_number;
 		}
 
+		// A reverse prepost that reuses the document of the shipment tells the Correios not to issue a DC-e of its own.
+		if ( 'N' === $this->emit_dce && $this->reverse_logistic && ! empty( $this->invoice_key ) ) {
+			$data['emiteDCe'] = 'N';
+		}
+
 		return $data;
 	}
 

@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.13.0
+Stable tag: 1.14.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -64,20 +64,43 @@ Nosso plugin garante a privacidade de seus dados, saiba mais nos links abaixo:
 
 [Política de Privacidade](https://infixs.io/politica-de-privacidade/)
 
-### 🌍 **Serviços Externos**
+== External services ==
 
-Esse plugin pode depender de serviços externos dos correios, ele consome a API Webservice oficial pelas seguintes URLS:
+O plugin se conecta aos serviços abaixo. Cada um recebe só o necessário para a função descrita, e só quando ela é usada.
 
-- https://api.correios.com.br/
-- https://apihom.correios.com.br/
+= API dos Correios (api.correios.com.br e apihom.correios.com.br) =
 
-Esses serviços estão sujeitos a política de privacidade dos correios a seguir:
+Usada apenas com o Contrato Próprio ligado, com as credenciais do contrato da loja: cotação de frete, prazo, consulta de CEP, rastreamento, pré-postagem, cancelamento e DACE. Recebe os dados do envio (CEPs, peso, medidas, serviço), e na pré-postagem o remetente e o destinatário (nome, endereço, CPF/CNPJ, telefone e e-mail), os itens declarados e a nota fiscal.
 
-[Política de Privacidade dos Correios](https://www.correios.com.br/falecomoscorreios/politica-de-privacidade-e-cookies)
+- [Política de Privacidade dos Correios](https://www.correios.com.br/falecomoscorreios/politica-de-privacidade-e-cookies)
 
-Também usamos a API Gratuita do Viacep:
+= API da Infixs (api.infixs.io) =
 
-- https://viacep.com.br/
+Serviço da Infixs, autora do plugin.
+
+- **Cotação de frete:** sem o Contrato Próprio, cada cálculo de frete (carrinho, checkout e simulador do produto) envia os CEPs de origem e destino, o peso, as medidas, o código do serviço, o valor declarado e os serviços adicionais. Com a conta Infixs Ship conectada, vai junto o token da loja, e o preço volta pelo contrato da Infixs.
+- **Rastreamento:** sem o Contrato Próprio, o código de rastreio dos pedidos é consultado nessa API.
+- **Endereço pelo CEP:** o CEP digitado, quando os outros serviços de CEP não respondem.
+- **Frete internacional:** câmbio e ICMS, sem dados da loja ou do cliente.
+- **Contrato pré-pago (api.infixs.io/v1/ship):** só com a conta Infixs Ship conectada. Ao gerar, cancelar, sincronizar ou imprimir a DACE de uma pré-postagem, envia os dados da pré-postagem (remetente e destinatário com nome, endereço, CPF/CNPJ, telefone e e-mail, itens declarados, nota fiscal, medidas e serviço), o número do pedido, o endereço do site e o token da loja. O valor da etiqueta é debitado do saldo da conta. O painel também lê o nome da conta e o saldo.
+- **Desativação:** quando o lojista envia o formulário ao desativar o plugin, vão o motivo, o comentário e o e-mail que ele escreveu, o endereço do site e as versões do plugin e do PHP.
+- **Termos de uso:** ao aceitar os termos de uso no painel, a chave e o token da licença.
+
+- [Política de Privacidade da Infixs](https://infixs.com/politica-de-privacidade/)
+
+= Infixs Ship (ship.infixs.com) =
+
+Site da Infixs onde o lojista cria a conta do Contrato pré-pago, coloca saldo e acompanha o extrato. Só é aberto quando o lojista clica em "Conectar conta Infixs Ship" na página Contrato: o navegador vai até lá com o endereço e o nome do site, o link de retorno e o código de verificação da conexão (PKCE). O cadastro da conta (login Google, nome, CPF/CNPJ e telefone) e a recarga são feitos no próprio site. A conexão pode ser desfeita a qualquer momento, no plugin ou na conta.
+
+- [Termos de Uso da Infixs Ship](https://ship.infixs.com/termos)
+- [Política de Privacidade da Infixs](https://infixs.com/politica-de-privacidade/)
+
+= ViaCEP (viacep.com.br) e BrasilAPI (brasilapi.com.br) =
+
+O CEP digitado no checkout ou no painel, para preencher o endereço.
+
+- [ViaCEP](https://viacep.com.br/)
+- [Termos de uso da BrasilAPI](https://brasilapi.com.br/)
 
 == Installation ==
 
@@ -140,6 +163,27 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.14.0 2026-11-03 =
+* Contrato: Contrato pré-pago, com o envio pago antes pelo saldo da conta Infixs Ship e postagem em qualquer agência
+* Contrato: a integração com o seu contrato dos Correios passa a se chamar Contrato Próprio
+* Frete: cotação no checkout pelo Contrato pré-pago
+* Pré-postagem: saldo da conta Infixs Ship na janela da pré-postagem e botão para adicionar saldo
+* Pré-postagem: o pedido anota o valor de cada etiqueta do Contrato pré-pago e o estorno do cancelamento
+* Devolução: a reversa vai com a mesma NF-e ou DC-e do envio, sem emitir documento novo
+* Devolução: a devolução manual mostra o documento do envio, ou pede a NF-e ou a DC-e quando não há
+* Devolução: serviços Logística Reversa SEDEX PC (05991) e PAC PC (06637), com busca na escolha do serviço
+* Métodos de entrega: busca por nome ou código no campo Serviço, no modo básico e no avançado
+* Correios LOG+: seção em Configurações para o armazém dos Correios, com o estoque e a conferência do armazém (PRO)
+* Pedidos: envio ao armazém Correios LOG+, situação, NF-e e rastreio na própria lista, com filtro e ação em lote (PRO)
+* Devolução: correção do erro crítico ao criar a pré-postagem reversa em PHP anterior a 8.1
+* Painel: aviso da NF-e para contribuintes de ICMS desde 02/11/2026, com o SquidCore ERP e vídeo
+* Pré-postagem: a DC-e recusada pela SEFAZ mostra o motivo, e a recusa do contribuinte de ICMS indica a NF-e e o SquidCore ERP
+* Remetente: cadastro como pessoa jurídica (CNPJ) ou pessoa física (CPF), com a etiqueta mostrando o documento certo
+* JadLog: Conta corrente opcional e separada do Código do Cliente
+* Painel: filtros, busca e colunas das listas também no celular
+* Pedidos: barra da lista numa linha só no celular, com o menu "Mais opções"
+* Pedidos: a escolha de colunas mostra o nome de cada coluna
 
 = 1.13.0 2026-10-24 =
 * Integrações: aba Bling para a pré-postagem sair com a NF-e emitida no Bling (PRO)

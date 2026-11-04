@@ -28,7 +28,8 @@ class SettingsSenderValidator extends Validator {
 		];
 
 		if ( $this->getFieldValue( 'address_country' ) === 'BR' ) {
-			$rules['document'] = 'required|cpfcnpj';
+			$rules['person_type'] = 'personType';
+			$rules['document'] = 'required|' . $this->documentRule();
 			$rules['celphone'] = 'required|celphone';
 			$rules['phone'] = 'phone|empty';
 			$rules['address_state'] = 'required|size:2';
@@ -63,6 +64,73 @@ class SettingsSenderValidator extends Validator {
 	public function cep( $field ) {
 		if ( ! preg_match( '/^\d{5}-?\d{3}$/', $this->data[ $field ] ) ) {
 			$this->errors[ $field ] = "CEP inválido.";
+		}
+	}
+
+	/**
+	 * Rule of the document for the person type chosen.
+	 *
+	 * A request without the choice, as the screens before 1.14.0 sent, takes
+	 * either document.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @return string
+	 */
+	private function documentRule() {
+		$type = $this->getFieldValue( 'person_type' );
+
+		if ( 'person' === $type ) {
+			return 'cpf';
+		}
+
+		return 'company' === $type ? 'cnpj' : 'cpfcnpj';
+	}
+
+	/**
+	 * The sender is a company or a person.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $field Field.
+	 *
+	 * @return void
+	 */
+	public function personType( $field ) {
+		$value = $this->getFieldValue( $field );
+
+		if ( null !== $value && '' !== $value && ! in_array( $value, [ 'company', 'person' ], true ) ) {
+			$this->errors[ $field ] = 'Escolha pessoa jurídica ou pessoa física.';
+		}
+	}
+
+	/**
+	 * The document is a valid CPF.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $field Field.
+	 *
+	 * @return void
+	 */
+	public function cpf( $field ) {
+		if ( ! $this->validateCpf( (string) $this->getFieldValue( $field ) ) ) {
+			$this->errors[ $field ] = 'CPF inválido.';
+		}
+	}
+
+	/**
+	 * The document is a valid CNPJ.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $field Field.
+	 *
+	 * @return void
+	 */
+	public function cnpj( $field ) {
+		if ( ! $this->validateCnpj( (string) $this->getFieldValue( $field ) ) ) {
+			$this->errors[ $field ] = 'CNPJ inválido.';
 		}
 	}
 

@@ -66,6 +66,8 @@ class DeliveryServiceCode {
 	public const SEDEX_HOJE_REVERSO = '03190';
 	public const LR_PAC_GRANDE_FORMATO = '06785';
 	public const LR_SEDEX_GRANDE_FORMATO = '03484';
+	public const LR_SEDEX_PC = '05991'; // @since 1.14.0
+	public const LR_PAC_PC = '06637'; // @since 1.14.0
 
 
 
@@ -118,6 +120,8 @@ class DeliveryServiceCode {
 		self::SEDEX_HOJE_REVERSO => 'SEDEX Hoje Reverso',
 		self::LR_PAC_GRANDE_FORMATO => 'LR PAC Grandes Formatos',
 		self::LR_SEDEX_GRANDE_FORMATO => 'LR SEDEX Grandes Formatos',
+		self::LR_SEDEX_PC => 'Logística Reversa SEDEX PC',
+		self::LR_PAC_PC => 'Logística Reversa PAC PC',
 	];
 
 	/**
@@ -471,6 +475,8 @@ class DeliveryServiceCode {
 			self::SEDEX_HOJE_REVERSO,
 			self::LR_PAC_GRANDE_FORMATO,
 			self::LR_SEDEX_GRANDE_FORMATO,
+			self::LR_SEDEX_PC,
+			self::LR_PAC_PC,
 		];
 
 		$services = [];

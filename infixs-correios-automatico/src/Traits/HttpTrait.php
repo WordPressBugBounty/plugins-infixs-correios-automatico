@@ -8,6 +8,7 @@ trait HttpTrait {
 	 * Post request
 	 * 
 	 * @since 1.0.0
+	 * @since 1.14.0 A refusal carries the code of the error the API answered (`error.code`) in `error_code`.
 	 * 
 	 * @param string $endpoint
 	 * @param array $data
@@ -42,7 +43,13 @@ trait HttpTrait {
 				'body' => is_string( $body ) ? substr( $body, 0, 2000 ) : '',
 			] );
 
-			return new \WP_Error( "http_error", $message, [ 'status' => $code ] );
+			$error_data = [ 'status' => $code ];
+
+			if ( is_array( $data ) && isset( $data['error']['code'] ) && is_string( $data['error']['code'] ) ) {
+				$error_data['error_code'] = $data['error']['code'];
+			}
+
+			return new \WP_Error( "http_error", $message, $error_data );
 		}
 
 		return $data;

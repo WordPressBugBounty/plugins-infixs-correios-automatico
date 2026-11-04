@@ -8,6 +8,14 @@ use Infixs\CorreiosAutomatico\Models\Prepost;
 use Infixs\CorreiosAutomatico\Models\TrackingCode;
 use Infixs\CorreiosAutomatico\Models\TrackingRangeCode;
 use Infixs\CorreiosAutomatico\Models\Unit;
+use Infixs\CorreiosAutomatico\Prepaid\ContractMode;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidApi;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidChargeNote;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidClientResolver;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidConnection;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidConnector;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidCorreiosApi;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidOAuth;
 use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
@@ -93,6 +101,14 @@ class Container {
 
 		$this->container['infixsApi'] = fn() => new InfixsApi();
 
+		$this->container['prepaidConnection'] = fn() => new PrepaidConnection();
+		$this->container['contractMode'] = fn( $c ) => new ContractMode( $c['configRepository'], $c['prepaidConnection'] );
+		$this->container['prepaidApi'] = fn( $c ) => new PrepaidApi( $c['prepaidConnection'] );
+		$this->container['prepaidCorreiosApi'] = fn( $c ) => new PrepaidCorreiosApi( $c['prepaidApi'], $c['infixsApi'], $c['prepaidConnection'] );
+		$this->container['prepaidConnector'] = fn( $c ) => new PrepaidConnector( new PrepaidOAuth(), $c['prepaidApi'], $c['prepaidConnection'], $c['contractMode'], $c['routes'] );
+		$this->container['prepaidClientResolver'] = fn( $c ) => new PrepaidClientResolver( $c['contractMode'], $c['prepaidCorreiosApi'], $c['correiosApi'] );
+		$this->container['prepaidChargeNote'] = fn() => new PrepaidChargeNote();
+
 		$this->container['correiosService'] = fn( $c ) => new CorreiosService( $c['correiosApi'] );
 		$this->container['trackingService'] = fn( $c ) => new TrackingService( $c['trackingRepository'], $c['correiosService'], $c['configRepository'] );
 		$this->container['prepostService'] = fn( $c ) => new PrepostService( $c['prepostRepository'], $c['correiosService'] );
@@ -100,12 +116,12 @@ class Container {
 		$this->container['orderInvoiceResolver'] = fn() => new OrderInvoiceResolver();
 		$this->container['orderDanfeResolver'] = fn( $c ) => new OrderDanfeResolver( $c['orderInvoiceResolver'] );
 		$this->container['orderInvoiceStatus'] = fn() => new OrderInvoiceStatus();
-		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'] );
+		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'], $c['contractMode'], $c['prepaidConnection'] );
 		$this->container['emailService'] = fn() => new EmailService();
 		$this->container['shipmentContextResolver'] = fn() => new ShipmentContextResolver();
 		$this->container['volumePlanner'] = fn() => new VolumePlanner();
 		$this->container['volumeLineExpander'] = fn() => new VolumeLineExpander();
-		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'], $c['shipmentContextResolver'], $c['prepostService'], $c['orderDanfeResolver'] );
+		$this->container['labelService'] = fn( $c ) => new LabelService( $c['trackingService'], $c['shippingService'], $c['rangeCodeRepository'], $c['shipmentContextResolver'], $c['prepostService'], $c['orderDanfeResolver'], $c['prepaidConnector'] );
 		$this->container['invoiceUnitService'] = fn( $c ) => new InvoiceUnitService( $c['invoiceUnitRepository'] );
 		$this->container['unitService'] = fn( $c ) => new UnitService( $c['unitRepository'], $c['invoiceUnitService'] );
 		$this->container['settingsService'] = fn() => new SettingsService();
@@ -124,6 +140,56 @@ class Container {
 	 */
 	public static function vendorContractService() {
 		return self::getInstance()->container['vendorContractService'];
+	}
+
+	/**
+	 * Which contract the store posts with.
+	 *
+	 * @since 1.14.0
+	 * @return ContractMode
+	 */
+	public static function contractMode() {
+		return self::getInstance()->container['contractMode'];
+	}
+
+	/**
+	 * Connection of the store to its Infixs Ship account.
+	 *
+	 * @since 1.14.0
+	 * @return PrepaidConnection
+	 */
+	public static function prepaidConnection() {
+		return self::getInstance()->container['prepaidConnection'];
+	}
+
+	/**
+	 * Connects the store to its Infixs Ship account.
+	 *
+	 * @since 1.14.0
+	 * @return PrepaidConnector
+	 */
+	public static function prepaidConnector() {
+		return self::getInstance()->container['prepaidConnector'];
+	}
+
+	/**
+	 * Sends the preposts of the Contrato pré-pago through the Infixs Ship.
+	 *
+	 * @since 1.14.0
+	 * @return PrepaidClientResolver
+	 */
+	public static function prepaidClientResolver() {
+		return self::getInstance()->container['prepaidClientResolver'];
+	}
+
+	/**
+	 * Notes on the order what a prepaid prepost cost.
+	 *
+	 * @since 1.14.0
+	 * @return PrepaidChargeNote
+	 */
+	public static function prepaidChargeNote() {
+		return self::getInstance()->container['prepaidChargeNote'];
 	}
 
 	/**

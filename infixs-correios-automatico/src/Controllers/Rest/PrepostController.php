@@ -1,7 +1,7 @@
 <?php
 
 namespace Infixs\CorreiosAutomatico\Controllers\Rest;
-use Infixs\CorreiosAutomatico\Core\Support\Config;
+use Infixs\CorreiosAutomatico\Prepaid\ContractMode;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 
 defined( 'ABSPATH' ) || exit;
@@ -15,8 +15,24 @@ class PrepostController {
 	 */
 	private $prepostService;
 
-	public function __construct( PrepostService $prepostService ) {
+	/**
+	 * Which contract the store posts with.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @var ContractMode
+	 */
+	private $contractMode;
+
+	/**
+	 * @since 1.14.0 Receives the contract mode.
+	 *
+	 * @param PrepostService $prepostService Prepost service.
+	 * @param ContractMode   $contractMode   Which contract the store posts with.
+	 */
+	public function __construct( PrepostService $prepostService, ContractMode $contractMode ) {
 		$this->prepostService = $prepostService;
+		$this->contractMode = $contractMode;
 	}
 
 	/**
@@ -40,6 +56,7 @@ class PrepostController {
 	 * Create prepost.
 	 * 
 	 * @since 1.0.0
+	 * @since 1.14.0 Allowed by the contract mode: the own contract on, or the Infixs Ship connected.
 	 * 
 	 * @param \WP_REST_Request $request
 	 * 
@@ -47,43 +64,21 @@ class PrepostController {
 	 */
 	public function createFromOrder( \WP_REST_Request $request ) {
 		$params = $request->get_params();
-		$invoice_key = null;
 
 		if ( ! isset( $params['order_id'] ) ) {
 			return new \WP_Error( 'missing_order_id', 'Order ID is required.', [ 'status' => 400 ] );
 		}
 
-		if ( isset( $params['invoice_key'] ) ) {
-			$invoice_key = preg_replace( '/[^[:alnum:]]+/', '', (string) $params['invoice_key'] );
+		$data = $this->fiscalDocumentParams( $params );
 
-			if ( strlen( $invoice_key ) !== 44 ) {
-				return new \WP_Error( 'invalid_invoice_key', 'A Chave da nota fiscal deve ter 44 caracteres.', [ 'status' => 400 ] );
-			}
+		if ( is_wp_error( $data ) ) {
+			return $data;
 		}
 
-		if ( isset( $params['invoice_number'] ) && strlen( trim( $params['invoice_number'] ) ) == 0 ) {
-			return new \WP_Error( 'invalid_invoice_number', 'O Número da nota fiscal é obrigatório.', [ 'status' => 400 ] );
-		}
+		$contract_error = $this->contractMode->prepostError();
 
-		if ( ! Config::boolean( 'auth.active' ) ) {
-			return new \WP_Error( 'auth_not_active', 'O Contrato não está ativo, acesse as configurações para ativá-lo. Menu WooCommerce -> Correios Automático -> Configurações -> Contrato.', [ 'status' => 400 ] );
-		}
-
-		$data = [];
-
-		if ( null !== $invoice_key ) {
-			$data['invoice_key'] = $invoice_key;
-		}
-
-		if ( isset( $params['invoice_number'] ) ) {
-			$data['invoice_number'] = $params['invoice_number'];
-		}
-
-		if ( array_key_exists( 'withDce', $params ) ) {
-			$with_dce = filter_var( $params['withDce'], FILTER_VALIDATE_BOOLEAN );
-			$data['emiteDCe'] = $with_dce ? 'S' : 'N';
-		} elseif ( isset( $params['invoice_number'] ) && isset( $params['invoice_key'] ) ) {
-			$data['emiteDCe'] = 'N';
+		if ( $contract_error ) {
+			return $contract_error;
 		}
 
 		if ( isset( $params['dangerousProduct'] ) ) {
@@ -116,9 +111,83 @@ class PrepostController {
 	}
 
 	/**
+	 * Tell the fiscal document the reverse prepost of a shipment would travel with.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \WP_REST_Request $request Request with `order_id`, and `shipping_item_id` and `vendor_id` of the shipment.
+	 *
+	 * @return \WP_Error|\WP_REST_Response
+	 */
+	public function reverseDocument( $request ) {
+		$params = $request->get_params();
+
+		if ( empty( $params['order_id'] ) ) {
+			return new \WP_Error( 'missing_order_id', 'Order ID is required.', [ 'status' => 400 ] );
+		}
+
+		$document = $this->prepostService->previewReverseFiscalDocument( absint( $params['order_id'] ), $this->resolveShipmentScope( $params ) );
+
+		if ( is_wp_error( $document ) ) {
+			return $document;
+		}
+
+		return rest_ensure_response( [
+			'source' => $document['source'],
+			'emite_dce' => 'S' === $document['emiteDCe'],
+			'invoice_number' => isset( $document['invoice_number'] ) ? (string) $document['invoice_number'] : '',
+			'invoice_key' => isset( $document['invoice_key'] ) ? (string) $document['invoice_key'] : '',
+		] );
+	}
+
+	/**
+	 * Read the fiscal document a prepost request asks for.
+	 *
+	 * An NF-e informed by the store, or the `withDce` choice of the DC-e
+	 * button; an NF-e without `withDce` sends no DC-e.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param array $params Request params.
+	 *
+	 * @return array|\WP_Error Keys understood by the prepost service, empty when the request leaves it open.
+	 */
+	private function fiscalDocumentParams( $params ) {
+		$data = [];
+
+		if ( isset( $params['invoice_key'] ) ) {
+			$invoice_key = preg_replace( '/[^[:alnum:]]+/', '', (string) $params['invoice_key'] );
+
+			if ( strlen( $invoice_key ) !== 44 ) {
+				return new \WP_Error( 'invalid_invoice_key', 'A Chave da nota fiscal deve ter 44 caracteres.', [ 'status' => 400 ] );
+			}
+
+			$data['invoice_key'] = $invoice_key;
+		}
+
+		if ( isset( $params['invoice_number'] ) && strlen( trim( $params['invoice_number'] ) ) == 0 ) {
+			return new \WP_Error( 'invalid_invoice_number', 'O Número da nota fiscal é obrigatório.', [ 'status' => 400 ] );
+		}
+
+		if ( isset( $params['invoice_number'] ) ) {
+			$data['invoice_number'] = $params['invoice_number'];
+		}
+
+		if ( array_key_exists( 'withDce', $params ) ) {
+			$data['emiteDCe'] = filter_var( $params['withDce'], FILTER_VALIDATE_BOOLEAN ) ? 'S' : 'N';
+		} elseif ( isset( $params['invoice_number'] ) && isset( $params['invoice_key'] ) ) {
+			$data['emiteDCe'] = 'N';
+		}
+
+		return $data;
+	}
+
+	/**
 	 * Create a reverse logistics prepost (manual) from an order.
 	 *
 	 * @since 1.8.0
+	 * @since 1.14.0 Only on the own contract: the Contrato pré-pago has no reverse prepost yet.
+	 * @since 1.14.0 Takes the NF-e or the DC-e the store chose for the return.
 	 *
 	 * @param \WP_REST_Request $request
 	 *
@@ -131,11 +200,17 @@ class PrepostController {
 			return new \WP_Error( 'missing_order_id', 'Order ID is required.', [ 'status' => 400 ] );
 		}
 
-		if ( ! Config::boolean( 'auth.active' ) ) {
-			return new \WP_Error( 'auth_not_active', 'O Contrato não está ativo, acesse as configurações para ativá-lo. Menu WooCommerce -> Correios Automático -> Configurações -> Contrato.', [ 'status' => 400 ] );
+		$contract_error = $this->contractMode->prepostError( true );
+
+		if ( $contract_error ) {
+			return $contract_error;
 		}
 
-		$data = [];
+		$data = $this->fiscalDocumentParams( $params );
+
+		if ( is_wp_error( $data ) ) {
+			return $data;
+		}
 
 		if ( isset( $params['service'] ) && ! empty( $params['service'] ) ) {
 			$data['service'] = sanitize_text_field( $params['service'] );

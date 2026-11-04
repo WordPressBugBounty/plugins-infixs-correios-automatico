@@ -355,6 +355,14 @@ class Admin {
 			 * @since 1.13.0
 			 */
 			'squidcore' => SquidCorePlugin::status(),
+			/**
+			 * Contract the store posts with, `prepaid` or `own`, and whether
+			 * the Infixs Ship account of the Contrato pré-pago is connected.
+			 *
+			 * @since 1.14.0
+			 */
+			'contractMode' => Container::contractMode()->mode(),
+			'prepaidConnected' => Container::contractMode()->prepaidConnected(),
 		] );
 
 		if ( function_exists( 'get_woocommerce_currency' ) ) {

@@ -82,9 +82,12 @@ final class OrderFilterConditions {
 	 * Condition matching the orders still waiting for one of the actions.
 	 *
 	 * Two pendencies asked at once match the orders carrying either of them.
+	 * A pendency the plugin does not know is one an extension registered, and
+	 * its condition is asked from the extension.
 	 *
 	 * @since 1.11.0
 	 * @since 1.13.0 Matches the orders waiting for the NF-e.
+	 * @since 1.14.0 Matches the pendencies an extension registers.
 	 *
 	 * @param string[] $kinds Pendency keys, already sanitized.
 	 *
@@ -94,19 +97,9 @@ final class OrderFilterConditions {
 		$conditions = [];
 
 		foreach ( (array) $kinds as $kind ) {
-			$condition = null;
-
-			if ( OrderFilterSanitizer::PENDING_TRACKING === $kind ) {
-				$condition = self::withoutTracking();
-			}
-
-			if ( OrderFilterSanitizer::PENDING_PREPOST === $kind ) {
-				$condition = self::withoutPrepost();
-			}
-
-			if ( OrderFilterSanitizer::PENDING_INVOICE === $kind ) {
-				$condition = self::waitingInvoice();
-			}
+			$condition = in_array( $kind, OrderFilterSanitizer::NATIVE_PENDING, true )
+				? self::nativePending( $kind )
+				: self::registeredPending( $kind );
 
 			if ( $condition ) {
 				$conditions[] = $condition;
@@ -114,6 +107,57 @@ final class OrderFilterConditions {
 		}
 
 		return $conditions ? '( ' . implode( ' OR ', $conditions ) . ' )' : null;
+	}
+
+	/**
+	 * Condition of a pendency the plugin answers by itself.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $kind Pendency key, one of OrderFilterSanitizer::NATIVE_PENDING.
+	 *
+	 * @return string|null Null when the pendency cannot be matched on this store.
+	 */
+	private static function nativePending( $kind ) {
+		if ( OrderFilterSanitizer::PENDING_TRACKING === $kind ) {
+			return self::withoutTracking();
+		}
+
+		if ( OrderFilterSanitizer::PENDING_PREPOST === $kind ) {
+			return self::withoutPrepost();
+		}
+
+		return self::waitingInvoice();
+	}
+
+	/**
+	 * Condition of a pendency an extension registered.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $kind Pendency key, as the extension registered it.
+	 *
+	 * @return string|null Null when the extension answered nothing.
+	 */
+	private static function registeredPending( $kind ) {
+		/**
+		 * Filters the SQL condition of a pendency an extension registered.
+		 *
+		 * The fragment comes already prepared and carries
+		 * `OrderQuery::ORDER_ID_TOKEN` (`{order_id}`) where the order id column
+		 * belongs, so the same fragment narrows the posts storage and the HPOS
+		 * tables — the column is put in place by `OrderQuery`. Null leaves the
+		 * pendency out of the query.
+		 *
+		 * @since 1.14.0
+		 *
+		 * @param string|null $condition SQL fragment matching the orders with the pendency. Null by default.
+		 * @param string      $kind      Key of the pendency, as registered through
+		 *                               `infixs_correios_automatico_order_pending_kinds`.
+		 */
+		$condition = apply_filters( 'infixs_correios_automatico_order_pending_condition', null, $kind );
+
+		return is_string( $condition ) && '' !== trim( $condition ) ? $condition : null;
 	}
 
 	/**

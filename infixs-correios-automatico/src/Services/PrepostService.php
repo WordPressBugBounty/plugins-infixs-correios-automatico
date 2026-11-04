@@ -10,8 +10,10 @@ use Infixs\CorreiosAutomatico\Core\Support\Plugin;
 use Infixs\CorreiosAutomatico\Database\Migration;
 use Infixs\CorreiosAutomatico\Entities\Order;
 use Infixs\CorreiosAutomatico\Models\Prepost as PrepostModel;
+use Infixs\CorreiosAutomatico\Prepaid\ContractMode;
 use Infixs\CorreiosAutomatico\Repositories\PrepostRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
+use Infixs\CorreiosAutomatico\Services\Correios\DceRejection;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\AddicionalServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\DeliveryServiceCode;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\ObjectFormatCode;
@@ -69,6 +71,24 @@ class PrepostService {
 	 * @var string
 	 */
 	const DCE_COLUMNS_TRANSIENT = 'infixs_ca_dce_columns';
+
+	/**
+	 * Transient that records the column of the contract of a prepost is already in the table.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @var string
+	 */
+	const CONTRACT_SOURCE_COLUMN_TRANSIENT = 'infixs_ca_contract_source_column';
+
+	/**
+	 * Transient that records the column of the reason a prepost was cancelled is already in the table.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @var string
+	 */
+	const CANCEL_REASON_COLUMN_TRANSIENT = 'infixs_ca_cancel_reason_column';
 
 	/**
 	 * How long a prepost is left alone after a failed DACE read, in seconds.
@@ -1204,6 +1224,7 @@ class PrepostService {
 	 *
 	 * @since 1.8.0
 	 * @since 1.11.0 Also lists the reverse prepost on the order, per shipping line.
+	 * @since 1.14.0 Travels with the fiscal document the shipment went out with.
 	 *
 	 * @param int $order_id Order ID.
 	 * @param array{
@@ -1212,6 +1233,9 @@ class PrepostService {
 	 * 		length?: float,
 	 * 		width?: float,
 	 * 		height?: float,
+	 * 		invoice_number?: string,
+	 * 		invoice_key?: string,
+	 * 		emiteDCe?: string,
 	 * } $data Optional overrides (used by the manual reverse prepost screen).
 	 *
 	 * @return \Infixs\CorreiosAutomatico\Models\Prepost|\WP_Error
@@ -1224,15 +1248,7 @@ class PrepostService {
 			return new \WP_Error( 'invalid_order', 'Pedido inválido ao criar a devolução.', [ 'status' => 400 ] );
 		}
 
-		$ca_order = new Order( $order );
-
-		$scope = Order::resolveScope( $ca_order, [
-			'for' => 'reverse_prepost',
-			'vendor_id' => isset( $data['vendor_id'] ) ? absint( $data['vendor_id'] ) : 0,
-			'shipping_item_id' => isset( $data['shipping_item_id'] ) ? absint( $data['shipping_item_id'] ) : 0,
-		] );
-
-		$ca_order->applyScope( $scope );
+		$ca_order = $this->reverseScopedOrder( $order, $data );
 
 		$vendor_id = $ca_order->getScopedVendorId();
 
@@ -1319,8 +1335,23 @@ class PrepostService {
 		$prepost->setId( $this->resolveCorreiosId( $vendor_id ) );
 		$prepost->setShippingItemId( $ca_order->getScopedShippingItemId() );
 		$prepost->setReverseLogistic( true );
-		$prepost->setEmitDce( 'N' );
 		$prepost->setItemsFromPackage( $ca_order->getPackage() );
+
+		$document = $this->reverseFiscalDocument( $order, (int) $ca_order->getScopedShippingItemId(), $vendor_id, $data, $store->getCpfCnpj() );
+
+		if ( is_wp_error( $document ) ) {
+			return $document;
+		}
+
+		if ( ! empty( $document['invoice_number'] ) ) {
+			$prepost->setInvoiceNumber( $document['invoice_number'] );
+		}
+
+		if ( ! empty( $document['invoice_key'] ) ) {
+			$prepost->setInvoiceKey( $document['invoice_key'] );
+		}
+
+		$prepost->setEmitDce( $document['emiteDCe'] );
 
 		$shippingItem = $ca_order->getShipmentDimensions();
 
@@ -1330,6 +1361,10 @@ class PrepostService {
 		$prepost->setWeight( isset( $data['weight'] ) ? $data['weight'] : $shippingItem['weight'] );
 
 		$created_prepost = $this->processPrespost( $prepost );
+
+		if ( is_wp_error( $created_prepost ) && $this->isRefusedFiscalDocument( $created_prepost, $document ) ) {
+			$created_prepost = $this->retryReverseWithDeclaration( $order, $prepost, $document, $created_prepost );
+		}
 
 		if ( is_wp_error( $created_prepost ) ) {
 			Log::notice( "Erro ao criar a pré-postagem reversa.", [
@@ -1359,6 +1394,381 @@ class PrepostService {
 		] );
 
 		return $created_prepost;
+	}
+
+	/**
+	 * Tell the fiscal document a reverse prepost of the order would travel with.
+	 *
+	 * The same decision the reverse prepost takes, so the manual screen can
+	 * show it, or ask for one when the shipment has no NF-e.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param int   $order_id Order ID.
+	 * @param array $data     Shipment being returned: `shipping_item_id` and `vendor_id`.
+	 *
+	 * @return array{emiteDCe: string, invoice_number?: string, invoice_key?: string, source: string}|\WP_Error
+	 */
+	public function previewReverseFiscalDocument( $order_id, $data = [] ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order ) {
+			return new \WP_Error( 'invalid_order', 'Pedido inválido ao consultar a devolução.', [ 'status' => 404 ] );
+		}
+
+		$ca_order = $this->reverseScopedOrder( $order, $data );
+		$vendor_id = $ca_order->getScopedVendorId();
+		$store = $this->buildSender( $order_id, $vendor_id );
+
+		return $this->reverseFiscalDocument( $order, (int) $ca_order->getScopedShippingItemId(), $vendor_id, [], $store->getCpfCnpj() );
+	}
+
+	/**
+	 * The order scoped to the shipment a reverse prepost brings back.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \WC_Order $order Order being returned.
+	 * @param array     $data  Shipment being returned: `shipping_item_id` and `vendor_id`.
+	 *
+	 * @return Order
+	 */
+	private function reverseScopedOrder( $order, $data ) {
+		$ca_order = new Order( $order );
+
+		$ca_order->applyScope( Order::resolveScope( $ca_order, [
+			'for' => 'reverse_prepost',
+			'vendor_id' => isset( $data['vendor_id'] ) ? absint( $data['vendor_id'] ) : 0,
+			'shipping_item_id' => isset( $data['shipping_item_id'] ) ? absint( $data['shipping_item_id'] ) : 0,
+		] ) );
+
+		return $ca_order;
+	}
+
+	/**
+	 * Decide the fiscal document a reverse prepost travels with.
+	 *
+	 * A return goes back with the document its shipment went out with, the
+	 * NF-e or the DC-e of the outbound prepost, with the same key and number
+	 * and no new document. A shipment with a DC-e whose key cannot be found
+	 * asks for a new one, so the return is not lost. A shipment the plugin did
+	 * not prepost, or one sent before the DC-e, goes back with the NF-e of the
+	 * order when there is one, and with the content declaration only otherwise,
+	 * as every return did before.
+	 *
+	 * An NF-e only goes back to the store that issued it, so the return of a
+	 * marketplace order never carries the invoice of another vendor. An
+	 * invoice or an `emiteDCe` given by the caller always wins.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \WC_Order $order            Order being returned.
+	 * @param int       $shipping_item_id Shipping line being returned, zero for the whole order.
+	 * @param int       $vendor_id        Marketplace vendor of the shipment, zero for the store.
+	 * @param array     $data             Data given by the caller.
+	 * @param string    $store_document   CPF or CNPJ of the store the return goes to, digits only.
+	 *
+	 * @return array{emiteDCe: string, invoice_number?: string, invoice_key?: string, source: string}|\WP_Error Error when the DC-e of the shipment could not be looked up.
+	 */
+	private function reverseFiscalDocument( $order, $shipping_item_id, $vendor_id, $data, $store_document ) {
+		if ( ! empty( $data['invoice_key'] ) || ! empty( $data['invoice_number'] ) || isset( $data['emiteDCe'] ) ) {
+			return [
+				'invoice_number' => isset( $data['invoice_number'] ) ? (string) $data['invoice_number'] : '',
+				'invoice_key' => isset( $data['invoice_key'] ) ? (string) $data['invoice_key'] : '',
+				'emiteDCe' => $this->resolveEmitDce( $data ),
+				'source' => 'caller',
+			];
+		}
+
+		$outbound = $this->outboundPrepost( $order, $shipping_item_id, $vendor_id );
+		$outbound_key = $outbound ? AccessKey::normalize( $outbound->invoice_key ) : null;
+
+		if ( null !== $outbound_key && AccessKey::isInvoice( $outbound_key ) && $this->isIssuedBy( $outbound_key, $store_document ) ) {
+			$document = $this->invoiceDocument( $outbound_key, (string) $outbound->invoice_number, 'outbound_invoice' );
+		} elseif ( $outbound && $this->hasDce( $outbound ) ) {
+			$dce_key = $this->outboundDceKey( $outbound );
+
+			if ( is_wp_error( $dce_key ) ) {
+				return $dce_key;
+			}
+
+			$document = null !== $dce_key
+				? $this->invoiceDocument( $dce_key, (string) AccessKey::number( $dce_key ), 'outbound_dce' )
+				: [
+					'emiteDCe' => 'S',
+					'source' => 'outbound_dce',
+				];
+		} else {
+			$invoice = $this->withOrderInvoice( [], $order, $shipping_item_id, $vendor_id );
+			$order_key = isset( $invoice['invoice_key'] ) ? AccessKey::normalize( $invoice['invoice_key'] ) : null;
+
+			$document = null !== $order_key && $this->isIssuedBy( $order_key, $store_document )
+				? $this->invoiceDocument( $order_key, (string) $invoice['invoice_number'], 'order_invoice' )
+				: [
+					'emiteDCe' => 'N',
+					'source' => 'declaration',
+				];
+		}
+
+		/**
+		 * Filters the fiscal document a reverse prepost travels with.
+		 *
+		 * A key that is neither of an NF-e nor of a DC-e is dropped, and an
+		 * `emiteDCe` other than `S` sends no DC-e.
+		 *
+		 * @since 1.14.0
+		 *
+		 * @param array             $document         Document: `emiteDCe`, and `invoice_number` and `invoice_key` for an NF-e or a DC-e.
+		 * @param \WC_Order         $order            Order being returned.
+		 * @param int               $shipping_item_id Shipping line being returned, zero for the whole order.
+		 * @param PrepostModel|null $outbound         Prepost the shipment went out with, null when there is none.
+		 */
+		$filtered = apply_filters( 'infixs_correios_automatico_reverse_prepost_fiscal_document', $document, $order, $shipping_item_id, $outbound );
+		$document = $this->sanitizeReverseDocument( $filtered, $document );
+
+		Log::debug( 'Documento fiscal da pré-postagem reversa definido.', [
+			'order_id' => $order->get_id(),
+			'shipping_item_id' => $shipping_item_id,
+			'source' => $document['source'],
+			'emite_dce' => $document['emiteDCe'],
+			'nfe' => ! empty( $document['invoice_key'] ),
+		] );
+
+		return $document;
+	}
+
+	/**
+	 * Access key of the DC-e a shipment went out with.
+	 *
+	 * The key reaches the row with the sync after the prepost is created, so
+	 * a row that never got it asks the Correios. Failing to ask does not mean
+	 * the key does not exist, so it is an error instead of a reason for a new
+	 * DC-e.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param PrepostModel $outbound Prepost the shipment went out with.
+	 *
+	 * @return string|null|\WP_Error Forty four digits, null when the Correios do not have it, error when they could not be asked.
+	 */
+	private function outboundDceKey( $outbound ) {
+		$key = $this->dceAccessKey( $outbound );
+
+		if ( null !== $key ) {
+			return $key;
+		}
+
+		$response = $this->correiosService->get_prepost( $outbound->object_code, $outbound );
+
+		if ( is_wp_error( $response ) ) {
+			$data = $response->get_error_data();
+
+			if ( is_array( $data ) && isset( $data['status'] ) && 404 === (int) $data['status'] ) {
+				return null;
+			}
+
+			Log::notice( 'Não foi possível consultar a DC-e da ida nos Correios.', [
+				'prepost_id' => (int) $outbound->id,
+				'message' => $response->get_error_message(),
+			] );
+
+			return new \WP_Error( 'outbound_dce_unavailable', 'Não foi possível consultar a DC-e da ida nos Correios. Tente novamente em instantes.', [ 'status' => 503 ] );
+		}
+
+		$key = isset( $response['itens'][0]['chaveNFe'] ) ? $response['itens'][0]['chaveNFe'] : null;
+
+		return AccessKey::isDce( $key ) ? AccessKey::normalize( $key ) : null;
+	}
+
+	/**
+	 * Document of an NF-e or a DC-e, with the number read from the key when missing.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $invoice_key    Access key of the document, digits only.
+	 * @param string $invoice_number Number of the document, empty when unknown.
+	 * @param string $source         Where the document was found.
+	 *
+	 * @return array{emiteDCe: string, invoice_number: string, invoice_key: string, source: string}
+	 */
+	private function invoiceDocument( $invoice_key, $invoice_number, $source ) {
+		return [
+			'invoice_number' => '' !== $invoice_number ? $invoice_number : (string) AccessKey::number( $invoice_key ),
+			'invoice_key' => $invoice_key,
+			'emiteDCe' => 'N',
+			'source' => $source,
+		];
+	}
+
+	/**
+	 * Keep only what the Correios can take from a filtered document.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param mixed $filtered Document returned by the filter.
+	 * @param array $document Document decided before the filter.
+	 *
+	 * @return array{emiteDCe: string, invoice_number?: string, invoice_key?: string, source: string}
+	 */
+	private function sanitizeReverseDocument( $filtered, $document ) {
+		if ( ! is_array( $filtered ) ) {
+			return $document;
+		}
+
+		$sanitized = [
+			'emiteDCe' => isset( $filtered['emiteDCe'] ) && 'S' === $filtered['emiteDCe'] ? 'S' : 'N',
+			'source' => isset( $filtered['source'] ) ? sanitize_key( $filtered['source'] ) : $document['source'],
+		];
+
+		$key = isset( $filtered['invoice_key'] ) ? AccessKey::normalize( $filtered['invoice_key'] ) : null;
+
+		if ( null !== $key && ( AccessKey::isInvoice( $key ) || AccessKey::isDce( $key ) ) ) {
+			$number = isset( $filtered['invoice_number'] ) ? Sanitizer::numeric_text( $filtered['invoice_number'] ) : '';
+
+			return array_merge( $sanitized, $this->invoiceDocument( $key, $number, $sanitized['source'] ), [ 'emiteDCe' => $sanitized['emiteDCe'] ] );
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Whether an NF-e was issued by the store a return goes to.
+	 *
+	 * The root of the CNPJ is compared, so an invoice of another branch of the
+	 * same company still goes back.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $invoice_key    Access key of the NF-e.
+	 * @param string $store_document CPF or CNPJ of the store, digits only.
+	 *
+	 * @return bool
+	 */
+	private function isIssuedBy( $invoice_key, $store_document ) {
+		$issuer = AccessKey::issuerDocument( $invoice_key );
+		$store_document = Sanitizer::numeric_text( $store_document );
+
+		if ( null === $issuer || '' === $store_document ) {
+			return false;
+		}
+
+		if ( 14 === strlen( $store_document ) ) {
+			return substr( $issuer, 0, 8 ) === substr( $store_document, 0, 8 );
+		}
+
+		return str_pad( $store_document, 14, '0', STR_PAD_LEFT ) === $issuer;
+	}
+
+	/**
+	 * Get the prepost a shipment of the order went out with.
+	 *
+	 * The newest prepost of the shipping line being returned, or else the
+	 * newest one made for the whole order; any newest one when the whole
+	 * order is returned. Only the preposts of the same vendor count, and
+	 * neither returns nor preposts that were cancelled, expired or reversed.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \WC_Order $order            Order being returned.
+	 * @param int       $shipping_item_id Shipping line being returned, zero for the whole order.
+	 * @param int       $vendor_id        Marketplace vendor of the shipment, zero for the store.
+	 *
+	 * @return PrepostModel|null
+	 */
+	private function outboundPrepost( $order, $shipping_item_id, $vendor_id ) {
+		$reverse_ids = array_map( 'intval', array_column( $this->getReversePreposts( $order ), 'id' ) );
+		$whole_order = null;
+
+		foreach ( PrepostModel::where( 'order_id', $order->get_id() )->orderBy( 'id', 'desc' )->get() as $prepost ) {
+			if (
+				(int) $prepost->vendor_id !== (int) $vendor_id
+				|| ! empty( $prepost->cancelled_at )
+				|| in_array( (int) $prepost->status, [ PrepostStatusCode::EXPRIRADO, PrepostStatusCode::CANCELADO, PrepostStatusCode::ESTORNADO ], true )
+				|| in_array( (int) $prepost->id, $reverse_ids, true )
+				|| $this->isReversePrepost( $order, $prepost )
+			) {
+				continue;
+			}
+
+			$line = (int) $prepost->shipping_item_id;
+
+			if ( 0 === $shipping_item_id || $line === $shipping_item_id ) {
+				return $prepost;
+			}
+
+			if ( 0 === $line && null === $whole_order ) {
+				$whole_order = $prepost;
+			}
+		}
+
+		return $whole_order;
+	}
+
+	/**
+	 * Whether the Correios refused the fiscal document of a reverse prepost.
+	 *
+	 * Only a refusal of the request itself counts, never a failure to reach
+	 * the Correios, after which the prepost may have been created anyway.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \WP_Error $error    Error of the reverse prepost.
+	 * @param array     $document Fiscal document it was sent with.
+	 *
+	 * @return bool
+	 */
+	private function isRefusedFiscalDocument( $error, $document ) {
+		if ( 'http_error' !== $error->get_error_code() || ! in_array( $document['source'], [ 'outbound_invoice', 'outbound_dce', 'order_invoice' ], true ) ) {
+			return false;
+		}
+
+		$data = $error->get_error_data();
+		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
+
+		return in_array( $status, [ 400, 422 ], true );
+	}
+
+	/**
+	 * Create the reverse prepost again without the document of the shipment.
+	 *
+	 * A return was always accepted without a document, so a store does not
+	 * lose it when the Correios refuse the NF-e or the DC-e of the shipment.
+	 * With no document in the request they may issue a DC-e of their own, and
+	 * the order tells the store both things.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \WC_Order $order    Order being returned.
+	 * @param Prepost   $prepost  Reverse prepost refused.
+	 * @param array     $document Fiscal document it was sent with.
+	 * @param \WP_Error $refusal  Error of the Correios.
+	 *
+	 * @return PrepostModel|\WP_Error
+	 */
+	private function retryReverseWithDeclaration( $order, $prepost, $document, $refusal ) {
+		Log::notice( 'Os Correios recusaram o documento fiscal da pré-postagem reversa; nova tentativa sem o documento.', [
+			'order_id' => $order->get_id(),
+			'source' => $document['source'],
+			'message' => $refusal->get_error_message(),
+		] );
+
+		$prepost->setInvoiceKey( '' );
+		$prepost->setInvoiceNumber( '' );
+		$prepost->setEmitDce( 'N' );
+
+		$created = $this->processPrespost( $prepost );
+
+		if ( ! is_wp_error( $created ) ) {
+			$order->add_order_note( sprintf(
+				/* translators: 1: object code of the return, 2: fiscal document, 3: message of the Correios */
+				__( 'Correios Automático - A pré-postagem reversa %1$s saiu sem %2$s da ida, porque os Correios recusaram o documento: %3$s. Sem documento na solicitação, os Correios podem emitir uma DC-e para ela.', 'infixs-correios-automatico' ),
+				$created->object_code,
+				'outbound_dce' === $document['source'] ? __( 'a DC-e', 'infixs-correios-automatico' ) : __( 'a NF-e', 'infixs-correios-automatico' ),
+				$refusal->get_error_message()
+			) );
+		}
+
+		return $created;
 	}
 
 	/**
@@ -1535,9 +1945,34 @@ class PrepostService {
 
 
 	/**
+	 * Posting deadline of a new prepost, as the table stores it.
+	 *
+	 * The Correios answer a reverse prepost with nanoseconds, which PHP before
+	 * 8.1 refuses. The prepost already exists at the Correios by then, so the
+	 * fractions are left out, and a deadline that still cannot be read does not
+	 * cost the prepost.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string $deadline Deadline sent by the Correios.
+	 *
+	 * @return string|null Null when it cannot be read.
+	 */
+	private function postingDeadline( $deadline ) {
+		try {
+			return ( new \DateTime( substr( (string) $deadline, 0, 19 ) ) )->format( 'Y-m-d H:i:s' );
+		} catch ( \Exception $e ) {
+			Log::notice( 'Prazo de postagem ilegível na resposta dos Correios.', [ 'deadline' => $deadline ] );
+
+			return null;
+		}
+	}
+
+	/**
 	 * Process prepost.
 	 * 
 	 * @since 1.0.0
+	 * @since 1.14.0 Records the contract the prepost was created with, in `contract_source`.
 	 * 
 	 * @param \Infixs\CorreiosAutomatico\Services\Correios\Includes\Prepost $prepost
 	 * 
@@ -1549,7 +1984,7 @@ class PrepostService {
 		if ( is_wp_error( $response ) )
 			return $response;
 
-		$prazoPostagem = ( new \DateTime( $response['prazoPostagem'] ) )->format( 'Y-m-d H:i:s' );
+		$prazoPostagem = $this->postingDeadline( isset( $response['prazoPostagem'] ) ? $response['prazoPostagem'] : '' );
 
 		$data = [
 			'external_id' => $response['id'],
@@ -1574,6 +2009,16 @@ class PrepostService {
 			'created_at' => current_time( 'mysql' ),
 			'dce' => isset( $response['emiteDCe'] ) && $response['emiteDCe'] === 'S' ? 1 : 0,
 		];
+
+		if ( ContractMode::PREPAID === ContractMode::sourceOf( $response ) ) {
+			if ( $this->ensureContractSourceColumn() ) {
+				$data['contract_source'] = ContractMode::PREPAID;
+			} else {
+				Log::alert( 'A pré-postagem do Contrato pré-pago foi criada, mas a tabela não tem a coluna da origem do contrato.', [
+					'object_code' => $response['codigoObjeto'],
+				] );
+			}
+		}
 
 		$created_prepost = $this->prepostRepository->create( $data );
 
@@ -1657,6 +2102,8 @@ class PrepostService {
 			"status_code" => (int) $prepost->status,
 			"payment_type" => PaymentTypeCode::getDescription( $prepost->payment_type ),
 			"dce" => (bool) $prepost->dce || null !== $this->dceAccessKey( $prepost ),
+			"cancel_reason" => $prepost->cancel_reason ? (string) $prepost->cancel_reason : null,
+			"dce_icms_blocked" => DceRejection::isIcmsTaxpayer( $prepost->cancel_reason ),
 		];
 	}
 
@@ -1907,6 +2354,12 @@ class PrepostService {
 			$update_data['invoice_key'] = $prepost_data['chaveNFe'];
 		}
 
+		$cancel_reason = isset( $prepost_data['motivoCancelamento'] ) ? trim( (string) $prepost_data['motivoCancelamento'] ) : '';
+
+		if ( '' !== $cancel_reason && $this->ensureCancelReasonColumn() ) {
+			$update_data['cancel_reason'] = mb_substr( $cancel_reason, 0, 500 );
+		}
+
 		// Update the prepost
 		$updated = $this->prepostRepository->update( $prepost_id, $update_data );
 
@@ -1918,12 +2371,52 @@ class PrepostService {
 		// Refresh the prepost data
 		$updated_prepost = $this->prepostRepository->findById( $prepost_id );
 
+		if ( '' !== $cancel_reason && PrepostStatusCode::CANCELADO !== (int) $prepost->status && PrepostStatusCode::CANCELADO === $status ) {
+			$this->noteCancelReason( $prepost, $cancel_reason );
+		}
+
 		Log::debug( 'Pré-postagem sincronizada com sucesso.', [
 			'prepost_id' => $prepost_id,
 			'object_code' => $prepost->object_code,
 		] );
 
 		return $updated_prepost;
+	}
+
+	/**
+	 * Tell on the order why the Correios cancelled a prepost, with their message.
+	 *
+	 * A refused DC-e comes back a few seconds after the prepost, already
+	 * cancelled, so the automatic prepost has no screen to show it. When the
+	 * SEFAZ refused it because the store pays ICMS, the note says what to ship
+	 * with instead.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param \Infixs\CorreiosAutomatico\Models\Prepost $prepost Prepost cancelled.
+	 * @param string                                    $reason  Message of the Correios.
+	 *
+	 * @return void
+	 */
+	private function noteCancelReason( $prepost, $reason ) {
+		$order = wc_get_order( $prepost->order_id );
+
+		if ( ! $order ) {
+			return;
+		}
+
+		$note = sprintf(
+			/* translators: 1: object code of the prepost, 2: message of the Correios */
+			__( 'Correios Automático - Os Correios cancelaram a pré-postagem %1$s: %2$s', 'infixs-correios-automatico' ),
+			$prepost->object_code,
+			$reason
+		);
+
+		if ( DceRejection::isIcmsTaxpayer( $reason ) ) {
+			$note .= ' ' . __( 'A loja é contribuinte de ICMS: desde 2 de novembro de 2026, a pré-postagem precisa sair com a NF-e. O SquidCore ERP emite a NF-e e já faz a pré-postagem com ela, automaticamente.', 'infixs-correios-automatico' );
+		}
+
+		$order->add_order_note( $note );
 	}
 
 	/**
@@ -2541,40 +3034,88 @@ class PrepostService {
 	 * @return bool True when the columns are in place.
 	 */
 	protected function ensureDceColumns() {
-		if ( get_transient( self::DCE_COLUMNS_TRANSIENT ) ) {
+		return $this->ensureColumns( [ 'dce_access_key', 'dce_issued_at', 'dce_checked_at' ], self::DCE_COLUMNS_TRANSIENT, 'da DC-e' );
+	}
+
+	/**
+	 * Make sure the column of the reason a prepost was cancelled exists before it is written.
+	 *
+	 * Same reason as ensureDceColumns(): the migration only runs when the
+	 * version changes.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @return bool True when the column is in place.
+	 */
+	protected function ensureCancelReasonColumn() {
+		return $this->ensureColumns( [ 'cancel_reason' ], self::CANCEL_REASON_COLUMN_TRANSIENT, 'do motivo do cancelamento' );
+	}
+
+	/**
+	 * Make sure the column of the contract of a prepost exists before a prepaid prepost is written.
+	 *
+	 * Same reason as ensureDceColumns(): the migration only runs when the
+	 * version changes.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @return bool True when the column is in place.
+	 */
+	protected function ensureContractSourceColumn() {
+		return $this->ensureColumns( [ 'contract_source' ], self::CONTRACT_SOURCE_COLUMN_TRANSIENT, 'da origem do contrato' );
+	}
+
+	/**
+	 * Make sure columns of the prepost table exist, running the migration when they do not.
+	 *
+	 * The check sits behind a transient so `SHOW COLUMNS` is not paid on every request.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param string[] $columns   Columns.
+	 * @param string   $transient Transient that records they exist.
+	 * @param string   $label     What the columns are, for the log.
+	 *
+	 * @return bool True when the columns are in place.
+	 */
+	private function ensureColumns( array $columns, $transient, $label ) {
+		if ( get_transient( $transient ) ) {
 			return true;
 		}
 
-		if ( ! $this->dceColumnsExist() ) {
+		if ( ! $this->columnsExist( $columns ) ) {
 			Migration::run();
 
-			if ( ! $this->dceColumnsExist() ) {
-				Log::notice( 'As colunas da DC-e não existem na tabela de pré-postagens.' );
+			if ( ! $this->columnsExist( $columns ) ) {
+				Log::notice( "As colunas {$label} não existem na tabela de pré-postagens." );
 
 				return false;
 			}
 
-			Log::info( 'Colunas da DC-e criadas na tabela de pré-postagens.' );
+			Log::info( "Colunas {$label} criadas na tabela de pré-postagens." );
 		}
 
-		set_transient( self::DCE_COLUMNS_TRANSIENT, 1, DAY_IN_SECONDS );
+		set_transient( $transient, 1, DAY_IN_SECONDS );
 
 		return true;
 	}
 
 	/**
-	 * Whether the prepost table already has the DC-e columns.
+	 * Whether the prepost table already has the columns.
 	 *
 	 * @since 1.11.0
+	 * @since 1.14.0 Takes the columns to look for.
+	 *
+	 * @param string[] $columns Columns.
 	 *
 	 * @return bool
 	 */
-	private function dceColumnsExist() {
+	private function columnsExist( array $columns ) {
 		global $wpdb;
 
 		$table = $wpdb->prefix . 'infixs_correios_automatico_preposts';
 
-		foreach ( [ 'dce_access_key', 'dce_issued_at', 'dce_checked_at' ] as $column ) {
+		foreach ( $columns as $column ) {
 			if ( ! $wpdb->get_var( $wpdb->prepare( "SHOW COLUMNS FROM `{$table}` LIKE %s", $column ) ) ) {
 				return false;
 			}

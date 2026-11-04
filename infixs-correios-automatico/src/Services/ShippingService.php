@@ -6,6 +6,9 @@ use Infixs\CorreiosAutomatico\Container;
 use Infixs\CorreiosAutomatico\Core\Shipping\CorreiosShippingMethod;
 use Infixs\CorreiosAutomatico\Core\Support\Config;
 use Infixs\CorreiosAutomatico\Models\WoocommerceShippingZoneMethod;
+use Infixs\CorreiosAutomatico\Prepaid\ContractMode;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidApi;
+use Infixs\CorreiosAutomatico\Prepaid\PrepaidConnection;
 use Infixs\CorreiosAutomatico\Repositories\ConfigRepository;
 use Infixs\CorreiosAutomatico\Services\Correios\CorreiosService;
 use Infixs\CorreiosAutomatico\Services\Correios\Enums\APIServiceCode;
@@ -42,16 +45,40 @@ class ShippingService {
 	protected $configRepository;
 
 	/**
+	 * Which contract the store posts with.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @var ContractMode
+	 */
+	protected $contractMode;
+
+	/**
+	 * Connection to the Infixs Ship, whose token prices the quotes of the Contrato pré-pago.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @var PrepaidConnection
+	 */
+	protected $prepaidConnection;
+
+	/**
 	 * Constructor
 	 * 
-	 * @param CorreiosService $correiosService
-	 * @param InfixsApi $infixsApi
-	 * 
+	 * @since 1.14.0 Takes the contract mode and the connection to the Infixs Ship.
+	 *
+	 * @param CorreiosService   $correiosService
+	 * @param InfixsApi         $infixsApi
+	 * @param ConfigRepository  $configRepository
+	 * @param ContractMode      $contractMode      Which contract the store posts with.
+	 * @param PrepaidConnection $prepaidConnection Connection to the Infixs Ship.
 	 */
-	public function __construct( CorreiosService $correiosService, InfixsApi $infixsApi, ConfigRepository $configRepository ) {
+	public function __construct( CorreiosService $correiosService, InfixsApi $infixsApi, ConfigRepository $configRepository, ContractMode $contractMode, PrepaidConnection $prepaidConnection ) {
 		$this->correiosService = $correiosService;
 		$this->infixsApi = $infixsApi;
 		$this->configRepository = $configRepository;
+		$this->contractMode = $contractMode;
+		$this->prepaidConnection = $prepaidConnection;
 	}
 
 	/**
@@ -903,7 +930,7 @@ class ShippingService {
 				],
 			];
 
-			$response = $this->infixsApi->calculateShipping( $request );
+			$response = $this->calculateInfixsShipping( $request );
 
 			if ( ! is_wp_error( $response ) && isset( $response["shipping_cost"] ) ) {
 				Log::debug( "Shipping cost api infixs response", $response );
@@ -923,5 +950,56 @@ class ShippingService {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Quote through the API of the Infixs.
+	 *
+	 * On the Contrato pré-pago with an account connected, the token of the
+	 * connection goes along and the API answers the price of the contract of
+	 * the Infixs with the margin of the account. A token the API refuses marks
+	 * the connection to be made again. An account the Infixs blocked keeps the
+	 * connection as it is, so the next label tells the store the account is
+	 * blocked instead of asking to connect again. Either way the quote is asked
+	 * once more without the token, so the checkout keeps showing the freight.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param array $request Quote.
+	 *
+	 * @return array|\WP_Error
+	 */
+	protected function calculateInfixsShipping( $request ) {
+		$token = $this->contractMode->prepaidConnected() ? $this->prepaidConnection->token() : '';
+
+		if ( '' === $token ) {
+			return $this->infixsApi->calculateShipping( $request );
+		}
+
+		$response = $this->infixsApi->calculateShipping( $request, $token );
+
+		if ( ! is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		$data = $response->get_error_data();
+		$status = is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 0;
+		$code = is_array( $data ) && isset( $data['error_code'] ) ? (string) $data['error_code'] : '';
+
+		if ( PrepaidApi::isAccountBlocked( $status, $code ) ) {
+			Log::notice( 'Infixs Ship: a conta está bloqueada; a cotação segue sem a conexão.', [ 'status' => $status, 'error' => $code ] );
+
+			return $this->infixsApi->calculateShipping( $request );
+		}
+
+		if ( ! PrepaidApi::isInvalidToken( $status, $code ) ) {
+			return $response;
+		}
+
+		Log::notice( 'Infixs Ship: a cotação recusou a conexão da loja; a conexão precisa ser refeita.', [ 'status' => $status, 'error' => $code ] );
+
+		$this->prepaidConnection->markReconnect();
+
+		return $this->infixsApi->calculateShipping( $request );
 	}
 }

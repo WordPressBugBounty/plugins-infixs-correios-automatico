@@ -47,6 +47,7 @@ class Core {
 		new Front();
 
 		$this->load_marketplace();
+		$this->load_prepaid();
 		$this->load_modules();
 
 		do_action( 'infixs_correios_automatico_plugin_loaded' );
@@ -73,6 +74,22 @@ class Core {
 		new VendorLabelSender();
 		new VendorObjectApi();
 		new VendorTrackingService();
+	}
+
+	/**
+	 * Wire the Contrato pré-pago.
+	 *
+	 * Registered while the plugin is being included, like the marketplace
+	 * layer, and after it: the choice of the client runs after the one of the
+	 * vendor, and leaves a vendor contract alone.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @return void
+	 */
+	public function load_prepaid() {
+		Container::prepaidClientResolver()->register();
+		Container::prepaidChargeNote()->register();
 	}
 
 	public function load_modules() {
@@ -163,5 +180,28 @@ class Core {
 		if ( version_compare( $version, '1.5.9', '<' ) ) {
 			Install::create_tracking_page();
 		}
+
+		if ( version_compare( $version, '1.14.0', '<' ) ) {
+			$this->migrate_contract_mode();
+		}
+	}
+
+	/**
+	 * Give the stores that predate the Contrato pré-pago the mode they were already on.
+	 *
+	 * A store with its own contract on stays on the Contrato Próprio; one
+	 * without a contract goes to the Contrato pré-pago, which works as before
+	 * until an Infixs Ship account is connected. A mode already chosen is kept.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @return void
+	 */
+	public function migrate_contract_mode() {
+		if ( null !== Config::get( 'auth.mode' ) ) {
+			return;
+		}
+
+		Config::update( 'auth.mode', Container::contractMode()->mode() );
 	}
 }

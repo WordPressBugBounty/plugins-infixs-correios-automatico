@@ -48,14 +48,18 @@ class SettingsSenderController {
 		}
 
 		$data = $validator->all();
+		$document = Sanitizer::numeric_text( $data['document'] );
+		$person_type = $this->personType( $data, $document );
 
 		$updated_settings = [
 			'name' => sanitize_text_field( $data['name'] ),
-			'legal_name' => sanitize_text_field( $data['legal_name'] ),
+			// A person has no legal name to print.
+			'legal_name' => 'person' === $person_type || ! isset( $data['legal_name'] ) ? '' : sanitize_text_field( $data['legal_name'] ),
 			'email' => sanitize_text_field( $data['email'] ),
 			'phone' => Sanitizer::numeric_text( $data['phone'] ),
 			'celphone' => Sanitizer::numeric_text( $data['celphone'] ),
-			'document' => Sanitizer::numeric_text( $data['document'] ),
+			'document' => $document,
+			'person_type' => $person_type,
 			'address_postalcode' => Sanitizer::numeric_text( $data['address_postalcode'] ),
 			'address_street' => sanitize_text_field( $data['address_street'] ),
 			'address_complement' => sanitize_text_field( $data['address_complement'] ),
@@ -77,6 +81,24 @@ class SettingsSenderController {
 			'sender' => $response_data,
 		];
 		return rest_ensure_response( $response );
+	}
+
+	/**
+	 * Person type to store: the one chosen, or the one the document tells.
+	 *
+	 * @since 1.14.0
+	 *
+	 * @param array  $data     Request data.
+	 * @param string $document Document, digits only.
+	 *
+	 * @return string `company` or `person`.
+	 */
+	private function personType( $data, $document ) {
+		if ( isset( $data['person_type'] ) && in_array( $data['person_type'], [ 'company', 'person' ], true ) ) {
+			return $data['person_type'];
+		}
+
+		return 11 === strlen( $document ) ? 'person' : 'company';
 	}
 
 	public function retrieve() {
