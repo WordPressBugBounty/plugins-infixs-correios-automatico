@@ -20,6 +20,7 @@ use Infixs\CorreiosAutomatico\Repositories\InvoiceUnitRepository;
 use Infixs\CorreiosAutomatico\Repositories\UnitRepository;
 use Infixs\CorreiosAutomatico\Services\InfixsApi;
 use Infixs\CorreiosAutomatico\Services\OrderDanfeResolver;
+use Infixs\CorreiosAutomatico\Services\OrderInvoiceIssuer;
 use Infixs\CorreiosAutomatico\Services\OrderInvoiceResolver;
 use Infixs\CorreiosAutomatico\Services\OrderInvoiceStatus;
 use Infixs\CorreiosAutomatico\Services\OrderService;
@@ -116,6 +117,7 @@ class Container {
 		$this->container['orderInvoiceResolver'] = fn() => new OrderInvoiceResolver();
 		$this->container['orderDanfeResolver'] = fn( $c ) => new OrderDanfeResolver( $c['orderInvoiceResolver'] );
 		$this->container['orderInvoiceStatus'] = fn() => new OrderInvoiceStatus();
+		$this->container['orderInvoiceIssuer'] = fn( $c ) => new OrderInvoiceIssuer( $c['orderInvoiceResolver'] );
 		$this->container['shippingService'] = fn( $c ) => new ShippingService( $c['correiosService'], $c['infixsApi'], $c['configRepository'], $c['contractMode'], $c['prepaidConnection'] );
 		$this->container['emailService'] = fn() => new EmailService();
 		$this->container['shipmentContextResolver'] = fn() => new ShipmentContextResolver();
@@ -344,6 +346,16 @@ class Container {
 	 */
 	public static function orderInvoiceStatus() {
 		return self::getInstance()->container['orderInvoiceStatus'];
+	}
+
+	/**
+	 * Order Invoice Issuer
+	 *
+	 * @since 1.15.0
+	 * @return OrderInvoiceIssuer
+	 */
+	public static function orderInvoiceIssuer() {
+		return self::getInstance()->container['orderInvoiceIssuer'];
 	}
 
 	/**

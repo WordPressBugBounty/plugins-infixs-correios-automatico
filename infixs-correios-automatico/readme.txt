@@ -4,7 +4,7 @@ Tags: correios, declaração, rastreio, etiqueta, frete
 Requires at least: 6.0
 Requires PHP: 7.4
 Tested up to: 7.1
-Stable tag: 1.14.0
+Stable tag: 1.15.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 Integração com correios automatizada (Tudo em um), com ou sem contrato, código de rastreio automático, geração de etiquetas, devolução e muito mais.
@@ -163,6 +163,12 @@ Sim, você consegue integrar os correios automático com o Bling para que apare�
 **WC_INFIXS-CORREIOS-AUTOMATICO_SEDEX**
 
 == Changelog ==
+
+= 1.15.0 2026-11-04 =
+* Pré-postagem: emissão da NF-e pelo SquidCore ERP na própria janela, com número e chave preenchidos sozinhos
+* Pré-postagem: emissão automática agendada no SquidCore ERP pode ser antecipada com "Emitir agora"
+* Pedidos: "Emitir NF-e" no menu do pedido ainda sem nota, com o SquidCore ERP, e "Tentar emitir de novo" após uma recusa
+* Painel: as dicas dos ícones abrem com um toque no celular
 
 = 1.14.0 2026-11-03 =
 * Contrato: Contrato pré-pago, com o envio pago antes pelo saldo da conta Infixs Ship e postagem em qualquer agência

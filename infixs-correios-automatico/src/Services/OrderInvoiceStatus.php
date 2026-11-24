@@ -2,6 +2,9 @@
 
 namespace Infixs\CorreiosAutomatico\Services;
 
+use Infixs\CorreiosAutomatico\Utils\Sanitizer;
+use Infixs\CorreiosAutomatico\Utils\SiteUrl;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -247,9 +250,9 @@ class OrderInvoiceStatus {
 
 			$id = sanitize_key( $this->text( $action, 'id' ) );
 			$label = $this->text( $action, 'label' );
-			$url = isset( $action['url'] ) && is_string( $action['url'] ) ? esc_url_raw( $action['url'], [ 'http', 'https' ] ) : '';
+			$url = SiteUrl::own( isset( $action['url'] ) ? $action['url'] : '' );
 
-			if ( '' === $id || '' === $label || ! $this->isOwnUrl( $url ) ) {
+			if ( '' === $id || '' === $label || '' === $url ) {
 				continue;
 			}
 
@@ -265,30 +268,6 @@ class OrderInvoiceStatus {
 	}
 
 	/**
-	 * Whether an address points to this site, on the host of the store or of its admin.
-	 *
-	 * @since 1.12.0
-	 *
-	 * @param string $url Address, already escaped.
-	 *
-	 * @return bool
-	 */
-	private function isOwnUrl( $url ) {
-		$host = '' !== $url ? wp_parse_url( $url, PHP_URL_HOST ) : null;
-
-		if ( ! is_string( $host ) || '' === $host ) {
-			return false;
-		}
-
-		$own = array_filter( [
-			wp_parse_url( home_url(), PHP_URL_HOST ),
-			wp_parse_url( admin_url(), PHP_URL_HOST ),
-		] );
-
-		return in_array( strtolower( $host ), array_map( 'strtolower', $own ), true );
-	}
-
-	/**
 	 * Sanitized text of a scalar field, empty when it is missing.
 	 *
 	 * @since 1.12.0
@@ -299,8 +278,6 @@ class OrderInvoiceStatus {
 	 * @return string
 	 */
 	private function text( array $values, $field ) {
-		return isset( $values[ $field ] ) && is_scalar( $values[ $field ] ) && ! is_bool( $values[ $field ] )
-			? sanitize_text_field( (string) $values[ $field ] )
-			: '';
+		return Sanitizer::scalar_text( isset( $values[ $field ] ) ? $values[ $field ] : null );
 	}
 }

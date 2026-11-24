@@ -1238,6 +1238,11 @@ class Order {
 				'waiting' => $waiting_invoice,
 				'danfe' => $nfe['status'],
 			] ), //@since 1.12.0
+			'invoice_issuer' => Container::orderInvoiceIssuer()->describe( $this->order, [
+				'vendor_id' => $this->getScopedVendorId(),
+				'invoice' => $invoice,
+				'shipping_items' => $this->getShippingItemsData(),
+			] ), //@since 1.15.0
 			'shipping_items' => $this->getShippingItemsPayload(),
 			'prepost_errors' => $prepost_errors,
 			'preposts' => []

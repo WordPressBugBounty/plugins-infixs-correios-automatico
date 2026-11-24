@@ -17,6 +17,22 @@ class Sanitizer {
 		return preg_replace( '/\D/', '', (string) $value );
 	}
 
+	/**
+	 * Sanitized text of a value another plugin answered, empty when it is not a text.
+	 *
+	 * A list, an object, null or a boolean becomes empty instead of a
+	 * stringified "Array" or "1".
+	 *
+	 * @since 1.15.0
+	 *
+	 * @param mixed $value Value as it came.
+	 *
+	 * @return string
+	 */
+	public static function scalar_text( $value ) {
+		return is_scalar( $value ) && ! is_bool( $value ) ? sanitize_text_field( (string) $value ) : '';
+	}
+
 
 	/**
 	 * Sanitizer integer

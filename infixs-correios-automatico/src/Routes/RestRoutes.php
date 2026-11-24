@@ -8,6 +8,7 @@ use Infixs\CorreiosAutomatico\Controllers\Rest\LabelController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\CustomerReturnController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\NotificationController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\OrderController;
+use Infixs\CorreiosAutomatico\Controllers\Rest\OrderInvoiceIssueController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\PrepostController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\PrintController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\SettingsAuthController;
@@ -20,6 +21,7 @@ use Infixs\CorreiosAutomatico\Controllers\Rest\TrackingController;
 use Infixs\CorreiosAutomatico\Controllers\Rest\UnitController;
 use Infixs\CorreiosAutomatico\Prepaid\Rest\PrepaidCallbackPage;
 use Infixs\CorreiosAutomatico\Prepaid\Rest\PrepaidController;
+use Infixs\CorreiosAutomatico\Services\OrderInvoiceIssuer;
 use Infixs\CorreiosAutomatico\Services\PrepostService;
 use Infixs\CorreiosAutomatico\Utils\OrderFilterSanitizer;
 
@@ -636,6 +638,34 @@ class RestRoutes {
 			'permission_callback' => function () {
 				return current_user_can( 'manage_woocommerce' );
 			}
+		] );
+
+		$invoice_issue_controller = new OrderInvoiceIssueController( Container::orderInvoiceIssuer() );
+
+		$can_issue_invoice = function () {
+			return current_user_can( OrderInvoiceIssuer::CAPABILITY );
+		};
+
+		/**
+		 * Issue the NF-e of an order through the invoice issuer.
+		 *
+		 * @since 1.15.0
+		 */
+		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/invoice/issue', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $invoice_issue_controller, 'issue' ],
+			'permission_callback' => $can_issue_invoice,
+		] );
+
+		/**
+		 * Read how the issue of the NF-e of an order is going.
+		 *
+		 * @since 1.15.0
+		 */
+		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/invoice/issue/refresh', [
+			'methods' => \WP_REST_Server::CREATABLE,
+			'callback' => [ $invoice_issue_controller, 'refresh' ],
+			'permission_callback' => $can_issue_invoice,
 		] );
 
 		register_rest_route( $this->namespace, '/orders/(?P<id>\d+)/send-tracking-whatsapp', [

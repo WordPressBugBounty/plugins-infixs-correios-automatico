@@ -186,12 +186,14 @@ class OrderInvoiceResolver {
 	 * Check an invoice and fill what can be read from its key.
 	 *
 	 * @since 1.11.0
+	 * @since 1.15.0 Public, so the NF-e an invoice issuer hands back is checked the same way.
 	 *
 	 * @param array $invoice Invoice as given by a provider or read from the metas.
 	 *
 	 * @return array{invoice_number: string, invoice_key: string, model: string, source: string, source_label: string}|null
+	 *         Null when the key is not of an NF-e.
 	 */
-	private function normalize( array $invoice ) {
+	public function normalize( array $invoice ) {
 		$key = AccessKey::normalize( isset( $invoice['invoice_key'] ) ? $invoice['invoice_key'] : null );
 
 		if ( null === $key || ! AccessKey::isInvoice( $key ) ) {
